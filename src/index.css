@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* F7 Manager Pro — dark theme by default */
+    --background: 212 52% 11%;          /* #0D1B2A */
+    --foreground: 216 20% 96%;          /* #F2F4F7 */
+
+    --card: 213 38% 17%;                /* #1A283A */
+    --card-foreground: 216 20% 96%;
+
+    --popover: 213 38% 17%;
+    --popover-foreground: 216 20% 96%;
+
+    --primary: 182 100% 39%;            /* #00C2C7 cyan */
+    --primary-foreground: 212 52% 11%;
+    --primary-glow: 182 100% 50%;
+
+    --secondary: 27 100% 50%;           /* #FF7400 orange */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 213 30% 22%;
+    --muted-foreground: 216 15% 70%;
+
+    --accent: 182 100% 39%;
+    --accent-foreground: 212 52% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 213 30% 25%;
+    --input: 213 30% 25%;
+    --ring: 182 100% 39%;
+
+    --radius: 0.65rem;
+
+    /* Status semantic tokens */
+    --status-recibido: 215 16% 47%;
+    --status-recibido-bg: 210 40% 94%;
+    --status-diagnostico: 217 91% 60%;
+    --status-diagnostico-bg: 217 91% 95%;
+    --status-reparacion: 38 92% 50%;
+    --status-reparacion-bg: 48 96% 92%;
+    --status-listo: 142 71% 45%;
+    --status-listo-bg: 142 71% 92%;
+    --status-entregado: 262 83% 58%;
+    --status-entregado-bg: 262 83% 95%;
+    --status-garantia: 280 90% 75%;
+    --status-garantia-bg: 280 60% 22%;
+
+    /* Sidebar — dark navy with cyan active */
+    --sidebar-background: 212 52% 11%;          /* #0D1B2A */
+    --sidebar-foreground: 216 20% 96%;          /* #F2F4F7 */
+    --sidebar-primary: 182 100% 39%;            /* cyan */
+    --sidebar-primary-foreground: 212 52% 11%;
+    --sidebar-accent: 182 100% 39%;             /* cyan active bg */
+    --sidebar-accent-foreground: 212 52% 11%;
+    --sidebar-border: 213 38% 20%;
+    --sidebar-ring: 182 100% 39%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --shadow-card: 0 1px 3px 0 hsl(212 52% 5% / 0.4), 0 1px 2px -1px hsl(212 52% 5% / 0.3);
+    --shadow-elevated: 0 10px 25px -10px hsl(182 100% 39% / 0.35);
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --primary-glow: 221 83% 53%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 217 91% 60%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased; }
+}
+
+/* ============ Print receipt (A4 split) ============ */
+.print-receipt { display: none; }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html, body, #root {
+    width: 210mm !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  /* Strip height from Tailwind wrappers so they don't push paper down */
+  [class*="min-h-screen"],
+  [class*="h-screen"],
+  [class*="h-full"] {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  body * { visibility: hidden !important; }
+  .print-receipt, .print-receipt * { visibility: visible !important; }
+
+  .print-receipt {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 210mm;
+    height: 297mm;
+    max-height: 297mm;
+    padding: 10mm;
+    margin: 0;
+    background: #fff;
+    color: #000;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 10px;
+    line-height: 1.25;
+    box-sizing: border-box;
+    overflow: hidden;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-inside: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .print-receipt * {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-half {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: calc((277mm - 6mm) / 2);
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 2mm 2mm;
+  }
+
+  .print-half > .mt-2 { margin-top: 2mm !important; }
+  .print-half .space-y-2 > * + * { margin-top: 1.5mm !important; }
+  .print-half .space-y-1 > * + * { margin-top: 0.8mm !important; }
+  .print-half .gap-x-3 { column-gap: 2mm !important; }
+  .print-half .gap-y-1 { row-gap: 0.8mm !important; }
+  .print-half .pt-1 { padding-top: 1mm !important; }
+  .print-half .pt-2 { padding-top: 1.5mm !important; }
+  .print-half .pb-2 { padding-bottom: 1.5mm !important; }
+  .print-half .mt-1 { margin-top: 1mm !important; }
+
+  .print-receipt .text-lg { font-size: 12px !important; }
+  .print-receipt .text-\[11px\] { font-size: 9.5px !important; }
+  .print-receipt .text-\[10px\] { font-size: 8.5px !important; }
+  .print-receipt .text-\[9px\] { font-size: 7.5px !important; }
+  .print-receipt .text-\[8px\] { font-size: 7px !important; }
+
+  .print-cut {
+    flex: 0 0 auto;
+    height: 6mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px dashed #000;
+    border-bottom: 1px dashed #000;
+    font-size: 8px;
+    color: #555;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .print-receipt img { max-width: 100%; }
+}
+

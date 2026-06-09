@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS notification_preferences jsonb NOT NULL DEFAULT '{"recibido": true, "en_diagnostico": false, "en_reparacion": false, "listo": true, "entregado": false}'::jsonb;

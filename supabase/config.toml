@@ -1,0 +1,19 @@
+project_id = "xmvnxjtudkvjzbnjnlxd"
+
+[functions.connect-whatsapp-evolution]
+verify_jwt = false
+
+[functions.check-whatsapp-status]
+verify_jwt = false
+
+[functions.disconnect-whatsapp]
+verify_jwt = false
+
+[functions.send-order-notification]
+verify_jwt = false
+
+[functions.send-status-notification]
+verify_jwt = false
+
+[functions.admin-create-user]
+verify_jwt = true
