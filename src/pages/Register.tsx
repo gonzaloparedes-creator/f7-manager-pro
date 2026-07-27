@@ -23,21 +23,47 @@ export default function Register() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/login`,
-        data: { full_name: fullName, business_name: businessName, phone },
-      },
-    });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
+    try {
+      const redirectUrl = `${window.location.origin}/login`;
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: { full_name: fullName, business_name: businessName, phone },
+        },
+      });
+      setLoading(false);
+
+      if (error) {
+        let msg = error.message;
+        if (error.message.includes("weak")) {
+          msg = "La contraseña es muy débil. Debe incluir letras, números y símbolos.";
+        } else if (error.message.includes("already registered") || error.message.includes("already exists")) {
+          msg = "Este correo electrónico ya está registrado.";
+        }
+        toast({ title: "Error", description: msg, variant: "destructive" });
+        return;
+      }
+
+      if (data?.session) {
+        toast({ title: "¡Cuenta creada!", description: "Ingresando..." });
+        navigate("/dashboard", { replace: true });
+      } else {
+        toast({
+          title: "¡Cuenta creada!",
+          description: "Te enviamos un correo de verificación. Por favor, revisá tu casilla (y Spam) para confirmar tu cuenta.",
+        });
+        navigate("/login", { replace: true });
+      }
+    } catch (err: any) {
+      setLoading(false);
+      toast({
+        title: "Error",
+        description: err?.message || "Ocurrió un error inesperado al registrar.",
+        variant: "destructive",
+      });
     }
-    toast({ title: "¡Cuenta creada!", description: "Ya podés ingresar." });
-    navigate("/dashboard", { replace: true });
   };
 
   return (
