@@ -580,6 +580,24 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_send_log: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -596,6 +614,14 @@ export type Database = {
           status: string
         }[]
       }
+      get_technical_notes_by_tracking: {
+        Args: { _token: string }
+        Returns: {
+          created_at: string
+          id: string
+          note: string
+        }[]
+      }
       get_order_by_code: {
         Args: { _code: string }
         Returns: {
@@ -606,6 +632,9 @@ export type Database = {
           estimated_delivery_date: string
           id: string
           order_number: string
+          problem_description: string
+          problem_other: string
+          problems: string[]
           quote_amount: number
           status: string
           technician_notes: string
@@ -615,11 +644,17 @@ export type Database = {
       get_order_by_tracking: {
         Args: { _token: string }
         Returns: {
+          cargos_adicionales: Json
           created_at: string
+          deposit_amount: number
           device_type: string
           estimated_delivery_date: string
           id: string
           order_number: string
+          problem_description: string
+          problem_other: string
+          problems: string[]
+          quote_amount: number
           status: string
           technician_notes: string
           updated_at: string

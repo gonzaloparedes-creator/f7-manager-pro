@@ -5,6 +5,7 @@ import { DEFAULT_SERVICE_TERMS, formatPYG, STATUS_LABELS, type OrderStatus } fro
 
 interface PrintOrder {
   order_number: string;
+  tracking_token?: string | null;
   customer_name: string;
   customer_phone: string;
   device_type: string;
@@ -202,7 +203,7 @@ function InfoGrid({ order }: { order: PrintOrder }) {
 
 export function PrintReceipt({ order, businessName }: PrintReceiptProps) {
   const shopName = businessName?.trim() || "F7 Manager Pro";
-  const trackingUrl = `${window.location.origin}/tracking/${order.order_number}`;
+  const trackingUrl = `${window.location.origin}/tracking/${order.tracking_token || order.order_number}`;
 
   return (
     <div className="print-receipt">

@@ -127,6 +127,8 @@ export default function OrderPartsSection({
     }
     setAdding(item.id);
     try {
+      // El descuento de stock lo hace un trigger de base de datos (atómico,
+      // rechaza la inserción si no hay stock suficiente) — no se replica acá.
       const { error: insErr } = await (supabase as any).from("order_parts").insert({
         order_id: orderId,
         inventory_item_id: item.id,
@@ -136,11 +138,6 @@ export default function OrderPartsSection({
         created_by: user.id,
       });
       if (insErr) throw insErr;
-      const { error: updErr } = await (supabase as any)
-        .from("inventory_items")
-        .update({ stock: item.stock - 1 })
-        .eq("id", item.id);
-      if (updErr) throw updErr;
       toast({ title: "Repuesto agregado", description: `${item.name} (-1 stock)` });
       setQuery("");
       setOpen(false);
@@ -154,33 +151,18 @@ export default function OrderPartsSection({
 
   const removePart = async (part: OrderPart) => {
     try {
-      // External supplier parts have no inventory item; skip stock restitution
-      if (!part.inventory_item_id) {
-        const { error: delErr } = await (supabase as any)
-          .from("order_parts")
-          .delete()
-          .eq("id", part.id);
-        if (delErr) throw delErr;
-        toast({ title: "Repuesto removido" });
-        await loadParts();
-        return;
-      }
-      const { data: inv } = await (supabase as any)
-        .from("inventory_items")
-        .select("stock")
-        .eq("id", part.inventory_item_id)
-        .maybeSingle();
-      const currentStock = inv?.stock ?? 0;
+      // La restitución de stock (si corresponde) la hace un trigger de base
+      // de datos al borrarse la fila — cubre tanto este borrado explícito
+      // como el borrado en cascada cuando se elimina la orden completa.
       const { error: delErr } = await (supabase as any)
         .from("order_parts")
         .delete()
         .eq("id", part.id);
       if (delErr) throw delErr;
-      await (supabase as any)
-        .from("inventory_items")
-        .update({ stock: currentStock + part.quantity })
-        .eq("id", part.inventory_item_id);
-      toast({ title: "Repuesto removido", description: "Stock restituido." });
+      toast({
+        title: "Repuesto removido",
+        description: part.inventory_item_id ? "Stock restituido." : undefined,
+      });
       await Promise.all([loadItems(), loadParts()]);
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });

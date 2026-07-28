@@ -480,7 +480,7 @@ export default function OrderDetail() {
 
   const copyTracking = () => {
     if (!order) return;
-    const url = `${window.location.origin}/tracking/${order.order_number}`;
+    const url = `${window.location.origin}/tracking/${order.tracking_token || order.order_number}`;
     navigator.clipboard.writeText(url);
     toast({ title: "¡Copiado!", description: "Link de seguimiento copiado al portapapeles." });
   };
@@ -1149,7 +1149,7 @@ export default function OrderDetail() {
         <div className="space-y-6">
           <Card>
             <CardContent className="p-4">
-              <OrderQRCode orderCode={order.order_number} />
+              <OrderQRCode orderCode={order.order_number} trackingToken={order.tracking_token} />
             </CardContent>
           </Card>
 

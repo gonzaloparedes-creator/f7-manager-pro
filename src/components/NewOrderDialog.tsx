@@ -3,7 +3,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { usePlan } from "@/hooks/usePlan";
 import { supabase } from "@/integrations/supabase/client";
+import imageCompression from "browser-image-compression";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,8 +84,10 @@ export default function NewOrderDialog({
 }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const { limits, isStarter } = usePlan();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const DRAFT_KEY = "f7_order_draft";
   const loadDraft = (): { form: FormState; selectedClientId: string | null } | null => {
     try {
@@ -154,6 +158,23 @@ export default function NewOrderDialog({
   };
 
 
+  const addFiles = (incoming: File[]) => {
+    if (incoming.length === 0) return;
+    const remaining = limits.photos - files.length;
+    if (remaining <= 0) {
+      toast({
+        title: `Límite de ${limits.photos} fotos alcanzado${isStarter ? " (plan Starter)" : ""}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const accepted = incoming.slice(0, remaining);
+    if (incoming.length > remaining) {
+      toast({ title: `Solo se agregaron ${accepted.length} de ${incoming.length} fotos (máximo ${limits.photos}).` });
+    }
+    setFiles((prev) => [...prev, ...accepted]);
+  };
+
   const toggleProblem = (p: string) => {
     setForm((f) => ({
       ...f,
@@ -197,9 +218,33 @@ export default function NewOrderDialog({
     }
     setLoading(true);
     try {
-      // Upload photos
-      const photoUrls: string[] = [];
+      // Comprimir e subir fotos de recepción (mismo criterio que las fotos
+      // de evidencia en OrderDetail: son las primeras que ve el cliente y
+      // suelen subirse desde el mostrador con datos móviles).
+      setCompressing(true);
+      const compressOptions = {
+        maxSizeMB: 0.3,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+        initialQuality: 0.8,
+      };
+      const uploadFiles: File[] = [];
       for (const file of files) {
+        if (file.type.startsWith("image/")) {
+          try {
+            const compressed = await imageCompression(file, compressOptions);
+            uploadFiles.push(new File([compressed], file.name, { type: compressed.type || file.type }));
+          } catch {
+            uploadFiles.push(file);
+          }
+        } else {
+          uploadFiles.push(file);
+        }
+      }
+      setCompressing(false);
+
+      const photoUrls: string[] = [];
+      for (const file of uploadFiles) {
         const ext = file.name.split(".").pop() || "jpg";
         const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error: upErr } = await supabase.storage.from("order-photos").upload(path, file);
@@ -331,6 +376,7 @@ export default function NewOrderDialog({
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
+      setCompressing(false);
       setLoading(false);
     }
   };
@@ -615,7 +661,7 @@ export default function NewOrderDialog({
                     multiple
                     className="hidden"
                     onChange={(e) => {
-                      setFiles([...files, ...Array.from(e.target.files ?? [])]);
+                      addFiles(Array.from(e.target.files ?? []));
                       e.target.value = "";
                     }}
                   />
@@ -629,12 +675,15 @@ export default function NewOrderDialog({
                     capture="environment"
                     className="hidden"
                     onChange={(e) => {
-                      setFiles([...files, ...Array.from(e.target.files ?? [])]);
+                      addFiles(Array.from(e.target.files ?? []));
                       e.target.value = "";
                     }}
                   />
                 </label>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {files.length} / {limits.photos} fotos{isStarter ? " (plan Starter)" : ""}
+              </p>
               {files.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {files.map((f, i) => (
@@ -833,7 +882,9 @@ export default function NewOrderDialog({
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
-            <Button type="submit" disabled={loading}>{loading ? "Creando..." : "Crear orden"}</Button>
+            <Button type="submit" disabled={loading}>
+              {compressing ? "Optimizando fotos..." : loading ? "Creando..." : "Crear orden"}
+            </Button>
           </div>
         </form>
       </DialogContent>

@@ -6,13 +6,14 @@ import { useToast } from "@/hooks/use-toast";
 
 interface OrderQRCodeProps {
   orderCode: string;
+  trackingToken?: string | null;
 }
 
-export function OrderQRCode({ orderCode }: OrderQRCodeProps) {
+export function OrderQRCode({ orderCode, trackingToken }: OrderQRCodeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const trackingUrl = `${window.location.origin}/tracking/${orderCode}`;
+  const trackingUrl = `${window.location.origin}/tracking/${trackingToken || orderCode}`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(trackingUrl);

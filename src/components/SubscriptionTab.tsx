@@ -118,7 +118,7 @@ export default function SubscriptionTab() {
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-primary">$18</div>
+                <div className="text-3xl font-bold text-primary">$15</div>
                 <div className="text-xs text-muted-foreground">/mes</div>
               </div>
             </div>

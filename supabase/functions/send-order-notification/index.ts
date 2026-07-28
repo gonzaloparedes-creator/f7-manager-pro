@@ -15,6 +15,9 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return json({ error: "No autorizado" }, 401);
 
+    const rateLimited = await isRateLimited(supabase, user.id);
+    if (rateLimited) return json({ error: "Demasiadas notificaciones enviadas. Probá de nuevo en unos minutos." }, 429);
+
     const body = await req.json();
     const {
       customer_name,
@@ -30,6 +33,17 @@ Deno.serve(async (req) => {
     if (!customer_name || !customer_phone || !device_type || !order_number || !code) {
       return json({ error: "Campos requeridos faltantes" }, 400);
     }
+
+    // La orden tiene que existir y ser visible para este usuario bajo RLS
+    // (misma empresa, técnico asignado, admin, etc). Si no aparece, no se
+    // envía nada — evita usar esta función para spamear números arbitrarios
+    // sin una orden real detrás.
+    const { data: ownedOrder } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("order_number", order_number)
+      .maybeSingle();
+    if (!ownedOrder) return json({ error: "Orden no encontrada" }, 404);
 
     // Fetch evolution instance from profile
     const { data: profile } = await supabase
@@ -63,12 +77,26 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
+    await supabase.from("notification_send_log").insert({ user_id: user.id });
+
     return json({ success: res.ok, status: res.status });
   } catch (e) {
     console.error("send-order-notification error", e);
     return json({ error: (e as Error).message }, 500);
   }
 });
+
+const RATE_LIMIT_PER_HOUR = 40;
+
+async function isRateLimited(supabase: ReturnType<typeof createClient>, userId: string) {
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from("notification_send_log")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", since);
+  return (count ?? 0) >= RATE_LIMIT_PER_HOUR;
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

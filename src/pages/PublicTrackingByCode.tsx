@@ -37,6 +37,8 @@ const ICONS: Record<string, any> = {
   entregado: CheckCircle2,
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function PublicTrackingByCode() {
   const { orderCode } = useParams();
   const [order, setOrder] = useState<PublicOrder | null>(null);
@@ -54,11 +56,22 @@ export default function PublicTrackingByCode() {
         setLoading(false);
         return;
       }
-      const [{ data: o }, { data: h }, { data: tn }] = await Promise.all([
-        supabase.rpc("get_order_by_code", { _code: orderCode }),
-        supabase.rpc("get_history_by_code", { _code: orderCode }),
-        supabase.rpc("get_technical_notes_by_code", { _code: orderCode }),
-      ]);
+      // Los links nuevos (QR/recibos generados hoy en adelante) usan el
+      // tracking_token (uuid, no adivinable). Los links con el código
+      // correlativo ORD-XXXX (ya impresos/entregados antes de este cambio)
+      // se siguen resolviendo, pero sin exponer la bitácora técnica interna.
+      const isToken = UUID_RE.test(orderCode);
+      const [{ data: o }, { data: h }, { data: tn }] = isToken
+        ? await Promise.all([
+            supabase.rpc("get_order_by_tracking", { _token: orderCode }),
+            supabase.rpc("get_order_history_by_tracking", { _token: orderCode }),
+            supabase.rpc("get_technical_notes_by_tracking", { _token: orderCode }),
+          ])
+        : await Promise.all([
+            supabase.rpc("get_order_by_code", { _code: orderCode }),
+            supabase.rpc("get_history_by_code", { _code: orderCode }),
+            Promise.resolve({ data: [] as PublicTechNote[] }),
+          ]);
       const found: any = Array.isArray(o) ? o[0] : null;
       setOrder(found ? { ...found, cargos_adicionales: Array.isArray(found.cargos_adicionales) ? found.cargos_adicionales : [] } : null);
       setHistory((h ?? []) as PublicHistory[]);
