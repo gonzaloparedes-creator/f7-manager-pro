@@ -94,6 +94,7 @@ export default function OrderPartsSection({
       .from("inventory_items")
       .select("id,name,stock,selling_price,cost_price,category,branch_id")
       .eq("company_id", companyId)
+      .eq("is_for_repair", true)
       .order("name");
     if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
     const { data } = await q;

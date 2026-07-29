@@ -14,6 +14,7 @@ import Settings from "./pages/Settings.tsx";
 import Clients from "./pages/Clients.tsx";
 import Reports from "./pages/Reports.tsx";
 import Inventory from "./pages/Inventory.tsx";
+import Products from "./pages/Products.tsx";
 import PublicTrackingByCode from "./pages/PublicTrackingByCode.tsx";
 import MasterAdmin from "./pages/MasterAdmin.tsx";
 import SuperAdminHome from "./pages/SuperAdminHome.tsx";
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/ordenes/:id" element={<OrderDetail />} />
             <Route path="/clientes" element={<Clients />} />
             <Route path="/inventario" element={<Inventory />} />
+            <Route path="/productos" element={<Products />} />
             <Route path="/reportes" element={<Reports />} />
             <Route path="/configuracion" element={<Settings />} />
           </Route>

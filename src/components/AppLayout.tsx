@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -9,17 +9,20 @@ import f7Logo from "@/assets/f7-logo.png";
 import { useCompanyStatus } from "@/hooks/useCompanyStatus";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { usePlan } from "@/hooks/usePlan";
+import { openUpgradeWhatsApp } from "@/lib/upgrade";
+import { PLAN_MESSAGES } from "@/lib/plans";
 import SuspendedAccount from "@/pages/SuspendedAccount";
 import UpgradeProDialog from "@/components/UpgradeProDialog";
 
 const baseNav = [
-  { to: "/dashboard", label: "Órdenes", icon: LayoutDashboard, proOnly: false, adminOnly: false },
-  { to: "/clientes", label: "Clientes", icon: Users, proOnly: false, adminOnly: false },
-  { to: "/inventario", label: "Inventario", icon: Package, proOnly: true, adminOnly: false },
-  { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, adminOnly: true },
+  { to: "/dashboard", label: "Órdenes", icon: LayoutDashboard, proOnly: false, businessOnly: false, adminOnly: false },
+  { to: "/clientes", label: "Clientes", icon: Users, proOnly: false, businessOnly: false, adminOnly: false },
+  { to: "/inventario", label: "Inventario", icon: Package, proOnly: true, businessOnly: false, adminOnly: false },
+  { to: "/productos", label: "Productos", icon: ShoppingBag, proOnly: false, businessOnly: true, adminOnly: false },
+  { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true },
 ];
 const adminNav = [
-  { to: "/configuracion", label: "Configuración", icon: Settings, proOnly: false, adminOnly: true },
+  { to: "/configuracion", label: "Configuración", icon: Settings, proOnly: false, businessOnly: false, adminOnly: true },
 ];
 
 export default function AppLayout() {
@@ -27,14 +30,15 @@ export default function AppLayout() {
   const { isAdmin } = useUserRole();
   const { isSuperAdmin } = useSuperAdmin();
   const { isActive, loading: statusLoading } = useCompanyStatus();
-  const { isStarter, loading: planLoading } = usePlan();
+  const { isStarter, isBusiness, isRetail, loading: planLoading } = usePlan();
+  const hasExternalInventory = isBusiness || isRetail;
   const navigate = useNavigate();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const nav = useMemo(() => {
     const items = isAdmin ? [...baseNav, ...adminNav] : baseNav;
     const filtered = items.filter((i) => !i.adminOnly || isAdmin);
     if (isSuperAdmin) {
-      filtered.push({ to: "/superadmin", label: "Super Admin", icon: ShieldCheck, proOnly: false, adminOnly: false });
+      filtered.push({ to: "/superadmin", label: "Super Admin", icon: ShieldCheck, proOnly: false, businessOnly: false, adminOnly: false });
     }
     return filtered;
   }, [isAdmin, isSuperAdmin]);
@@ -61,12 +65,13 @@ export default function AppLayout() {
   }
 
   const renderNavItem = (item: typeof baseNav[number], mobile = false) => {
-    const locked = item.proOnly && isStarter;
+    const businessLocked = item.businessOnly && !hasExternalInventory;
+    const locked = (item.proOnly && isStarter) || businessLocked;
     if (locked) {
       return (
         <button
           key={item.to}
-          onClick={() => setUpgradeOpen(true)}
+          onClick={() => businessLocked ? openUpgradeWhatsApp(PLAN_MESSAGES.business) : setUpgradeOpen(true)}
           className={cn(
             mobile
               ? "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium text-muted-foreground"
@@ -79,7 +84,7 @@ export default function AppLayout() {
             <span
               className="rounded-sm bg-secondary px-1.5 py-0.5 text-[9px] font-bold leading-none text-secondary-foreground"
             >
-              PRO
+              {businessLocked ? "BUSINESS" : "PRO"}
             </span>
           </span>
         </button>

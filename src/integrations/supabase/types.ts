@@ -127,6 +127,8 @@ export type Database = {
           created_by: string | null
           id: string
           image_url: string | null
+          is_for_repair: boolean
+          is_for_sale: boolean
           min_stock_alert: number
           name: string
           selling_price: number
@@ -142,6 +144,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           image_url?: string | null
+          is_for_repair?: boolean
+          is_for_sale?: boolean
           min_stock_alert?: number
           name: string
           selling_price?: number
@@ -157,6 +161,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           image_url?: string | null
+          is_for_repair?: boolean
+          is_for_sale?: boolean
           min_stock_alert?: number
           name?: string
           selling_price?: number
@@ -692,7 +698,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff"
-      inventory_category: "Repuesto" | "Accesorio" | "Herramienta"
+      inventory_category: "Repuesto" | "Accesorio" | "Herramienta" | "Producto"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -821,7 +827,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff"],
-      inventory_category: ["Repuesto", "Accesorio", "Herramienta"],
+      inventory_category: ["Repuesto", "Accesorio", "Herramienta", "Producto"],
     },
   },
 } as const
