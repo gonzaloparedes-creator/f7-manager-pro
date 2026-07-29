@@ -476,7 +476,7 @@ export default function Presentacion() {
       </section>
 
       {/* SECTION 5.5 — PRICING */}
-      <PricingSection onContact={() => openUpgradeWhatsApp()} />
+      <PricingSection onContact={(message) => openUpgradeWhatsApp(message)} />
 
       {/* SECTION 6 — CTA */}
       <section className="border-t border-border/60 py-24">
@@ -550,8 +550,10 @@ export default function Presentacion() {
 // =================== PRICING SECTION ===================
 type Currency = "gs" | "usd";
 type Cycle = "mensual" | "semestral" | "anual";
+type Plan = "starter" | "pro" | "business" | "retail";
+type Segment = "taller" | "tienda";
 
-const PRICING: Record<"starter" | "pro", Record<Cycle, { usd: number; gs: number }>> = {
+const PRICING: Record<Plan, Record<Cycle, { usd: number; gs: number }>> = {
   starter: {
     mensual: { usd: 9, gs: 55000 },
     semestral: { usd: 49, gs: 295000 },
@@ -562,6 +564,23 @@ const PRICING: Record<"starter" | "pro", Record<Cycle, { usd: number; gs: number
     semestral: { usd: 80, gs: 510000 },
     anual: { usd: 150, gs: 950000 },
   },
+  business: {
+    mensual: { usd: 22, gs: 140000 },
+    semestral: { usd: 119, gs: 750000 },
+    anual: { usd: 220, gs: 1400000 },
+  },
+  retail: {
+    mensual: { usd: 13, gs: 80000 },
+    semestral: { usd: 70, gs: 430000 },
+    anual: { usd: 130, gs: 800000 },
+  },
+};
+
+const PLAN_MESSAGES: Record<Plan, string> = {
+  starter: "¡Hola! Vengo de la plataforma y me interesa el Plan Starter de F7 Manager Pro para mi taller.",
+  pro: "¡Hola! Vengo de la plataforma y me interesa activar el Plan Pro de F7 Manager Pro para mi taller.",
+  business: "¡Hola! Vengo de la plataforma y me interesa el Plan Business (reparación + venta) de F7 Manager Pro.",
+  retail: "¡Hola! Vengo de la plataforma y me interesa el Plan Retail (solo tienda) de F7 Manager Pro.",
 };
 
 const CYCLE_LABEL: Record<Cycle, string> = {
@@ -577,13 +596,14 @@ function fmt(amount: number, currency: Currency) {
   return `${amount.toLocaleString("es-PY")} Gs.`;
 }
 
-function PricingSection({ onContact }: { onContact: () => void }) {
+function PricingSection({ onContact }: { onContact: (message?: string) => void }) {
+  const [segment, setSegment] = useState<Segment>("taller");
   const [currency, setCurrency] = useState<Currency>("gs");
   const [cycle, setCycle] = useState<Cycle>("mensual");
 
   const renderCard = (
-    plan: "starter" | "pro",
-    opts: { title: string; subtitle: string; features: string[]; cta: string; highlight?: boolean },
+    plan: Plan,
+    opts: { title: string; subtitle: string; features: string[]; cta: string; accent?: boolean; badgeLabel?: string },
   ) => {
     const price = PRICING[plan][cycle];
     const value = currency === "usd" ? price.usd : price.gs;
@@ -594,23 +614,24 @@ function PricingSection({ onContact }: { onContact: () => void }) {
 
     return (
       <Card
+        key={plan}
         className={
           "relative flex flex-col p-7 " +
-          (opts.highlight
+          (opts.accent
             ? "border-primary/60 shadow-[0_0_40px_-10px_hsl(var(--primary)/0.5)]"
             : "border-border")
         }
       >
-        {opts.highlight && (
+        {opts.badgeLabel && (
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
-            Más Popular
+            {opts.badgeLabel}
           </div>
         )}
         <h3 className="text-2xl font-bold">{opts.title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{opts.subtitle}</p>
 
         <div className="mt-6 flex items-end gap-2">
-          <span className={"text-4xl font-extrabold tracking-tight " + (opts.highlight ? "text-primary" : "")}>
+          <span className={"text-4xl font-extrabold tracking-tight " + (opts.accent ? "text-primary" : "")}>
             {fmt(value, currency)}
           </span>
           <span className="pb-1 text-sm text-muted-foreground">{CYCLE_LABEL[cycle]}</span>
@@ -624,19 +645,19 @@ function PricingSection({ onContact }: { onContact: () => void }) {
         <ul className="mt-6 space-y-2.5">
           {opts.features.map((f) => (
             <li key={f} className="flex items-start gap-2 text-sm">
-              <CheckCircle2 className={"mt-0.5 h-4 w-4 shrink-0 " + (opts.highlight ? "text-primary" : "text-primary/80")} />
+              <CheckCircle2 className={"mt-0.5 h-4 w-4 shrink-0 " + (opts.accent ? "text-primary" : "text-primary/80")} />
               <span>{f}</span>
             </li>
           ))}
         </ul>
 
         <div className="mt-7 pt-2">
-          {opts.highlight ? (
-            <Button onClick={onContact} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+          {opts.accent ? (
+            <Button onClick={() => onContact(PLAN_MESSAGES[plan])} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
               {opts.cta}
             </Button>
           ) : (
-            <Button onClick={onContact} variant="outline" className="w-full border-primary/40 text-foreground hover:bg-primary/10 hover:text-primary">
+            <Button onClick={() => onContact(PLAN_MESSAGES[plan])} variant="outline" className="w-full border-primary/40 text-foreground hover:bg-primary/10 hover:text-primary">
               {opts.cta}
             </Button>
           )}
@@ -651,15 +672,42 @@ function PricingSection({ onContact }: { onContact: () => void }) {
       <div className="container">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold sm:text-4xl">
-            Precios honestos para <span className="text-primary">talleres reales</span>.
+            {segment === "taller" ? (
+              <>Precios honestos para <span className="text-primary">talleres reales</span>.</>
+            ) : (
+              <>Precios honestos para <span className="text-primary">tu mostrador</span>.</>
+            )}
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Elegí tu moneda y tu ciclo. Cambialo cuando quieras.
+            {segment === "taller"
+              ? "Elegí tu moneda y tu ciclo. Cambialo cuando quieras."
+              : "Sin órdenes de reparación, sin QR, sin firmas — solo mostrador y caja."}
           </p>
         </div>
 
-        {/* Toggles */}
-        <div className="mx-auto mt-8 flex max-w-3xl flex-col items-center gap-4 sm:flex-row sm:justify-center">
+        {/* Segmento: Taller vs Tienda */}
+        <div className="mx-auto mt-8 flex justify-center">
+          <div className="inline-flex rounded-full border border-border bg-card p-1">
+            {([
+              ["taller", "Tengo un Taller"],
+              ["tienda", "Solo tengo Tienda"],
+            ] as [Segment, string][]).map(([s, label]) => (
+              <button
+                key={s}
+                onClick={() => setSegment(s)}
+                className={
+                  "px-4 py-1.5 text-xs font-semibold rounded-full transition-colors " +
+                  (segment === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Toggles de moneda y ciclo */}
+        <div className="mx-auto mt-4 flex max-w-3xl flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <div className="inline-flex rounded-full border border-border bg-card p-1">
             {(["gs", "usd"] as Currency[]).map((c) => (
               <button
@@ -696,35 +744,71 @@ function PricingSection({ onContact }: { onContact: () => void }) {
         </div>
 
         {/* Cards */}
-        <div className="mx-auto mt-12 grid max-w-4xl gap-6 sm:grid-cols-2">
-          {renderCard("starter", {
-            title: "Starter",
-            subtitle: "Ideal para dar el primer paso y profesionalizar tu mostrador.",
-            features: [
-              "1 usuario (dueño / admin)",
-              "1 sucursal",
-              "Órdenes ilimitadas",
-              "Base de clientes ilimitada",
-              "Tracking QR público",
-              "5 fotos por orden",
-            ],
-            cta: "Comenzar prueba gratis",
-          })}
-          {renderCard("pro", {
-            title: "Pro",
-            subtitle: "Para talleres que quieren escalar y controlar sus ganancias reales.",
-            features: [
-              "Todo lo del plan Starter, más:",
-              "Hasta 5 usuarios con roles",
-              "Sucursales ilimitadas",
-              "Control de Inventario",
-              "Reportes financieros (Ingreso Neto)",
-              "20 fotos por orden",
-            ],
-            cta: "Empezar 14 días GRATIS",
-            highlight: true,
-          })}
-        </div>
+        {segment === "taller" ? (
+          <div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-3">
+            {renderCard("starter", {
+              title: "Starter",
+              subtitle: "Ideal para dar el primer paso y profesionalizar tu mostrador.",
+              features: [
+                "1 usuario (dueño / admin)",
+                "1 sucursal",
+                "Órdenes ilimitadas",
+                "Base de clientes ilimitada",
+                "Tracking QR público",
+                "5 fotos por orden",
+              ],
+              cta: "Comenzar prueba gratis",
+            })}
+            {renderCard("pro", {
+              title: "Pro",
+              subtitle: "Para talleres que quieren escalar y controlar sus ganancias reales.",
+              features: [
+                "Todo lo del plan Starter, más:",
+                "Hasta 5 usuarios con roles",
+                "Sucursales ilimitadas",
+                "Control de Inventario",
+                "Reportes financieros (Ingreso Neto)",
+                "20 fotos por orden",
+              ],
+              cta: "Empezar 14 días GRATIS",
+              accent: true,
+              badgeLabel: "Más Popular",
+            })}
+            {renderCard("business", {
+              title: "Business",
+              subtitle: "Para negocios híbridos que reparan y también venden en mostrador.",
+              features: [
+                "Todo lo del plan Pro, más:",
+                "Módulo Punto de Venta (POS / Caja rápida)",
+                "Inventario Externo (catálogo para venta al público)",
+                "Cobro unificado: reparación + venta en un solo ticket",
+                "Recibos automatizados por WhatsApp",
+                "Usuarios ilimitados",
+              ],
+              cta: "Empezar 14 días GRATIS",
+              accent: true,
+              badgeLabel: "Todo en Uno",
+            })}
+          </div>
+        ) : (
+          <div className="mx-auto mt-12 max-w-sm">
+            {renderCard("retail", {
+              title: "Retail",
+              subtitle: "Ideal para locales de accesorios, carcasas y venta de celulares.",
+              features: [
+                "Módulo Punto de Venta (POS / Caja rápida)",
+                "Inventario Externo (ventas)",
+                "Carga de productos con código de barras",
+                "Control de Caja y Reportes de Ventas",
+                "Recibos automatizados por WhatsApp",
+                "1 usuario / 1 sucursal",
+              ],
+              cta: "Empezar 14 días GRATIS",
+              accent: true,
+              badgeLabel: "Solo Ventas",
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
