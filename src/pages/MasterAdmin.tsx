@@ -111,12 +111,14 @@ export default function MasterAdmin() {
                           onValueChange={(v) => updateCompany(c.id, { plan_type: v })}
                           disabled={busy === c.id}
                         >
-                          <SelectTrigger className="h-8 w-32">
+                          <SelectTrigger className="h-8 w-36">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="starter">Starter</SelectItem>
                             <SelectItem value="pro">Pro</SelectItem>
+                            <SelectItem value="business">Business</SelectItem>
+                            <SelectItem value="retail">Retail</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>

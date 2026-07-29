@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import UpgradeProDialog from "@/components/UpgradeProDialog";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
+import { type PlanType, type Cycle, PRICING, PLAN_MESSAGES, PLAN_FEATURES } from "@/lib/plans";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertTriangle,
@@ -549,39 +550,8 @@ export default function Presentacion() {
 
 // =================== PRICING SECTION ===================
 type Currency = "gs" | "usd";
-type Cycle = "mensual" | "semestral" | "anual";
-type Plan = "starter" | "pro" | "business" | "retail";
 type Segment = "taller" | "tienda";
-
-const PRICING: Record<Plan, Record<Cycle, { usd: number; gs: number }>> = {
-  starter: {
-    mensual: { usd: 9, gs: 55000 },
-    semestral: { usd: 49, gs: 295000 },
-    anual: { usd: 90, gs: 550000 },
-  },
-  pro: {
-    mensual: { usd: 15, gs: 95000 },
-    semestral: { usd: 80, gs: 510000 },
-    anual: { usd: 150, gs: 950000 },
-  },
-  business: {
-    mensual: { usd: 22, gs: 140000 },
-    semestral: { usd: 119, gs: 750000 },
-    anual: { usd: 220, gs: 1400000 },
-  },
-  retail: {
-    mensual: { usd: 13, gs: 80000 },
-    semestral: { usd: 70, gs: 430000 },
-    anual: { usd: 130, gs: 800000 },
-  },
-};
-
-const PLAN_MESSAGES: Record<Plan, string> = {
-  starter: "¡Hola! Vengo de la plataforma y me interesa el Plan Starter de F7 Manager Pro para mi taller.",
-  pro: "¡Hola! Vengo de la plataforma y me interesa activar el Plan Pro de F7 Manager Pro para mi taller.",
-  business: "¡Hola! Vengo de la plataforma y me interesa el Plan Business (reparación + venta) de F7 Manager Pro.",
-  retail: "¡Hola! Vengo de la plataforma y me interesa el Plan Retail (solo tienda) de F7 Manager Pro.",
-};
+type Plan = PlanType;
 
 const CYCLE_LABEL: Record<Cycle, string> = {
   mensual: "/ mes",
@@ -749,27 +719,13 @@ function PricingSection({ onContact }: { onContact: (message?: string) => void }
             {renderCard("starter", {
               title: "Starter",
               subtitle: "Ideal para dar el primer paso y profesionalizar tu mostrador.",
-              features: [
-                "1 usuario (dueño / admin)",
-                "1 sucursal",
-                "Órdenes ilimitadas",
-                "Base de clientes ilimitada",
-                "Tracking QR público",
-                "5 fotos por orden",
-              ],
+              features: PLAN_FEATURES.starter,
               cta: "Comenzar prueba gratis",
             })}
             {renderCard("pro", {
               title: "Pro",
               subtitle: "Para talleres que quieren escalar y controlar sus ganancias reales.",
-              features: [
-                "Todo lo del plan Starter, más:",
-                "Hasta 5 usuarios con roles",
-                "Sucursales ilimitadas",
-                "Control de Inventario",
-                "Reportes financieros (Ingreso Neto)",
-                "20 fotos por orden",
-              ],
+              features: PLAN_FEATURES.pro,
               cta: "Empezar 14 días GRATIS",
               accent: true,
               badgeLabel: "Más Popular",
@@ -777,14 +733,7 @@ function PricingSection({ onContact }: { onContact: (message?: string) => void }
             {renderCard("business", {
               title: "Business",
               subtitle: "Para negocios híbridos que reparan y también venden en mostrador.",
-              features: [
-                "Todo lo del plan Pro, más:",
-                "Módulo Punto de Venta (POS / Caja rápida)",
-                "Inventario Externo (catálogo para venta al público)",
-                "Cobro unificado: reparación + venta en un solo ticket",
-                "Recibos automatizados por WhatsApp",
-                "Usuarios ilimitados",
-              ],
+              features: PLAN_FEATURES.business,
               cta: "Empezar 14 días GRATIS",
               accent: true,
               badgeLabel: "Todo en Uno",
@@ -795,14 +744,7 @@ function PricingSection({ onContact }: { onContact: (message?: string) => void }
             {renderCard("retail", {
               title: "Retail",
               subtitle: "Ideal para locales de accesorios, carcasas y venta de celulares.",
-              features: [
-                "Módulo Punto de Venta (POS / Caja rápida)",
-                "Inventario Externo (ventas)",
-                "Carga de productos con código de barras",
-                "Control de Caja y Reportes de Ventas",
-                "Recibos automatizados por WhatsApp",
-                "1 usuario / 1 sucursal",
-              ],
+              features: PLAN_FEATURES.retail,
               cta: "Empezar 14 días GRATIS",
               accent: true,
               badgeLabel: "Solo Ventas",
