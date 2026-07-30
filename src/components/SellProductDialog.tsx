@@ -16,6 +16,7 @@ type SellableProduct = {
   name: string;
   stock: number;
   selling_price: number;
+  cost_price: number;
 };
 
 export default function SellProductDialog({
@@ -61,6 +62,7 @@ export default function SellProductDialog({
         product_name: product.name,
         quantity: qty,
         unit_price: price,
+        unit_cost: product.cost_price,
         payment_method: paymentMethod,
         created_by: user.id,
       });

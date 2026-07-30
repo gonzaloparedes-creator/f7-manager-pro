@@ -614,6 +614,7 @@ export type Database = {
           payment_method: string | null
           product_name: string
           quantity: number
+          unit_cost: number
           unit_price: number
         }
         Insert: {
@@ -625,6 +626,7 @@ export type Database = {
           payment_method?: string | null
           product_name: string
           quantity?: number
+          unit_cost?: number
           unit_price?: number
         }
         Update: {
@@ -636,6 +638,7 @@ export type Database = {
           payment_method?: string | null
           product_name?: string
           quantity?: number
+          unit_cost?: number
           unit_price?: number
         }
         Relationships: []
