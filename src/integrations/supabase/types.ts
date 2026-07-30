@@ -604,6 +604,42 @@ export type Database = {
         }
         Relationships: []
       }
+      product_sales: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          inventory_item_id: string | null
+          payment_method: string | null
+          product_name: string
+          quantity: number
+          unit_price: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_item_id?: string | null
+          payment_method?: string | null
+          product_name: string
+          quantity?: number
+          unit_price?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_item_id?: string | null
+          payment_method?: string | null
+          product_name?: string
+          quantity?: number
+          unit_price?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
