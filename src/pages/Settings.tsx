@@ -58,6 +58,23 @@ type UserRow = {
   commission_rate: number;
 };
 
+// supabase-js no parsea el cuerpo de la respuesta cuando una Edge Function
+// devuelve un status no-2xx: solo da un FunctionsHttpError genérico ("Edge
+// Function returned a non-2xx status code") y deja el body real sin leer en
+// error.context. Sin esto, cualquier error específico que devuelva la función
+// (email duplicado, rol inválido, etc.) queda oculto detrás de ese mensaje
+// genérico e imposible de diagnosticar desde la UI.
+async function edgeFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (body?.error) return String(body.error);
+    } catch { /* respuesta sin JSON */ }
+  }
+  return (error as Error)?.message || fallback;
+}
+
 export default function Settings() {
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -136,7 +153,8 @@ export default function Settings() {
     const { data, error } = await supabase.functions.invoke("connect-whatsapp-evolution");
     setConnecting(false);
     if (error || data?.error) {
-      toast({ title: "Error", description: data?.error ?? error?.message ?? "No se pudo conectar", variant: "destructive" });
+      const description = data?.error ?? await edgeFunctionErrorMessage(error, "No se pudo conectar");
+      toast({ title: "Error", description, variant: "destructive" });
       return;
     }
     if (data?.qr) { setQr(data.qr); startPolling(); }
@@ -672,7 +690,8 @@ function UsersTab() {
     });
     setCreating(false);
     if (error || data?.error) {
-      return toast({ title: "Error", description: data?.error ?? error?.message ?? "No se pudo crear", variant: "destructive" });
+      const description = data?.error ?? await edgeFunctionErrorMessage(error, "No se pudo crear");
+      return toast({ title: "Error", description, variant: "destructive" });
     }
     toast({ title: "Usuario creado" });
     setOpen(false);
