@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Search, Users as UsersIcon } from "lucide-react";
+import { Pencil, Search, Users as UsersIcon, MessageCircle } from "lucide-react";
+import { openWhatsApp } from "@/lib/whatsapp";
 
 type Client = {
   id: string;
@@ -160,7 +161,7 @@ export default function Clients() {
                   <TableHead>Teléfono</TableHead>
                   <TableHead>Cédula</TableHead>
                   <TableHead className="text-center">Órdenes</TableHead>
-                  <TableHead className="w-[80px]"></TableHead>
+                  <TableHead className="w-[110px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -174,7 +175,18 @@ export default function Clients() {
                       <TableCell className="text-center">
                         <Badge variant={count > 0 ? "default" : "secondary"}>{count}</Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {c.phone && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-emerald-600 hover:text-emerald-600"
+                            onClick={(e) => { e.stopPropagation(); openWhatsApp(c.phone!); }}
+                            title="Abrir chat de WhatsApp"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(c); }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -235,6 +247,15 @@ export default function Clients() {
           </DialogHeader>
           {selectedClient && (
             <div className="space-y-3">
+              {selectedClient.phone && (
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-emerald-600/30 text-emerald-600 hover:bg-emerald-600/10 hover:text-emerald-600"
+                  onClick={() => openWhatsApp(selectedClient.phone!)}
+                >
+                  <MessageCircle className="h-4 w-4" /> Abrir chat de WhatsApp
+                </Button>
+              )}
               {selectedClient.cedula && (
                 <div className="text-sm">
                   <span className="text-muted-foreground">Cédula: </span>

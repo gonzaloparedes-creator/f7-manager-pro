@@ -9,16 +9,12 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Wrench, Plus, Trash2, Search, Loader2, PackagePlus, Package, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatPYG } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 
-type Category = "Repuesto" | "Accesorio" | "Herramienta";
 type Source = "inventory" | "external";
 
 interface InventoryItem {
@@ -27,7 +23,6 @@ interface InventoryItem {
   stock: number;
   selling_price: number;
   cost_price: number;
-  category: Category;
   branch_id: string | null;
 }
 
@@ -82,7 +77,6 @@ export default function OrderPartsSection({
 
   // create form
   const [newName, setNewName] = useState("");
-  const [newCategory, setNewCategory] = useState<Category>("Repuesto");
   const [newStock, setNewStock] = useState("1");
   const [newCost, setNewCost] = useState("0");
   const [newPrice, setNewPrice] = useState("0");
@@ -92,7 +86,7 @@ export default function OrderPartsSection({
     if (!companyId) return;
     let q = (supabase as any)
       .from("inventory_items")
-      .select("id,name,stock,selling_price,cost_price,category,branch_id")
+      .select("id,name,stock,selling_price,cost_price,branch_id")
       .eq("company_id", companyId)
       .eq("is_for_repair", true)
       .order("name");
@@ -221,19 +215,18 @@ export default function OrderPartsSection({
           company_id: companyId,
           branch_id: branchId,
           name: newName.trim(),
-          category: newCategory,
           stock: parseInt(newStock) || 0,
           min_stock_alert: 0,
           cost_price: parseFloat(newCost) || 0,
           selling_price: parseFloat(newPrice) || 0,
           created_by: user.id,
         })
-        .select("id,name,stock,selling_price,cost_price,category,branch_id")
+        .select("id,name,stock,selling_price,cost_price,branch_id")
         .single();
       if (error) throw error;
       toast({ title: "Artículo creado" });
       setCreateOpen(false);
-      setNewName(""); setNewCategory("Repuesto"); setNewStock("1"); setNewCost("0"); setNewPrice("0");
+      setNewName(""); setNewStock("1"); setNewCost("0"); setNewPrice("0");
       await loadItems();
       // Auto-add to the order if there's stock
       if (inserted && (inserted as InventoryItem).stock > 0) {
@@ -467,22 +460,9 @@ export default function OrderPartsSection({
               <Label>Nombre</Label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label>Categoría</Label>
-                <Select value={newCategory} onValueChange={(v) => setNewCategory(v as Category)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Repuesto">Repuesto</SelectItem>
-                    <SelectItem value="Accesorio">Accesorio</SelectItem>
-                    <SelectItem value="Herramienta">Herramienta</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Stock inicial</Label>
-                <Input type="number" min={0} value={newStock} onChange={(e) => setNewStock(e.target.value)} />
-              </div>
+            <div className="grid gap-2">
+              <Label>Stock inicial</Label>
+              <Input type="number" min={0} value={newStock} onChange={(e) => setNewStock(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">

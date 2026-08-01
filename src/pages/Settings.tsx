@@ -18,8 +18,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck } from "lucide-react";
+import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent } from "lucide-react";
 import { usePlan } from "@/hooks/usePlan";
+import { useCategories } from "@/hooks/useCategories";
 import SubscriptionTab from "@/components/SubscriptionTab";
 import WarrantyPresetsTab from "@/components/WarrantyPresetsTab";
 
@@ -54,11 +55,13 @@ type Branch = { id: string; name: string; address: string | null };
 type UserRow = {
   id: string; full_name: string | null; phone: string | null; branch_id: string | null;
   role: "admin" | "staff" | null;
+  commission_rate: number;
 };
 
 export default function Settings() {
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
+  const { isStarter: isStarterPlan } = usePlan();
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -172,10 +175,13 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-7">
+        <TabsList className={`grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 ${isStarterPlan ? "lg:grid-cols-7" : "lg:grid-cols-8"}`}>
           <TabsTrigger value="perfil" className="h-9">Perfil</TabsTrigger>
           <TabsTrigger value="whatsapp" className="h-9">WhatsApp</TabsTrigger>
           <TabsTrigger value="sucursales" className="h-9"><Building2 className="mr-1 h-4 w-4" /> Sucursales</TabsTrigger>
+          {!isStarterPlan && (
+            <TabsTrigger value="categorias" className="h-9"><Tags className="mr-1 h-4 w-4" /> Categorías</TabsTrigger>
+          )}
           <TabsTrigger value="usuarios" className="h-9"><Users className="mr-1 h-4 w-4" /> Usuarios</TabsTrigger>
           <TabsTrigger value="garantias" className="h-9"><ShieldCheck className="mr-1 h-4 w-4" /> Garantías</TabsTrigger>
           <TabsTrigger value="seguridad" className="h-9"><Lock className="mr-1 h-4 w-4" /> Seguridad</TabsTrigger>
@@ -282,6 +288,12 @@ export default function Settings() {
         <TabsContent value="sucursales">
           <BranchesTab />
         </TabsContent>
+
+        {!isStarterPlan && (
+          <TabsContent value="categorias">
+            <CategoryManagerTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="usuarios">
           <UsersTab />
@@ -426,13 +438,165 @@ function BranchesTab() {
   );
 }
 
+/* ---------- Categorías ---------- */
+function CategoryManagerTab() {
+  const { toast } = useToast();
+  const { companyId } = useCompany();
+  const { categories, subcategoriesFor, loading, reload } = useCategories();
+
+  const [catOpen, setCatOpen] = useState(false);
+  const [catName, setCatName] = useState("");
+  const [savingCat, setSavingCat] = useState(false);
+
+  const [subFor, setSubFor] = useState<{ id: string; name: string } | null>(null);
+  const [subName, setSubName] = useState("");
+  const [savingSub, setSavingSub] = useState(false);
+
+  const createCategory = async () => {
+    if (!catName.trim() || !companyId) return;
+    setSavingCat(true);
+    const { error } = await supabase.from("inventory_categories").insert({ company_id: companyId, name: catName.trim() });
+    setSavingCat(false);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setCatOpen(false);
+    setCatName("");
+    toast({ title: "Categoría creada" });
+    reload();
+  };
+
+  const removeCategory = async (id: string, name: string) => {
+    if (!confirm(`¿Eliminar la categoría "${name}" y sus subcategorías? Los artículos que la usan quedarán sin categoría.`)) return;
+    const { error } = await supabase.from("inventory_categories").delete().eq("id", id);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    reload();
+  };
+
+  const openNewSub = (cat: { id: string; name: string }) => { setSubFor(cat); setSubName(""); };
+
+  const createSubcategory = async () => {
+    if (!subName.trim() || !companyId || !subFor) return;
+    setSavingSub(true);
+    const { error } = await supabase.from("inventory_subcategories").insert({
+      company_id: companyId, category_id: subFor.id, name: subName.trim(),
+    });
+    setSavingSub(false);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setSubFor(null);
+    setSubName("");
+    toast({ title: "Subcategoría creada" });
+    reload();
+  };
+
+  const removeSubcategory = async (id: string) => {
+    const { error } = await supabase.from("inventory_subcategories").delete().eq("id", id);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    reload();
+  };
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold">Categorías</div>
+            <div className="text-xs text-muted-foreground">
+              Organizá tu inventario y catálogo de venta por categoría y subcategoría (ej: Accesorios → Auriculares). Compartidas entre Inventario y Productos.
+            </div>
+          </div>
+          <Button onClick={() => setCatOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nueva categoría</Button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : categories.length === 0 ? (
+          <div className="rounded-md border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+            Todavía no creaste categorías. Categorizar es opcional, pero ayuda a ordenar el inventario y a ver mejores métricas en Reportes.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {categories.map((cat) => (
+              <div key={cat.id} className="rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium text-foreground">{cat.name}</div>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => openNewSub(cat)} className="gap-1 text-xs">
+                      <Plus className="h-3.5 w-3.5" /> Subcategoría
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => removeCategory(cat.id, cat.name)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+                {subcategoriesFor(cat.id).length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {subcategoriesFor(cat.id).map((sub) => (
+                      <span key={sub.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground">
+                        {sub.name}
+                        <button type="button" onClick={() => removeSubcategory(sub.id)} className="text-muted-foreground hover:text-destructive">
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Dialog open={catOpen} onOpenChange={setCatOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nueva categoría</DialogTitle>
+              <DialogDescription>Ej: Repuestos, Accesorios, Herramientas, Celulares...</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label>Nombre</Label>
+              <Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="Accesorios" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCatOpen(false)} disabled={savingCat}>Cancelar</Button>
+              <Button onClick={createCategory} disabled={savingCat || !catName.trim()}>
+                {savingCat && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Crear
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!subFor} onOpenChange={(o) => !o && setSubFor(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nueva subcategoría de "{subFor?.name}"</DialogTitle>
+              <DialogDescription>Ej: Auriculares, Cargadores, Fundas...</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label>Nombre</Label>
+              <Input value={subName} onChange={(e) => setSubName(e.target.value)} placeholder="Auriculares" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSubFor(null)} disabled={savingSub}>Cancelar</Button>
+              <Button onClick={createSubcategory} disabled={savingSub || !subName.trim()}>
+                {savingSub && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Crear
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ---------- Usuarios ---------- */
 function UsersTab() {
   const { toast } = useToast();
   const { companyId } = useCompany();
+  const { isStarter, isRetail, limits } = usePlan();
+  const canUseCommissions = !isStarter && !isRetail;
   const [users, setUsers] = useState<UserRow[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [commissionEnabled, setCommissionEnabled] = useState(false);
+  const [savingCommissionToggle, setSavingCommissionToggle] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -445,9 +609,10 @@ function UsersTab() {
   const load = async () => {
     if (!companyId) return;
     setLoading(true);
-    const [{ data: profs }, { data: brs }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, phone, branch_id").eq("company_id", companyId),
+    const [{ data: profs }, { data: brs }, { data: company }] = await Promise.all([
+      supabase.from("profiles").select("id, full_name, phone, branch_id, commission_rate").eq("company_id", companyId),
       supabase.from("branches").select("id, name, address").eq("company_id", companyId).order("name"),
+      supabase.from("companies").select("commission_enabled").eq("id", companyId).maybeSingle(),
     ]);
     const userIds = (profs ?? []).map((p: any) => p.id);
     let roles: any[] = [];
@@ -463,9 +628,30 @@ function UsersTab() {
     });
     setUsers(((profs ?? []) as any[]).map((p) => ({ ...p, role: roleMap.get(p.id) ?? null })));
     setBranches((brs ?? []) as Branch[]);
+    setCommissionEnabled(!!company?.commission_enabled);
     setLoading(false);
   };
   useEffect(() => { load(); }, [companyId]);
+
+  const toggleCommissionEnabled = async (value: boolean) => {
+    if (!companyId) return;
+    setSavingCommissionToggle(true);
+    setCommissionEnabled(value);
+    const { error } = await supabase.from("companies").update({ commission_enabled: value }).eq("id", companyId);
+    setSavingCommissionToggle(false);
+    if (error) {
+      setCommissionEnabled(!value);
+      return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    toast({ title: value ? "Comisiones habilitadas" : "Comisiones deshabilitadas" });
+  };
+
+  const updateUserCommissionRate = async (userId: string, rate: number) => {
+    const clamped = Math.max(0, Math.min(100, rate));
+    const { error } = await supabase.from("profiles").update({ commission_rate: clamped }).eq("id", userId);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, commission_rate: clamped } : u)));
+  };
 
   const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? "—";
 
@@ -512,7 +698,6 @@ function UsersTab() {
     load();
   };
 
-  const { isStarter, limits } = usePlan();
   const atUserLimit = isStarter && users.length >= limits.users;
 
   return (
@@ -531,6 +716,22 @@ function UsersTab() {
           </div>
         )}
 
+        {canUseCommissions && (
+          <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Percent className="h-4 w-4 text-primary" />
+              <div>
+                <Label htmlFor="commission-toggle" className="cursor-pointer text-sm font-medium">Comisiones por venta/reparación</Label>
+                <div className="text-xs text-muted-foreground">Si tu negocio paga comisión al personal, habilitala y asigná un % por persona.</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {savingCommissionToggle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              <Switch id="commission-toggle" checked={commissionEnabled} onCheckedChange={toggleCommissionEnabled} />
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
@@ -542,6 +743,7 @@ function UsersTab() {
                   <TableHead>Teléfono</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Sucursal</TableHead>
+                  {commissionEnabled && canUseCommissions && <TableHead>Comisión</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -566,6 +768,25 @@ function UsersTab() {
                         </SelectContent>
                       </Select>
                     </TableCell>
+                    {commissionEnabled && canUseCommissions && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.5"
+                            defaultValue={u.commission_rate}
+                            onBlur={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (Number.isFinite(v) && v !== u.commission_rate) updateUserCommissionRate(u.id, v);
+                            }}
+                            className="w-20"
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

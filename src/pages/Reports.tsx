@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { useBranches } from "@/hooks/useBranches";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { formatPYG } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Wallet, TrendingUp, PackageMinus, TrendingDown, ShieldAlert, Wrench, ShoppingBag, CalendarDays } from "lucide-react";
+import { Wallet, TrendingUp, PackageMinus, TrendingDown, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound } from "lucide-react";
 import { usePlan } from "@/hooks/usePlan";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
@@ -26,17 +27,30 @@ interface OrderRow {
   cargos_adicionales: CargoAdicional[] | null;
   deposit_date: string | null;
   final_payment_date: string | null;
+  current_branch_id: string | null;
+  assigned_technician_id: string | null;
 }
 interface PartRow {
   order_id: string;
   quantity: number;
   historical_cost: number | null;
+  category_name: string | null;
+  subcategory_name: string | null;
 }
 interface SaleRow {
   quantity: number;
   unit_price: number;
   unit_cost: number;
   created_at: string;
+  branch_id: string | null;
+  category_name: string | null;
+  subcategory_name: string | null;
+  created_by: string | null;
+}
+interface StaffRow {
+  id: string;
+  full_name: string | null;
+  commission_rate: number;
 }
 
 type PresetKey = "hoy" | "ayer" | "esta_semana" | "semana_pasada" | "este_mes" | "mes_pasado" | "este_anio" | "todo";
@@ -182,6 +196,79 @@ function buildChartBuckets(from: Date, to: Date, granularity: Granularity) {
   return buckets;
 }
 
+/** Combina categoría + subcategoría en una sola etiqueta, para no necesitar UI anidada/expandible. */
+function categoryLabel(category: string | null, subcategory: string | null) {
+  if (!category) return "Sin categoría";
+  return subcategory ? `${category} › ${subcategory}` : category;
+}
+
+/** Costo de repuestos por categoría (Taller no tiene ingreso a nivel de repuesto, solo costo). */
+function partsCostByCategory(orders: OrderRow[], parts: PartRow[], from: Date | null, to: Date | null) {
+  const includedOrderIds = new Set(orders.filter(o => inRange(o.final_payment_date, from, to)).map(o => o.id));
+  const map = new Map<string, number>();
+  for (const p of parts) {
+    if (!includedOrderIds.has(p.order_id)) continue;
+    const key = categoryLabel(p.category_name, p.subcategory_name);
+    map.set(key, (map.get(key) ?? 0) + Number(p.historical_cost ?? 0) * Number(p.quantity ?? 0));
+  }
+  return map;
+}
+
+function salesByCategory(sales: SaleRow[], from: Date | null, to: Date | null) {
+  const map = new Map<string, { revenue: number; cost: number }>();
+  for (const s of sales) {
+    if (!inRange(s.created_at, from, to)) continue;
+    const key = categoryLabel(s.category_name, s.subcategory_name);
+    const cur = map.get(key) ?? { revenue: 0, cost: 0 };
+    cur.revenue += s.quantity * Number(s.unit_price || 0);
+    cur.cost += s.quantity * Number(s.unit_cost || 0);
+    map.set(key, cur);
+  }
+  return map;
+}
+
+function revenueByBranchId(orders: OrderRow[], sales: SaleRow[], from: Date | null, to: Date | null) {
+  const map = new Map<string, number>();
+  const add = (id: string | null, amount: number) => {
+    if (!amount) return;
+    const key = id ?? "";
+    map.set(key, (map.get(key) ?? 0) + amount);
+  };
+  for (const o of orders) {
+    const senia = Number(o.senia_amount ?? 0);
+    let rev = 0;
+    if (inRange(o.deposit_date, from, to)) rev += senia;
+    if (inRange(o.final_payment_date, from, to)) rev += Math.max(0, totalOf(o) - senia);
+    add(o.current_branch_id, rev);
+  }
+  for (const s of sales) {
+    if (!inRange(s.created_at, from, to)) continue;
+    add(s.branch_id, s.quantity * Number(s.unit_price || 0));
+  }
+  return map;
+}
+
+function revenueByStaffId(orders: OrderRow[], sales: SaleRow[], from: Date | null, to: Date | null) {
+  const map = new Map<string, number>();
+  const add = (id: string | null, amount: number) => {
+    if (!amount) return;
+    const key = id ?? "";
+    map.set(key, (map.get(key) ?? 0) + amount);
+  };
+  for (const o of orders) {
+    const senia = Number(o.senia_amount ?? 0);
+    let rev = 0;
+    if (inRange(o.deposit_date, from, to)) rev += senia;
+    if (inRange(o.final_payment_date, from, to)) rev += Math.max(0, totalOf(o) - senia);
+    add(o.assigned_technician_id, rev);
+  }
+  for (const s of sales) {
+    if (!inRange(s.created_at, from, to)) continue;
+    add(s.created_by, s.quantity * Number(s.unit_price || 0));
+  }
+  return map;
+}
+
 export default function Reports() {
   // Todos los hooks van primero, sin condicionar — los early return de
   // permisos/plan van después de que todos los hooks ya se ejecutaron.
@@ -189,10 +276,13 @@ export default function Reports() {
   const { companyId } = useCompany();
   const { isStarter, isPro, isBusiness, isRetail, loading: planLoading } = usePlan();
   const { isAdmin, loading: roleLoading } = useUserRole();
+  const { branches, hasMultipleBranches } = useBranches();
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [parts, setParts] = useState<PartRow[]>([]);
   const [sales, setSales] = useState<SaleRow[]>([]);
+  const [staff, setStaff] = useState<StaffRow[]>([]);
+  const [commissionEnabled, setCommissionEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<Timeframe>("este_mes");
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
@@ -213,14 +303,14 @@ export default function Reports() {
       if (hasTaller) {
         const { data: o } = await supabase
           .from("orders")
-          .select("id, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date")
+          .select("id, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, current_branch_id, assigned_technician_id")
           .eq("company_id", companyId);
         const orderIds = (o ?? []).map((x: any) => x.id);
         let p: any[] = [];
         if (orderIds.length > 0) {
           const { data } = await (supabase as any)
             .from("order_parts")
-            .select("order_id, quantity, historical_cost")
+            .select("order_id, quantity, historical_cost, category_name, subcategory_name")
             .in("order_id", orderIds);
           p = data ?? [];
         }
@@ -231,10 +321,17 @@ export default function Reports() {
       if (hasTienda) {
         const { data: s } = await (supabase as any)
           .from("product_sales")
-          .select("quantity, unit_price, unit_cost, created_at")
+          .select("quantity, unit_price, unit_cost, created_at, branch_id, category_name, subcategory_name, created_by")
           .eq("company_id", companyId);
         setSales((s ?? []) as SaleRow[]);
       }
+
+      const [{ data: profs }, { data: company }] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, commission_rate").eq("company_id", companyId),
+        supabase.from("companies").select("commission_enabled").eq("id", companyId).maybeSingle(),
+      ]);
+      setStaff((profs ?? []) as unknown as StaffRow[]);
+      setCommissionEnabled(!!company?.commission_enabled);
 
       setLoading(false);
     };
@@ -252,6 +349,29 @@ export default function Reports() {
   const gananciaNetaTienda = ventasBrutasTienda - costoProductosVendidos;
 
   const gananciaNetaTotal = (hasTaller ? ingresoNetoTaller : 0) + (hasTienda ? gananciaNetaTienda : 0);
+
+  const categoriaTaller = useMemo(
+    () => hasTaller ? partsCostByCategory(orders, parts, from, to) : new Map<string, number>(),
+    [hasTaller, orders, parts, from, to]
+  );
+  const categoriaTienda = useMemo(
+    () => hasTienda ? salesByCategory(sales, from, to) : new Map<string, { revenue: number; cost: number }>(),
+    [hasTienda, sales, from, to]
+  );
+
+  const branchName = (id: string) => id ? (branches.find((b) => b.id === id)?.name ?? "Sucursal") : "Sin sucursal";
+  const branchBreakdown = useMemo(() => {
+    const map = revenueByBranchId(orders, sales, from, to);
+    return Array.from(map.entries()).map(([id, revenue]) => ({ id, label: branchName(id), revenue }));
+  }, [orders, sales, from, to, branches]);
+
+  const staffBreakdown = useMemo(() => {
+    const map = revenueByStaffId(orders, sales, from, to);
+    return Array.from(map.entries()).map(([id, revenue]) => {
+      const person = staff.find((s) => s.id === id);
+      return { id, name: person?.full_name || (id ? "Usuario" : "Sin asignar"), revenue, rate: person?.commission_rate ?? 0 };
+    });
+  }, [orders, sales, from, to, staff]);
 
   const effectiveScope: ChartScope = hasTaller && hasTienda ? chartScope : hasTaller ? "taller" : "tienda";
 
@@ -446,6 +566,23 @@ export default function Reports() {
         )}
       </div>
 
+      {(categoriaTaller.size > 0 || categoriaTienda.size > 0 || (hasMultipleBranches && branchBreakdown.length > 0) || staffBreakdown.length > 1) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {categoriaTaller.size > 0 && (
+            <CostByCategoryCard title="Costo de repuestos por categoría" rows={categoriaTaller} />
+          )}
+          {categoriaTienda.size > 0 && (
+            <MarginByCategoryCard title="Ventas por categoría" rows={categoriaTienda} />
+          )}
+          {hasMultipleBranches && branchBreakdown.length > 0 && (
+            <RevenueListCard title="Por sucursal" icon={Building2} rows={branchBreakdown} />
+          )}
+          {staffBreakdown.length > 1 && (
+            <StaffCommissionCard rows={staffBreakdown} commissionEnabled={commissionEnabled} />
+          )}
+        </div>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -553,5 +690,128 @@ function SummaryCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function BreakdownCardShell({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Icon className="h-4 w-4 text-primary" /> {title}
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CostByCategoryCard({ title, rows }: { title: string; rows: Map<string, number> }) {
+  const sorted = Array.from(rows.entries()).sort((a, b) => b[1] - a[1]);
+  return (
+    <BreakdownCardShell title={title} icon={Tags}>
+      <div className="space-y-1.5">
+        {sorted.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-medium text-foreground">{formatPYG(value)}</span>
+          </div>
+        ))}
+      </div>
+    </BreakdownCardShell>
+  );
+}
+
+function MarginByCategoryCard({ title, rows }: { title: string; rows: Map<string, { revenue: number; cost: number }> }) {
+  const sorted = Array.from(rows.entries()).sort((a, b) => b[1].revenue - a[1].revenue);
+  return (
+    <BreakdownCardShell title={title} icon={Tags}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-muted-foreground">
+              <th className="pb-1 text-left font-normal">Categoría</th>
+              <th className="pb-1 text-right font-normal">Ingresos</th>
+              <th className="pb-1 text-right font-normal">Ganancia</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(([label, v]) => (
+              <tr key={label} className="border-t border-border/50">
+                <td className="py-1.5 text-foreground">{label}</td>
+                <td className="py-1.5 text-right">{formatPYG(v.revenue)}</td>
+                <td className={cn("py-1.5 text-right font-medium", v.revenue - v.cost >= 0 ? "text-primary" : "text-destructive")}>
+                  {formatPYG(v.revenue - v.cost)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </BreakdownCardShell>
+  );
+}
+
+function RevenueListCard({ title, icon, rows }: { title: string; icon: any; rows: { id: string; label: string; revenue: number }[] }) {
+  const sorted = [...rows].sort((a, b) => b.revenue - a.revenue);
+  return (
+    <BreakdownCardShell title={title} icon={icon}>
+      <div className="space-y-1.5">
+        {sorted.map((r) => (
+          <div key={r.id} className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{r.label}</span>
+            <span className="font-medium text-foreground">{formatPYG(r.revenue)}</span>
+          </div>
+        ))}
+      </div>
+    </BreakdownCardShell>
+  );
+}
+
+function StaffCommissionCard({
+  rows,
+  commissionEnabled,
+}: {
+  rows: { id: string; name: string; revenue: number; rate: number }[];
+  commissionEnabled: boolean;
+}) {
+  const sorted = [...rows].sort((a, b) => b.revenue - a.revenue);
+  const totalCommission = sorted.reduce((s, r) => s + (r.revenue * r.rate) / 100, 0);
+  return (
+    <BreakdownCardShell title="Por vendedor / técnico" icon={UsersRound}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-muted-foreground">
+              <th className="pb-1 text-left font-normal">Persona</th>
+              <th className="pb-1 text-right font-normal">Atribuido</th>
+              {commissionEnabled && <th className="pb-1 text-right font-normal">Comisión</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r) => (
+              <tr key={r.id} className="border-t border-border/50">
+                <td className="py-1.5 text-foreground">{r.name}</td>
+                <td className="py-1.5 text-right">{formatPYG(r.revenue)}</td>
+                {commissionEnabled && (
+                  <td className="py-1.5 text-right font-medium text-primary">
+                    {formatPYG((r.revenue * r.rate) / 100)}
+                    <span className="ml-1 text-xs text-muted-foreground">({r.rate}%)</span>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+          {commissionEnabled && (
+            <tfoot>
+              <tr className="border-t border-border font-semibold">
+                <td className="py-1.5" colSpan={2}>Total comisiones</td>
+                <td className="py-1.5 text-right text-primary">{formatPYG(totalCommission)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </BreakdownCardShell>
   );
 }

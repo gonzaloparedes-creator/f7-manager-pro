@@ -92,6 +92,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          commission_enabled: boolean
           created_at: string
           id: string
           is_active: boolean
@@ -100,6 +101,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          commission_enabled?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
@@ -108,6 +110,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          commission_enabled?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
@@ -120,7 +123,7 @@ export type Database = {
       inventory_items: {
         Row: {
           branch_id: string | null
-          category: Database["public"]["Enums"]["inventory_category"]
+          category_id: string | null
           company_id: string
           cost_price: number
           created_at: string
@@ -133,11 +136,12 @@ export type Database = {
           name: string
           selling_price: number
           stock: number
+          subcategory_id: string | null
           updated_at: string
         }
         Insert: {
           branch_id?: string | null
-          category?: Database["public"]["Enums"]["inventory_category"]
+          category_id?: string | null
           company_id: string
           cost_price?: number
           created_at?: string
@@ -150,11 +154,12 @@ export type Database = {
           name: string
           selling_price?: number
           stock?: number
+          subcategory_id?: string | null
           updated_at?: string
         }
         Update: {
           branch_id?: string | null
-          category?: Database["public"]["Enums"]["inventory_category"]
+          category_id?: string | null
           company_id?: string
           cost_price?: number
           created_at?: string
@@ -167,6 +172,7 @@ export type Database = {
           name?: string
           selling_price?: number
           stock?: number
+          subcategory_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -177,10 +183,93 @@ export type Database = {
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "inventory_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_categories: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_subcategories: {
+        Row: {
+          category_id: string
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          category_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          category_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_subcategories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_parts: {
         Row: {
+          category_name: string | null
           created_at: string
           created_by: string | null
           historical_cost: number
@@ -190,9 +279,11 @@ export type Database = {
           order_id: string
           part_details: string | null
           quantity: number
+          subcategory_name: string | null
           supplier_name: string | null
         }
         Insert: {
+          category_name?: string | null
           created_at?: string
           created_by?: string | null
           historical_cost?: number
@@ -202,9 +293,11 @@ export type Database = {
           order_id: string
           part_details?: string | null
           quantity?: number
+          subcategory_name?: string | null
           supplier_name?: string | null
         }
         Update: {
+          category_name?: string | null
           created_at?: string
           created_by?: string | null
           historical_cost?: number
@@ -214,6 +307,7 @@ export type Database = {
           order_id?: string
           part_details?: string | null
           quantity?: number
+          subcategory_name?: string | null
           supplier_name?: string | null
         }
         Relationships: [
@@ -485,6 +579,7 @@ export type Database = {
         Row: {
           branch_id: string | null
           business_name: string | null
+          commission_rate: number
           company_id: string
           created_at: string
           evolution_instance_name: string | null
@@ -499,6 +594,7 @@ export type Database = {
         Insert: {
           branch_id?: string | null
           business_name?: string | null
+          commission_rate?: number
           company_id: string
           created_at?: string
           evolution_instance_name?: string | null
@@ -513,6 +609,7 @@ export type Database = {
         Update: {
           branch_id?: string | null
           business_name?: string | null
+          commission_rate?: number
           company_id?: string
           created_at?: string
           evolution_instance_name?: string | null
@@ -606,6 +703,8 @@ export type Database = {
       }
       product_sales: {
         Row: {
+          branch_id: string | null
+          category_name: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -614,10 +713,13 @@ export type Database = {
           payment_method: string | null
           product_name: string
           quantity: number
+          subcategory_name: string | null
           unit_cost: number
           unit_price: number
         }
         Insert: {
+          branch_id?: string | null
+          category_name?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -626,10 +728,13 @@ export type Database = {
           payment_method?: string | null
           product_name: string
           quantity?: number
+          subcategory_name?: string | null
           unit_cost?: number
           unit_price?: number
         }
         Update: {
+          branch_id?: string | null
+          category_name?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -638,10 +743,19 @@ export type Database = {
           payment_method?: string | null
           product_name?: string
           quantity?: number
+          subcategory_name?: string | null
           unit_cost?: number
           unit_price?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "product_sales_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -737,7 +851,6 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff"
-      inventory_category: "Repuesto" | "Accesorio" | "Herramienta" | "Producto"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -866,7 +979,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff"],
-      inventory_category: ["Repuesto", "Accesorio", "Herramienta", "Producto"],
     },
   },
 } as const

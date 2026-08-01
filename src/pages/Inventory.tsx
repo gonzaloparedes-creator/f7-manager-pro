@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Package, AlertTriangle, Trash2 } from "lucide-react";
@@ -10,6 +11,8 @@ import NewInventoryItemDialog from "@/components/NewInventoryItemDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
+import { useCategories } from "@/hooks/useCategories";
+import { useBranches } from "@/hooks/useBranches";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,7 +21,9 @@ import { formatPYG } from "@/lib/orders";
 type Item = {
   id: string;
   name: string;
-  category: "Repuesto" | "Accesorio" | "Herramienta";
+  category_id: string | null;
+  subcategory_id: string | null;
+  branch_id: string | null;
   stock: number;
   min_stock_alert: number;
   cost_price: number;
@@ -26,22 +31,30 @@ type Item = {
   image_url: string | null;
 };
 
+const ALL_CATEGORIES = "__all__";
+const ALL_BRANCHES = "__all__";
+
 export default function Inventory() {
+  // Todos los hooks van primero, sin condicionar — el early return de plan
+  // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
-  if (!planLoading && isStarter) return <Navigate to="/dashboard" replace />;
+  const { categories, subcategories } = useCategories();
+  const { branches, hasMultipleBranches } = useBranches();
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
+  const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
 
   const load = async () => {
     if (!companyId) return;
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from("inventory_items")
-      .select("*")
+      .select("id,name,category_id,subcategory_id,branch_id,stock,min_stock_alert,cost_price,selling_price,image_url")
       .eq("company_id", companyId)
       .eq("is_for_repair", true)
       .order("created_at", { ascending: false });
@@ -60,12 +73,24 @@ export default function Inventory() {
     load();
   };
 
-  const filtered = items.filter((i) =>
-    i.name.toLowerCase().includes(search.toLowerCase()) ||
-    i.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null;
+  const subcategoryName = (id: string | null) => subcategories.find((s) => s.id === id)?.name ?? null;
+  const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? null;
+
+  const filtered = items.filter((i) => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q ||
+      i.name.toLowerCase().includes(q) ||
+      (categoryName(i.category_id) ?? "").toLowerCase().includes(q) ||
+      (subcategoryName(i.subcategory_id) ?? "").toLowerCase().includes(q);
+    const matchesCategory = categoryFilter === ALL_CATEGORIES || i.category_id === categoryFilter;
+    const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
+    return matchesSearch && matchesCategory && matchesBranch;
+  });
 
   const lowStockCount = items.filter((i) => i.stock <= i.min_stock_alert).length;
+
+  if (!planLoading && isStarter) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="space-y-6">
@@ -104,12 +129,32 @@ export default function Inventory() {
       </div>
 
       <Card className="p-4">
-        <Input
-          placeholder="Buscar por nombre o categoría..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mb-4 max-w-sm"
-        />
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Input
+            placeholder="Buscar por nombre o categoría..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+          {categories.length > 0 && (
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CATEGORIES}>Todas las categorías</SelectItem>
+                {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {hasMultipleBranches && (
+            <Select value={branchFilter} onValueChange={setBranchFilter}>
+              <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_BRANCHES}>Todas las sucursales</SelectItem>
+                {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -117,6 +162,7 @@ export default function Inventory() {
                 <TableHead>Imagen</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Categoría</TableHead>
+                {hasMultipleBranches && <TableHead>Sucursal</TableHead>}
                 <TableHead className="text-right">Stock</TableHead>
                 <TableHead className="text-right">Mín.</TableHead>
                 <TableHead className="text-right">Costo</TableHead>
@@ -126,11 +172,13 @@ export default function Inventory() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Cargando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Cargando...</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Sin artículos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Sin artículos</TableCell></TableRow>
               ) : filtered.map((i) => {
                 const low = i.stock <= i.min_stock_alert;
+                const cat = categoryName(i.category_id);
+                const sub = subcategoryName(i.subcategory_id);
                 return (
                   <TableRow key={i.id} className={cn(low && "bg-secondary/5")}>
                     <TableCell>
@@ -144,8 +192,18 @@ export default function Inventory() {
                     </TableCell>
                     <TableCell className="font-medium text-foreground">{i.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{i.category}</Badge>
+                      {cat ? (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge variant="outline">{cat}</Badge>
+                          {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Sin categoría</span>
+                      )}
                     </TableCell>
+                    {hasMultipleBranches && (
+                      <TableCell className="text-muted-foreground">{branchName(i.branch_id) ?? "—"}</TableCell>
+                    )}
                     <TableCell className="text-right">
                       <span className={cn(
                         "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold",

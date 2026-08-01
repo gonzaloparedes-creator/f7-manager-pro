@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
@@ -10,6 +11,8 @@ import SellProductDialog from "@/components/SellProductDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
+import { useCategories } from "@/hooks/useCategories";
+import { useBranches } from "@/hooks/useBranches";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,6 +21,9 @@ import { formatPYG } from "@/lib/orders";
 type Product = {
   id: string;
   name: string;
+  category_id: string | null;
+  subcategory_id: string | null;
+  branch_id: string | null;
   stock: number;
   min_stock_alert: number;
   cost_price: number;
@@ -34,23 +40,31 @@ type Sale = {
   created_at: string;
 };
 
+const ALL_CATEGORIES = "__all__";
+const ALL_BRANCHES = "__all__";
+
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 export default function Products() {
+  // Todos los hooks van primero, sin condicionar — el early return de plan
+  // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
   const { companyId } = useCompany();
   const { isBusiness, isRetail, loading: planLoading } = usePlan();
-  const hasExternalInventory = isBusiness || isRetail;
-  if (!planLoading && !hasExternalInventory) return <Navigate to="/dashboard" replace />;
-
+  const { categories, subcategories } = useCategories();
+  const { branches, hasMultipleBranches } = useBranches();
   const [items, setItems] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
+  const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [selling, setSelling] = useState<Product | null>(null);
+
+  const hasExternalInventory = isBusiness || isRetail;
 
   const load = async () => {
     if (!companyId) return;
@@ -58,7 +72,7 @@ export default function Products() {
     const [{ data: productsData, error: pErr }, { data: salesData, error: sErr }] = await Promise.all([
       (supabase as any)
         .from("inventory_items")
-        .select("id, name, stock, min_stock_alert, cost_price, selling_price, image_url")
+        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url")
         .eq("company_id", companyId)
         .eq("is_for_sale", true)
         .order("created_at", { ascending: false }),
@@ -86,13 +100,23 @@ export default function Products() {
     load();
   };
 
-  const filtered = items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()));
+  const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null;
+  const subcategoryName = (id: string | null) => subcategories.find((s) => s.id === id)?.name ?? null;
+
+  const filtered = items.filter((i) => {
+    const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === ALL_CATEGORIES || i.category_id === categoryFilter;
+    const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
+    return matchesSearch && matchesCategory && matchesBranch;
+  });
   const outOfStockCount = items.filter((i) => i.stock <= 0).length;
   const lowStockCount = items.filter((i) => i.stock > 0 && i.stock <= i.min_stock_alert).length;
 
   const today = new Date();
   const salesToday = sales.filter((s) => isSameDay(new Date(s.created_at), today));
   const totalToday = salesToday.reduce((s, sale) => s + sale.quantity * Number(sale.unit_price || 0), 0);
+
+  if (!planLoading && !hasExternalInventory) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="space-y-6">
@@ -137,12 +161,32 @@ export default function Products() {
         </Card>
       </div>
 
-      <Input
-        placeholder="Buscar producto..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Input
+          placeholder="Buscar producto..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        {categories.length > 0 && (
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CATEGORIES}>Todas las categorías</SelectItem>
+              {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        {hasMultipleBranches && (
+          <Select value={branchFilter} onValueChange={setBranchFilter}>
+            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_BRANCHES}>Todas las sucursales</SelectItem>
+              {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
 
       {loading ? (
         <p className="text-center text-sm text-muted-foreground">Cargando...</p>
@@ -158,6 +202,8 @@ export default function Products() {
           {filtered.map((i) => {
             const outOfStock = i.stock <= 0;
             const lowStock = !outOfStock && i.stock <= i.min_stock_alert;
+            const cat = categoryName(i.category_id);
+            const sub = subcategoryName(i.subcategory_id);
             return (
               <Card
                 key={i.id}
@@ -187,6 +233,18 @@ export default function Products() {
                       </Button>
                     )}
                   </div>
+
+                  {(cat || i.branch_id) && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {cat && <Badge variant="outline" className="text-[11px]">{cat}</Badge>}
+                      {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
+                      {hasMultipleBranches && i.branch_id && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {branches.find((b) => b.id === i.branch_id)?.name ?? "Sucursal"}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between">
                     {outOfStock ? (

@@ -7,11 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { useCategories } from "@/hooks/useCategories";
+import { useBranches } from "@/hooks/useBranches";
 import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
-import { Loader2, ImagePlus } from "lucide-react";
+import { Loader2, ImagePlus, FolderPlus } from "lucide-react";
 
-type Category = "Repuesto" | "Accesorio" | "Herramienta";
+const CREATE_CATEGORY = "__create_category__";
+const CREATE_SUBCATEGORY = "__create_subcategory__";
+const NO_SUBCATEGORY = "__none__";
 
 export default function NewInventoryItemDialog({
   open,
@@ -24,8 +28,12 @@ export default function NewInventoryItemDialog({
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const { categories, subcategoriesFor, reload: reloadCategories } = useCategories();
+  const { branches, userBranchId, hasMultipleBranches } = useBranches();
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<Category>("Repuesto");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
+  const [branchId, setBranchId] = useState<string | null>(null);
   const [stock, setStock] = useState("0");
   const [minAlert, setMinAlert] = useState("0");
   const [cost, setCost] = useState("0");
@@ -35,14 +43,49 @@ export default function NewInventoryItemDialog({
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
 
+  const [newCatName, setNewCatName] = useState<string | null>(null);
+  const [newSubName, setNewSubName] = useState<string | null>(null);
+  const [savingTaxonomy, setSavingTaxonomy] = useState(false);
+
   const reset = () => {
-    setName(""); setCategory("Repuesto"); setStock("0"); setMinAlert("0");
-    setCost("0"); setPrice("0"); setFile(null); setPreview(null);
+    setName(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
+    setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setFile(null); setPreview(null);
   };
 
   const onFile = (f: File | null) => {
     setFile(f);
     setPreview(f ? URL.createObjectURL(f) : null);
+  };
+
+  const createCategory = async () => {
+    if (!newCatName?.trim() || !companyId) return;
+    setSavingTaxonomy(true);
+    const { data, error } = await supabase
+      .from("inventory_categories")
+      .insert({ company_id: companyId, name: newCatName.trim() })
+      .select("id")
+      .single();
+    setSavingTaxonomy(false);
+    if (error) { toast.error(error.message); return; }
+    await reloadCategories();
+    setCategoryId((data as any).id);
+    setSubcategoryId(null);
+    setNewCatName(null);
+  };
+
+  const createSubcategory = async () => {
+    if (!newSubName?.trim() || !companyId || !categoryId) return;
+    setSavingTaxonomy(true);
+    const { data, error } = await supabase
+      .from("inventory_subcategories")
+      .insert({ company_id: companyId, category_id: categoryId, name: newSubName.trim() })
+      .select("id")
+      .single();
+    setSavingTaxonomy(false);
+    if (error) { toast.error(error.message); return; }
+    await reloadCategories();
+    setSubcategoryId((data as any).id);
+    setNewSubName(null);
   };
 
   const submit = async () => {
@@ -70,8 +113,10 @@ export default function NewInventoryItemDialog({
 
       const { error } = await (supabase as any).from("inventory_items").insert({
         company_id: companyId,
+        branch_id: branchId,
         name: name.trim(),
-        category,
+        category_id: categoryId,
+        subcategory_id: subcategoryId,
         stock: parseInt(stock) || 0,
         min_stock_alert: parseInt(minAlert) || 0,
         cost_price: parseFloat(cost) || 0,
@@ -109,20 +154,80 @@ export default function NewInventoryItemDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label>Categoría</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Repuesto">Repuesto</SelectItem>
-                  <SelectItem value="Accesorio">Accesorio</SelectItem>
-                  <SelectItem value="Herramienta">Herramienta</SelectItem>
-                </SelectContent>
-              </Select>
+              {newCatName !== null ? (
+                <div className="flex gap-1">
+                  <Input autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Nombre" />
+                  <Button size="sm" onClick={createCategory} disabled={savingTaxonomy || !newCatName.trim()}>
+                    {savingTaxonomy ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={categoryId ?? ""}
+                  onValueChange={(v) => {
+                    if (v === CREATE_CATEGORY) { setNewCatName(""); return; }
+                    setCategoryId(v || null);
+                    setSubcategoryId(null);
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Sin categoría" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    <SelectItem value={CREATE_CATEGORY} className="text-primary">
+                      <span className="flex items-center gap-1.5"><FolderPlus className="h-3.5 w-3.5" /> Nueva categoría...</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Stock</Label>
               <Input type="number" min={0} value={stock} onChange={(e) => setStock(e.target.value)} />
             </div>
           </div>
+
+          {categoryId && (
+            <div className="grid gap-2">
+              <Label>Subcategoría (opcional)</Label>
+              {newSubName !== null ? (
+                <div className="flex gap-1">
+                  <Input autoFocus value={newSubName} onChange={(e) => setNewSubName(e.target.value)} placeholder="Nombre" />
+                  <Button size="sm" onClick={createSubcategory} disabled={savingTaxonomy || !newSubName.trim()}>
+                    {savingTaxonomy ? <Loader2 className="h-4 w-4 animate-spin" /> : "OK"}
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={subcategoryId ?? NO_SUBCATEGORY}
+                  onValueChange={(v) => {
+                    if (v === CREATE_SUBCATEGORY) { setNewSubName(""); return; }
+                    setSubcategoryId(v === NO_SUBCATEGORY ? null : v);
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Sin subcategoría" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_SUBCATEGORY}>Sin subcategoría</SelectItem>
+                    {subcategoriesFor(categoryId).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    <SelectItem value={CREATE_SUBCATEGORY} className="text-primary">
+                      <span className="flex items-center gap-1.5"><FolderPlus className="h-3.5 w-3.5" /> Nueva subcategoría...</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
+          {hasMultipleBranches && (
+            <div className="grid gap-2">
+              <Label>Sucursal</Label>
+              <Select value={branchId ?? userBranchId ?? ""} onValueChange={(v) => setBranchId(v || null)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar sucursal" /></SelectTrigger>
+                <SelectContent>
+                  {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div className="grid gap-2">
