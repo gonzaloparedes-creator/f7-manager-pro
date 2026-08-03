@@ -96,38 +96,58 @@ export type Database = {
           created_at: string
           founder_cohort: boolean
           founder_cohort_at: string | null
+          has_own_shop: boolean | null
           id: string
           is_active: boolean
           is_paying: boolean
           name: string
           plan_type: string
+          previous_system: string | null
+          referral_partner_id: string | null
           updated_at: string
+          weekly_repairs_estimate: string | null
         }
         Insert: {
           commission_enabled?: boolean
           created_at?: string
           founder_cohort?: boolean
           founder_cohort_at?: string | null
+          has_own_shop?: boolean | null
           id?: string
           is_active?: boolean
           is_paying?: boolean
           name: string
           plan_type?: string
+          previous_system?: string | null
+          referral_partner_id?: string | null
           updated_at?: string
+          weekly_repairs_estimate?: string | null
         }
         Update: {
           commission_enabled?: boolean
           created_at?: string
           founder_cohort?: boolean
           founder_cohort_at?: string | null
+          has_own_shop?: boolean | null
           id?: string
           is_active?: boolean
           is_paying?: boolean
           name?: string
           plan_type?: string
+          previous_system?: string | null
+          referral_partner_id?: string | null
           updated_at?: string
+          weekly_repairs_estimate?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_referral_partner_id_fkey"
+            columns: ["referral_partner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_items: {
         Row: {
@@ -665,6 +685,30 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      referral_partners: {
+        Row: {
+          commission_rate: number
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          commission_rate?: number
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          commission_rate?: number
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
         }
         Relationships: []
       }

@@ -17,11 +17,20 @@ interface Company {
   plan_type: string;
   is_active: boolean;
   founder_cohort: boolean;
+  referral_partner_id: string | null;
 }
+
+interface Partner {
+  id: string;
+  name: string;
+}
+
+const NO_PARTNER = "__none__";
 
 export default function MasterAdmin() {
   const { isSuperAdmin, loading } = useSuperAdmin();
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,15 +43,19 @@ export default function MasterAdmin() {
   }, [isSuperAdmin]);
 
   async function load() {
-    const { data, error } = await supabase
-      .from("companies")
-      .select("id, name, created_at, plan_type, is_active, founder_cohort")
-      .order("created_at", { ascending: false });
+    const [{ data, error }, { data: partnersData }] = await Promise.all([
+      supabase
+        .from("companies")
+        .select("id, name, created_at, plan_type, is_active, founder_cohort, referral_partner_id")
+        .order("created_at", { ascending: false }),
+      supabase.from("referral_partners").select("id, name").order("name"),
+    ]);
     if (error) {
       toast.error("No se pudieron cargar las empresas");
       return;
     }
     setCompanies((data as Company[]) ?? []);
+    setPartners((partnersData as Partner[]) ?? []);
   }
 
   async function updateCompany(id: string, patch: Partial<Company>) {
@@ -110,6 +123,7 @@ export default function MasterAdmin() {
                     <TableHead>Plan</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Fundador</TableHead>
+                    <TableHead>Aliado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -158,11 +172,24 @@ export default function MasterAdmin() {
                           onCheckedChange={(v) => toggleFounder(c.id, v)}
                         />
                       </TableCell>
+                      <TableCell>
+                        <Select
+                          value={c.referral_partner_id ?? NO_PARTNER}
+                          onValueChange={(v) => updateCompany(c.id, { referral_partner_id: v === NO_PARTNER ? null : v })}
+                          disabled={busy === c.id}
+                        >
+                          <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_PARTNER}>Ninguno</SelectItem>
+                            {partners.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {companies.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         Sin empresas registradas.
                       </TableCell>
                     </TableRow>

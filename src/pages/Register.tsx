@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Wrench } from "lucide-react";
+import { Wrench, Sparkles } from "lucide-react";
+
+const REPAIRS_BUCKETS = ["1 a 5", "6 a 15", "16 a 30", "Más de 30"];
 
 export default function Register() {
+  const [searchParams] = useSearchParams();
+  const refSlug = searchParams.get("ref");
+
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
@@ -18,10 +24,37 @@ export default function Register() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const [partnerName, setPartnerName] = useState<string | null>(null);
+  const [checkingPartner, setCheckingPartner] = useState(!!refSlug);
+
+  // Preguntas del Programa Fundadores — solo cuando llega por un link de aliado.
+  const [hasOwnShop, setHasOwnShop] = useState<"si" | "no" | "">("");
+  const [weeklyRepairs, setWeeklyRepairs] = useState("");
+  const [previousSystem, setPreviousSystem] = useState("");
+
   useEffect(() => { document.title = "Registro | F7 Manager Pro"; }, []);
+
+  useEffect(() => {
+    if (!refSlug) { setCheckingPartner(false); return; }
+    supabase
+      .from("referral_partners")
+      .select("name")
+      .eq("slug", refSlug)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPartnerName(data?.name ?? null);
+        setCheckingPartner(false);
+      });
+  }, [refSlug]);
+
+  const isFounderFlow = !!partnerName;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isFounderFlow && (!hasOwnShop || !weeklyRepairs)) {
+      toast({ title: "Faltan datos", description: "Completá las dos preguntas para continuar.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/login`;
@@ -30,7 +63,19 @@ export default function Register() {
         password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: { full_name: fullName, business_name: businessName, phone },
+          data: {
+            full_name: fullName,
+            business_name: businessName,
+            phone,
+            ...(isFounderFlow
+              ? {
+                  referral_slug: refSlug,
+                  has_own_shop: hasOwnShop === "si" ? "true" : "false",
+                  weekly_repairs_estimate: weeklyRepairs,
+                  previous_system: previousSystem,
+                }
+              : {}),
+          },
         },
       });
       setLoading(false);
@@ -77,6 +122,14 @@ export default function Register() {
           <CardDescription>Empezá a gestionar tus reparaciones</CardDescription>
         </CardHeader>
         <CardContent>
+          {!checkingPartner && isFounderFlow && (
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span>
+                Te invitó <b>{partnerName}</b> al Programa Fundadores — completá tus datos y en breve activamos tu acceso.
+              </span>
+            </div>
+          )}
           <form onSubmit={onSubmit} className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor="fullName">Nombre completo</Label>
@@ -98,7 +151,41 @@ export default function Register() {
               <Label htmlFor="password">Contraseña</Label>
               <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+
+            {isFounderFlow && (
+              <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+                <div className="space-y-2">
+                  <Label>¿Tenés local propio?</Label>
+                  <Select value={hasOwnShop} onValueChange={(v) => setHasOwnShop(v as "si" | "no")}>
+                    <SelectTrigger><SelectValue placeholder="Elegí una opción" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="si">Sí</SelectItem>
+                      <SelectItem value="no">No, trabajo de forma independiente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>¿Cuántas reparaciones hacés por semana, aproximadamente?</Label>
+                  <Select value={weeklyRepairs} onValueChange={setWeeklyRepairs}>
+                    <SelectTrigger><SelectValue placeholder="Elegí una opción" /></SelectTrigger>
+                    <SelectContent>
+                      {REPAIRS_BUCKETS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="previousSystem">¿Usás algún sistema hoy para gestionar tu taller? (opcional)</Label>
+                  <Input
+                    id="previousSystem"
+                    placeholder="Ej: cuaderno, Excel, otro sistema..."
+                    value={previousSystem}
+                    onChange={(e) => setPreviousSystem(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading || checkingPartner}>
               {loading ? "Creando..." : "Crear cuenta"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
