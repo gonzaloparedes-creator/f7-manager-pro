@@ -94,8 +94,11 @@ export type Database = {
         Row: {
           commission_enabled: boolean
           created_at: string
+          founder_cohort: boolean
+          founder_cohort_at: string | null
           id: string
           is_active: boolean
+          is_paying: boolean
           name: string
           plan_type: string
           updated_at: string
@@ -103,8 +106,11 @@ export type Database = {
         Insert: {
           commission_enabled?: boolean
           created_at?: string
+          founder_cohort?: boolean
+          founder_cohort_at?: string | null
           id?: string
           is_active?: boolean
+          is_paying?: boolean
           name: string
           plan_type?: string
           updated_at?: string
@@ -112,8 +118,11 @@ export type Database = {
         Update: {
           commission_enabled?: boolean
           created_at?: string
+          founder_cohort?: boolean
+          founder_cohort_at?: string | null
           id?: string
           is_active?: boolean
+          is_paying?: boolean
           name?: string
           plan_type?: string
           updated_at?: string

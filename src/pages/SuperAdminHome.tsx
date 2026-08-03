@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Globe2, Building2 } from "lucide-react";
+import { ShieldCheck, Globe2, Building2, Rocket } from "lucide-react";
 
 export default function SuperAdminHome() {
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -29,6 +29,12 @@ export default function SuperAdminHome() {
       icon: Building2,
       title: "Gestión de Empresas",
       desc: "Planes, estado y administración global de talleres.",
+    },
+    {
+      to: "/superadmin/fundadores",
+      icon: Rocket,
+      title: "Panel de Fundadores",
+      desc: "Embudo de activación del Programa Fundadores: quién activó, quién paga.",
     },
   ];
 

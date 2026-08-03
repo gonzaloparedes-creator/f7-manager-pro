@@ -16,6 +16,7 @@ interface Company {
   created_at: string;
   plan_type: string;
   is_active: boolean;
+  founder_cohort: boolean;
 }
 
 export default function MasterAdmin() {
@@ -35,7 +36,7 @@ export default function MasterAdmin() {
   async function load() {
     const { data, error } = await supabase
       .from("companies")
-      .select("id, name, created_at, plan_type, is_active")
+      .select("id, name, created_at, plan_type, is_active, founder_cohort")
       .order("created_at", { ascending: false });
     if (error) {
       toast.error("No se pudieron cargar las empresas");
@@ -54,6 +55,21 @@ export default function MasterAdmin() {
     }
     setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     toast.success("Empresa actualizada");
+  }
+
+  async function toggleFounder(id: string, value: boolean) {
+    setBusy(id);
+    const { error } = await supabase
+      .from("companies")
+      .update({ founder_cohort: value, founder_cohort_at: value ? new Date().toISOString() : null })
+      .eq("id", id);
+    setBusy(null);
+    if (error) {
+      toast.error("Error al actualizar");
+      return;
+    }
+    setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, founder_cohort: value } : c)));
+    toast.success(value ? "Marcada como Fundador" : "Ya no es Fundador");
   }
 
   if (loading) {
@@ -93,6 +109,7 @@ export default function MasterAdmin() {
                     <TableHead>Creada</TableHead>
                     <TableHead>Plan</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead>Fundador</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -134,11 +151,18 @@ export default function MasterAdmin() {
                           </Badge>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={c.founder_cohort}
+                          disabled={busy === c.id}
+                          onCheckedChange={(v) => toggleFounder(c.id, v)}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                   {companies.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         Sin empresas registradas.
                       </TableCell>
                     </TableRow>
