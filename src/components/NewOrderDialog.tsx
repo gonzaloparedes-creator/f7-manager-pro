@@ -27,6 +27,31 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
+type PhotoEntry = { file: File; previewUrl: string };
+
+// Comprimir apenas se agrega la foto (no recién al enviar el formulario): una
+// foto de cámara sin comprimir puede pesar varios MB, y mientras el usuario
+// completa el resto del formulario esos File quedan enteros en memoria. En
+// Android, justo después de volver de la app de Cámara (que ya usó memoria
+// por su cuenta), esa presión extra hace que el sistema mate la pestaña y
+// vuelva al dashboard — no pasa con la galería porque el picker del sistema
+// es mucho más liviano que la app de Cámara.
+const PHOTO_COMPRESS_OPTIONS = {
+  maxSizeMB: 0.3,
+  maxWidthOrHeight: 1024,
+  useWebWorker: true,
+  initialQuality: 0.8,
+};
+
+async function compressPhoto(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  try {
+    const compressed = await imageCompression(file, PHOTO_COMPRESS_OPTIONS);
+    return new File([compressed], file.name, { type: compressed.type || file.type });
+  } catch {
+    return file;
+  }
+}
 
 
 type FormState = {
@@ -105,7 +130,7 @@ export default function NewOrderDialog({
   };
   const initialDraft = loadDraft();
   const [form, setForm] = useState<FormState>(initialDraft?.form ?? INITIAL_STATE);
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<PhotoEntry[]>([]);
   const [clients, setClients] = useState<ClientLite[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(initialDraft?.selectedClientId ?? null);
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
@@ -148,7 +173,7 @@ export default function NewOrderDialog({
 
   const reset = (clearDraft = false) => {
     setForm(INITIAL_STATE);
-    setFiles([]);
+    setFiles((prev) => { prev.forEach((p) => URL.revokeObjectURL(p.previewUrl)); return []; });
     setSelectedClientId(null);
     setClientSearch("");
     setShowSecondaryContact(false);
@@ -158,7 +183,7 @@ export default function NewOrderDialog({
   };
 
 
-  const addFiles = (incoming: File[]) => {
+  const addFiles = async (incoming: File[]) => {
     if (incoming.length === 0) return;
     const remaining = limits.photos - files.length;
     if (remaining <= 0) {
@@ -172,7 +197,17 @@ export default function NewOrderDialog({
     if (incoming.length > remaining) {
       toast({ title: `Solo se agregaron ${accepted.length} de ${incoming.length} fotos (máximo ${limits.photos}).` });
     }
-    setFiles((prev) => [...prev, ...accepted]);
+    setCompressing(true);
+    try {
+      const entries: PhotoEntry[] = [];
+      for (const file of accepted) {
+        const compressed = await compressPhoto(file);
+        entries.push({ file: compressed, previewUrl: URL.createObjectURL(compressed) });
+      }
+      setFiles((prev) => [...prev, ...entries]);
+    } finally {
+      setCompressing(false);
+    }
   };
 
   const toggleProblem = (p: string) => {
@@ -218,33 +253,10 @@ export default function NewOrderDialog({
     }
     setLoading(true);
     try {
-      // Comprimir e subir fotos de recepción (mismo criterio que las fotos
-      // de evidencia en OrderDetail: son las primeras que ve el cliente y
-      // suelen subirse desde el mostrador con datos móviles).
-      setCompressing(true);
-      const compressOptions = {
-        maxSizeMB: 0.3,
-        maxWidthOrHeight: 1024,
-        useWebWorker: true,
-        initialQuality: 0.8,
-      };
-      const uploadFiles: File[] = [];
-      for (const file of files) {
-        if (file.type.startsWith("image/")) {
-          try {
-            const compressed = await imageCompression(file, compressOptions);
-            uploadFiles.push(new File([compressed], file.name, { type: compressed.type || file.type }));
-          } catch {
-            uploadFiles.push(file);
-          }
-        } else {
-          uploadFiles.push(file);
-        }
-      }
-      setCompressing(false);
-
+      // Las fotos ya se comprimen apenas se agregan (ver addFiles), así que
+      // acá solo queda subir lo que ya está en memoria en tamaño reducido.
       const photoUrls: string[] = [];
-      for (const file of uploadFiles) {
+      for (const { file } of files) {
         const ext = file.name.split(".").pop() || "jpg";
         const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error: upErr } = await supabase.storage.from("order-photos").upload(path, file);
@@ -687,9 +699,14 @@ export default function NewOrderDialog({
               {files.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {files.map((f, i) => (
-                    <div key={i} className="relative">
-                      <img src={URL.createObjectURL(f)} alt={f.name} className="h-16 w-16 rounded-md object-cover" />
-                      <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                    <div key={f.previewUrl} className="relative">
+                      <img src={f.previewUrl} alt={f.file.name} className="h-16 w-16 rounded-md object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          URL.revokeObjectURL(f.previewUrl);
+                          setFiles(files.filter((_, j) => j !== i));
+                        }}
                         className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
                         <X className="h-3 w-3" />
                       </button>
@@ -882,7 +899,7 @@ export default function NewOrderDialog({
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || compressing}>
               {compressing ? "Optimizando fotos..." : loading ? "Creando..." : "Crear orden"}
             </Button>
           </div>
