@@ -199,3 +199,39 @@
   .print-receipt img { max-width: 100%; }
 }
 
+/* ============ Print ticket (térmica 80mm) ============ */
+.print-ticket { display: none; }
+
+@media print {
+  @page ticket {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  .print-ticket, .print-ticket * { visibility: visible !important; }
+
+  .print-ticket {
+    display: block !important;
+    page: ticket;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 80mm;
+    padding: 4mm;
+    margin: 0;
+    background: #fff;
+    color: #000;
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    box-sizing: border-box;
+  }
+
+  .print-ticket > * + * { margin-top: 1.5mm; }
+
+  .ticket-dashed {
+    border-top: 1px dashed #000;
+    margin: 1.5mm 0;
+  }
+}
+

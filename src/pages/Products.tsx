@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printer } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
-import SellProductDialog from "@/components/SellProductDialog";
+import SellProductDialog, { type CompletedSale } from "@/components/SellProductDialog";
+import { SaleTicket } from "@/components/SaleTicket";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -38,6 +40,7 @@ type Sale = {
   unit_price: number;
   payment_method: string | null;
   created_at: string;
+  branch_id: string | null;
 };
 
 const ALL_CATEGORIES = "__all__";
@@ -51,6 +54,7 @@ export default function Products() {
   // Todos los hooks van primero, sin condicionar — el early return de plan
   // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
+  const { user } = useAuth();
   const { companyId } = useCompany();
   const { isBusiness, isRetail, loading: planLoading } = usePlan();
   const { categories, subcategories } = useCategories();
@@ -63,6 +67,20 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [selling, setSelling] = useState<Product | null>(null);
+  const [businessName, setBusinessName] = useState<string | null>(null);
+  const [printingSale, setPrintingSale] = useState<Sale | CompletedSale | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle()
+      .then(({ data }) => setBusinessName(data?.business_name ?? null));
+  }, [user]);
+
+  useEffect(() => {
+    if (!printingSale) return;
+    const t = window.setTimeout(() => window.print(), 80);
+    return () => window.clearTimeout(t);
+  }, [printingSale]);
 
   const hasExternalInventory = isBusiness || isRetail;
 
@@ -78,7 +96,7 @@ export default function Products() {
         .order("created_at", { ascending: false }),
       (supabase as any)
         .from("product_sales")
-        .select("id, product_name, quantity, unit_price, payment_method, created_at")
+        .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -293,9 +311,14 @@ export default function Products() {
                       {s.payment_method ? ` · ${s.payment_method}` : ""}
                     </div>
                   </div>
-                  <span className="shrink-0 font-semibold text-foreground">
-                    {formatPYG(s.quantity * Number(s.unit_price || 0))}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-semibold text-foreground">
+                      {formatPYG(s.quantity * Number(s.unit_price || 0))}
+                    </span>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPrintingSale(s)}>
+                      <Printer className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -309,7 +332,16 @@ export default function Products() {
         onOpenChange={(o) => !o && setSelling(null)}
         product={selling}
         onSold={load}
+        onPrintRequest={setPrintingSale}
       />
+
+      {printingSale && (
+        <SaleTicket
+          sale={printingSale}
+          businessName={businessName}
+          branchName={branches.find((b) => b.id === printingSale.branch_id)?.name ?? null}
+        />
+      )}
     </div>
   );
 }
