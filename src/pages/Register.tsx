@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Wrench, Sparkles } from "lucide-react";
+import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
 
 const REPAIRS_BUCKETS = ["1 a 5", "6 a 15", "16 a 30", "Más de 30"];
 
@@ -32,7 +33,24 @@ export default function Register() {
   const [weeklyRepairs, setWeeklyRepairs] = useState("");
   const [previousSystem, setPreviousSystem] = useState("");
 
+  // País por geolocalización de IP (api/geo.ts) — solo pre-selecciona,
+  // el usuario siempre puede cambiarlo. Departamento/ciudad solo aplican a PY.
+  const [country, setCountry] = useState("PY");
+  const [department, setDepartment] = useState("");
+  const [city, setCity] = useState("");
+  const isParaguay = country === "PY";
+
   useEffect(() => { document.title = "Registro | F7 Manager Pro"; }, []);
+
+  useEffect(() => {
+    fetch("/api/geo")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const detected = data?.country as string | undefined;
+        if (detected && COUNTRIES.some((c) => c.code === detected)) setCountry(detected);
+      })
+      .catch(() => { /* sin geo, se queda en Paraguay por defecto */ });
+  }, []);
 
   useEffect(() => {
     if (!refSlug) { setCheckingPartner(false); return; }
@@ -55,6 +73,10 @@ export default function Register() {
       toast({ title: "Faltan datos", description: "Completá las dos preguntas para continuar.", variant: "destructive" });
       return;
     }
+    if (isParaguay && !department) {
+      toast({ title: "Faltan datos", description: "Elegí tu departamento.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/login`;
@@ -67,6 +89,9 @@ export default function Register() {
             full_name: fullName,
             business_name: businessName,
             phone,
+            country,
+            department: isParaguay ? department : "",
+            city: isParaguay ? city : "",
             ...(isFounderFlow
               ? {
                   referral_slug: refSlug,
@@ -151,6 +176,34 @@ export default function Register() {
               <Label htmlFor="password">Contraseña</Label>
               <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
+
+            <div className="space-y-2">
+              <Label>País</Label>
+              <Select value={country} onValueChange={(v) => { setCountry(v); setDepartment(""); setCity(""); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isParaguay && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Departamento</Label>
+                  <Select value={department} onValueChange={setDepartment}>
+                    <SelectTrigger><SelectValue placeholder="Elegí uno" /></SelectTrigger>
+                    <SelectContent>
+                      {PY_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">Ciudad</Label>
+                  <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+                </div>
+              </div>
+            )}
 
             {isFounderFlow && (
               <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">

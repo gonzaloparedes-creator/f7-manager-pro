@@ -52,3 +52,6 @@ supabase/functions/.import_map.json
 # Agent environments
 .agents/
 .gemini/
+
+# Segundo cerebro (notas de producto/negocio, no es código)
+segundo-cerebro/

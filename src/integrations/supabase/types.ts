@@ -92,8 +92,11 @@ export type Database = {
       }
       companies: {
         Row: {
+          city: string | null
           commission_enabled: boolean
+          country: string
           created_at: string
+          department: string | null
           founder_cohort: boolean
           founder_cohort_at: string | null
           has_own_shop: boolean | null
@@ -108,8 +111,11 @@ export type Database = {
           weekly_repairs_estimate: string | null
         }
         Insert: {
+          city?: string | null
           commission_enabled?: boolean
+          country?: string
           created_at?: string
+          department?: string | null
           founder_cohort?: boolean
           founder_cohort_at?: string | null
           has_own_shop?: boolean | null
@@ -124,8 +130,11 @@ export type Database = {
           weekly_repairs_estimate?: string | null
         }
         Update: {
+          city?: string | null
           commission_enabled?: boolean
+          country?: string
           created_at?: string
+          department?: string | null
           founder_cohort?: boolean
           founder_cohort_at?: string | null
           has_own_shop?: boolean | null
