@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Globe2, Building2, Rocket } from "lucide-react";
+import { ShieldCheck, Globe2, Building2, Rocket, BarChart3 } from "lucide-react";
 
 export default function SuperAdminHome() {
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -18,6 +18,12 @@ export default function SuperAdminHome() {
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
 
   const tiles = [
+    {
+      to: "/superadmin/metricas",
+      icon: BarChart3,
+      title: "Panel de Métricas",
+      desc: "Crecimiento, órdenes por mes, por departamento y dispositivos más reparados — todos los talleres.",
+    },
     {
       to: "/superadmin/proveedores",
       icon: Globe2,

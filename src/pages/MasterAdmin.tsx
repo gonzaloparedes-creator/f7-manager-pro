@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -9,6 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
+import { COUNTRIES, PY_DEPARTMENTS, countryLabel } from "@/lib/locations";
+import { monthKey, monthLabel, lastMonths, daysSince } from "@/lib/dateBuckets";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 interface Company {
   id: string;
@@ -18,6 +23,9 @@ interface Company {
   is_active: boolean;
   founder_cohort: boolean;
   referral_partner_id: string | null;
+  country: string;
+  department: string | null;
+  city: string | null;
 }
 
 interface Partner {
@@ -26,12 +34,15 @@ interface Partner {
 }
 
 const NO_PARTNER = "__none__";
+const NO_DEPARTMENT = "__unset__";
 
 export default function MasterAdmin() {
   const { isSuperAdmin, loading } = useSuperAdmin();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [cityDrafts, setCityDrafts] = useState<Record<string, string>>({});
+  const [detailCompany, setDetailCompany] = useState<Company | null>(null);
 
   useEffect(() => {
     document.title = "Master Admin — F7 Manager Pro";
@@ -46,7 +57,7 @@ export default function MasterAdmin() {
     const [{ data, error }, { data: partnersData }] = await Promise.all([
       supabase
         .from("companies")
-        .select("id, name, created_at, plan_type, is_active, founder_cohort, referral_partner_id")
+        .select("id, name, created_at, plan_type, is_active, founder_cohort, referral_partner_id, country, department, city")
         .order("created_at", { ascending: false }),
       supabase.from("referral_partners").select("id, name").order("name"),
     ]);
@@ -124,6 +135,9 @@ export default function MasterAdmin() {
                     <TableHead>Estado</TableHead>
                     <TableHead>Fundador</TableHead>
                     <TableHead>Aliado</TableHead>
+                    <TableHead>País</TableHead>
+                    <TableHead>Departamento</TableHead>
+                    <TableHead>Ciudad</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -132,7 +146,15 @@ export default function MasterAdmin() {
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {c.id.slice(0, 8)}…
                       </TableCell>
-                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
+                          className="text-left hover:underline"
+                          onClick={() => setDetailCompany(c)}
+                        >
+                          {c.name}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(c.created_at).toLocaleDateString("es-PY")}
                       </TableCell>
@@ -185,11 +207,61 @@ export default function MasterAdmin() {
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      <TableCell>
+                        <Select
+                          value={c.country}
+                          onValueChange={(v) => {
+                            if (v !== "PY") setCityDrafts((prev) => ({ ...prev, [c.id]: "" }));
+                            updateCompany(c.id, { country: v, ...(v !== "PY" ? { department: null, city: null } : {}) });
+                          }}
+                          disabled={busy === c.id}
+                        >
+                          <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {COUNTRIES.map((co) => <SelectItem key={co.code} value={co.code}>{co.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        {c.country === "PY" ? (
+                          <Select
+                            value={c.department ?? NO_DEPARTMENT}
+                            onValueChange={(v) => updateCompany(c.id, { department: v === NO_DEPARTMENT ? null : v })}
+                            disabled={busy === c.id}
+                          >
+                            <SelectTrigger className="h-8 w-36"><SelectValue placeholder="—" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={NO_DEPARTMENT}>—</SelectItem>
+                              {PY_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {c.country === "PY" ? (
+                          <Input
+                            className="h-8 w-32"
+                            value={cityDrafts[c.id] ?? c.city ?? ""}
+                            disabled={busy === c.id}
+                            onChange={(e) => setCityDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                            onBlur={() => {
+                              const draft = cityDrafts[c.id];
+                              if (draft !== undefined && draft !== (c.city ?? "")) {
+                                updateCompany(c.id, { city: draft || null });
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {companies.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                         Sin empresas registradas.
                       </TableCell>
                     </TableRow>
@@ -200,6 +272,146 @@ export default function MasterAdmin() {
           </CardContent>
         </Card>
       </div>
+
+      <CompanyDetailDialog company={detailCompany} onClose={() => setDetailCompany(null)} />
     </div>
+  );
+}
+
+/* ---------- Detalle por empresa ---------- */
+interface DetailOrder { created_at: string; device_type: string; quote_amount: number }
+interface DetailData {
+  clients: number;
+  branches: number;
+  staff: number;
+  orders: DetailOrder[];
+}
+
+function CompanyDetailDialog({ company, onClose }: { company: Company | null; onClose: () => void }) {
+  const [data, setData] = useState<DetailData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!company) { setData(null); return; }
+    setLoading(true);
+    setData(null);
+    const id = company.id;
+    Promise.all([
+      supabase.from("clients").select("id", { count: "exact", head: true }).eq("company_id", id),
+      supabase.from("branches").select("id", { count: "exact", head: true }).eq("company_id", id),
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("company_id", id),
+      supabase.from("orders").select("created_at, device_type, quote_amount").eq("company_id", id),
+    ]).then(([clientsRes, branchesRes, staffRes, ordersRes]) => {
+      setData({
+        clients: clientsRes.count ?? 0,
+        branches: branchesRes.count ?? 0,
+        staff: staffRes.count ?? 0,
+        orders: (ordersRes.data as DetailOrder[]) ?? [],
+      });
+      setLoading(false);
+    });
+  }, [company]);
+
+  const months = useMemo(() => lastMonths(6), []);
+  const ordersByMonth = useMemo(() => {
+    if (!data) return [];
+    const counts = new Map<string, number>();
+    data.orders.forEach((o) => counts.set(monthKey(o.created_at), (counts.get(monthKey(o.created_at)) ?? 0) + 1));
+    return months.map((k) => ({ label: monthLabel(k), value: counts.get(k) ?? 0 }));
+  }, [data, months]);
+
+  const topDevices = useMemo(() => {
+    if (!data) return [];
+    const counts = new Map<string, number>();
+    data.orders.forEach((o) => {
+      const key = o.device_type || "Sin especificar";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [data]);
+
+  const lastOrderAt = useMemo(() => {
+    if (!data || data.orders.length === 0) return null;
+    return data.orders.reduce((max, o) => (o.created_at > max ? o.created_at : max), data.orders[0].created_at);
+  }, [data]);
+
+  return (
+    <Dialog open={!!company} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        {company && (
+          <>
+            <DialogHeader>
+              <DialogTitle>{company.name}</DialogTitle>
+              <DialogDescription>
+                {company.country === "PY"
+                  ? [company.department, company.city].filter(Boolean).join(" · ") || "Paraguay"
+                  : countryLabel(company.country)}
+                {" · "}Alta {new Date(company.created_at).toLocaleDateString("es-PY")}
+              </DialogDescription>
+            </DialogHeader>
+
+            {loading || !data ? (
+              <div className="flex h-40 items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-md border border-border p-3">
+                    <div className="text-xs text-muted-foreground">Clientes</div>
+                    <div className="text-lg font-bold">{data.clients}</div>
+                  </div>
+                  <div className="rounded-md border border-border p-3">
+                    <div className="text-xs text-muted-foreground">Sucursales</div>
+                    <div className="text-lg font-bold">{data.branches}</div>
+                  </div>
+                  <div className="rounded-md border border-border p-3">
+                    <div className="text-xs text-muted-foreground">Usuarios</div>
+                    <div className="text-lg font-bold">{data.staff}</div>
+                  </div>
+                  <div className="rounded-md border border-border p-3">
+                    <div className="text-xs text-muted-foreground">Órdenes totales</div>
+                    <div className="text-lg font-bold">{data.orders.length}</div>
+                  </div>
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  Última orden: {lastOrderAt ? `hace ${daysSince(lastOrderAt)} días` : "nunca"}
+                </div>
+
+                <div>
+                  <div className="mb-2 text-sm font-medium">Órdenes por mes</div>
+                  <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={ordersByMonth} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} width={28} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                          formatter={(v: number) => [v, "Órdenes"]}
+                        />
+                        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {topDevices.length > 0 && (
+                  <div>
+                    <div className="mb-2 text-sm font-medium">Dispositivos más frecuentes</div>
+                    <div className="flex flex-wrap gap-2">
+                      {topDevices.map(([device, n]) => (
+                        <Badge key={device} variant="outline">{device} · {n}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
