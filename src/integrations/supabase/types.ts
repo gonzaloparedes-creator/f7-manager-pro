@@ -775,6 +775,7 @@ export type Database = {
           payment_method: string | null
           product_name: string
           quantity: number
+          sale_group_id: string | null
           subcategory_name: string | null
           unit_cost: number
           unit_price: number
@@ -790,6 +791,7 @@ export type Database = {
           payment_method?: string | null
           product_name: string
           quantity?: number
+          sale_group_id?: string | null
           subcategory_name?: string | null
           unit_cost?: number
           unit_price?: number
@@ -805,6 +807,7 @@ export type Database = {
           payment_method?: string | null
           product_name?: string
           quantity?: number
+          sale_group_id?: string | null
           subcategory_name?: string | null
           unit_cost?: number
           unit_price?: number

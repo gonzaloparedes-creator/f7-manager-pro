@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printer } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
-import SellProductDialog, { type CompletedSale } from "@/components/SellProductDialog";
+import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
+import QuantityStepper from "@/components/QuantityStepper";
 import { SaleTicket } from "@/components/SaleTicket";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,10 +42,21 @@ type Sale = {
   payment_method: string | null;
   created_at: string;
   branch_id: string | null;
+  sale_group_id: string | null;
+};
+
+type SaleGroup = {
+  key: string;
+  items: Sale[];
+  total: number;
+  created_at: string;
+  payment_method: string | null;
+  branch_id: string | null;
 };
 
 const ALL_CATEGORIES = "__all__";
 const ALL_BRANCHES = "__all__";
+const CART_STORAGE_KEY = "f7_products_cart";
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -66,15 +78,43 @@ export default function Products() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
-  const [selling, setSelling] = useState<Product | null>(null);
+  const [cart, setCart] = useState<Cart>(() => {
+    try {
+      const raw = localStorage.getItem(CART_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as Cart) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [cartOpen, setCartOpen] = useState(false);
   const [businessName, setBusinessName] = useState<string | null>(null);
-  const [printingSale, setPrintingSale] = useState<Sale | CompletedSale | null>(null);
+  const [printingSale, setPrintingSale] = useState<CompletedCartSale | null>(null);
 
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle()
       .then(({ data }) => setBusinessName(data?.business_name ?? null));
   }, [user]);
+
+  useEffect(() => {
+    try { localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart)); } catch { /* ignore */ }
+  }, [cart]);
+
+  // Descarta del carrito guardado cualquier producto que ya no exista o se
+  // haya dado de baja, para no arrastrar referencias fantasma entre sesiones.
+  useEffect(() => {
+    if (items.length === 0) return;
+    setCart((prev) => {
+      const validIds = new Set(items.map((i) => i.id));
+      let changed = false;
+      const next: Cart = {};
+      for (const [id, line] of Object.entries(prev)) {
+        if (validIds.has(id)) next[id] = line;
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [items]);
 
   useEffect(() => {
     if (!printingSale) return;
@@ -96,7 +136,7 @@ export default function Products() {
         .order("created_at", { ascending: false }),
       (supabase as any)
         .from("product_sales")
-        .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id")
+        .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id, sale_group_id")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -118,6 +158,26 @@ export default function Products() {
     load();
   };
 
+  const addToCart = (item: Product) => {
+    setCart((prev) => ({ ...prev, [item.id]: { quantity: 1, unitPrice: item.selling_price } }));
+  };
+
+  const updateCartQty = (item: Product, qty: number) => {
+    setCart((prev) => {
+      if (qty <= 0) {
+        const { [item.id]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [item.id]: { quantity: Math.min(qty, item.stock), unitPrice: prev[item.id]?.unitPrice ?? item.selling_price },
+      };
+    });
+  };
+
+  const cartCount = Object.values(cart).reduce((s, l) => s + l.quantity, 0);
+  const cartTotal = Object.values(cart).reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null;
   const subcategoryName = (id: string | null) => subcategories.find((s) => s.id === id)?.name ?? null;
 
@@ -133,6 +193,29 @@ export default function Products() {
   const today = new Date();
   const salesToday = sales.filter((s) => isSameDay(new Date(s.created_at), today));
   const totalToday = salesToday.reduce((s, sale) => s + sale.quantity * Number(sale.unit_price || 0), 0);
+
+  // Varias líneas de product_sales comparten sale_group_id cuando se
+  // confirmaron juntas desde el carrito — se agrupan acá para que "Ventas
+  // recientes" muestre una sola entrada por venta real, no una por producto.
+  const saleGroups: SaleGroup[] = useMemo(() => {
+    const map = new Map<string, Sale[]>();
+    sales.forEach((s) => {
+      const key = s.sale_group_id ?? s.id;
+      const arr = map.get(key) ?? [];
+      arr.push(s);
+      map.set(key, arr);
+    });
+    return Array.from(map.entries())
+      .map(([key, groupItems]) => ({
+        key,
+        items: groupItems,
+        total: groupItems.reduce((s, i) => s + i.quantity * Number(i.unit_price || 0), 0),
+        created_at: groupItems[0].created_at,
+        payment_method: groupItems[0].payment_method,
+        branch_id: groupItems[0].branch_id,
+      }))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }, [sales]);
 
   if (!planLoading && !hasExternalInventory) return <Navigate to="/dashboard" replace />;
 
@@ -278,13 +361,26 @@ export default function Products() {
                     )}
                   </div>
 
-                  <Button
-                    className="w-full gap-2"
-                    disabled={outOfStock}
-                    onClick={() => setSelling(i)}
-                  >
-                    <ShoppingCart className="h-4 w-4" /> Vender
-                  </Button>
+                  {cart[i.id] ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <QuantityStepper
+                        value={cart[i.id].quantity}
+                        max={i.stock}
+                        onChange={(q) => updateCartQty(i, q)}
+                      />
+                      <span className="text-sm font-semibold text-foreground">
+                        {formatPYG(cart[i.id].quantity * cart[i.id].unitPrice)}
+                      </span>
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full gap-2"
+                      disabled={outOfStock}
+                      onClick={() => addToCart(i)}
+                    >
+                      <ShoppingCart className="h-4 w-4" /> Agregar
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -297,25 +393,39 @@ export default function Products() {
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Receipt className="h-4 w-4 text-primary" /> Ventas recientes
           </div>
-          {sales.length === 0 ? (
+          {saleGroups.length === 0 ? (
             <p className="text-sm text-muted-foreground">Todavía no registraste ninguna venta.</p>
           ) : (
             <div className="space-y-1.5">
-              {sales.map((s) => (
-                <div key={s.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+              {saleGroups.map((g) => (
+                <div key={g.key} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
                   <div className="min-w-0">
-                    <div className="truncate font-medium text-foreground">{s.product_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(s.created_at).toLocaleString("es-PY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      {" · "}Cant: {s.quantity}
-                      {s.payment_method ? ` · ${s.payment_method}` : ""}
+                    <div className="truncate font-medium text-foreground">
+                      {g.items.length === 1 ? g.items[0].product_name : `${g.items.length} productos`}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {new Date(g.created_at).toLocaleString("es-PY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {" · "}
+                      {g.items.length === 1
+                        ? `Cant: ${g.items[0].quantity}`
+                        : g.items.map((i) => i.product_name).join(", ")}
+                      {g.payment_method ? ` · ${g.payment_method}` : ""}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-semibold text-foreground">
-                      {formatPYG(s.quantity * Number(s.unit_price || 0))}
-                    </span>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPrintingSale(s)}>
+                    <span className="font-semibold text-foreground">{formatPYG(g.total)}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => setPrintingSale({
+                        id: g.key,
+                        created_at: g.created_at,
+                        payment_method: g.payment_method,
+                        branch_id: g.branch_id,
+                        items: g.items.map((i) => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price })),
+                      })}
+                    >
                       <Printer className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
                   </div>
@@ -326,11 +436,27 @@ export default function Products() {
         </CardContent>
       </Card>
 
+      {cartCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setCartOpen(true)}
+          className="fixed bottom-20 left-4 right-4 z-40 flex items-center justify-between rounded-xl bg-primary px-4 py-3 text-primary-foreground shadow-elevated transition-transform active:scale-[0.98] md:bottom-6 md:left-auto md:right-6 md:w-80"
+        >
+          <span className="flex items-center gap-2 font-semibold">
+            <ShoppingCart className="h-5 w-5" />
+            {cartCount} {cartCount === 1 ? "producto" : "productos"}
+          </span>
+          <span className="font-bold">{formatPYG(cartTotal)}</span>
+        </button>
+      )}
+
       <NewProductDialog open={open} onOpenChange={setOpen} onCreated={load} />
-      <SellProductDialog
-        open={!!selling}
-        onOpenChange={(o) => !o && setSelling(null)}
-        product={selling}
+      <CartSheet
+        open={cartOpen}
+        onOpenChange={setCartOpen}
+        products={items}
+        cart={cart}
+        setCart={setCart}
         onSold={load}
         onPrintRequest={setPrintingSale}
       />

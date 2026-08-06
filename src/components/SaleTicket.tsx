@@ -2,13 +2,17 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatPYG } from "@/lib/orders";
 
-interface TicketSale {
-  id: string;
+interface TicketLineItem {
   product_name: string;
   quantity: number;
   unit_price: number;
-  payment_method: string | null;
+}
+
+interface TicketSale {
+  id: string;
   created_at: string;
+  payment_method: string | null;
+  items: TicketLineItem[];
 }
 
 interface SaleTicketProps {
@@ -19,7 +23,7 @@ interface SaleTicketProps {
 
 export function SaleTicket({ sale, businessName, branchName }: SaleTicketProps) {
   const shopName = businessName?.trim() || "F7 Manager Pro";
-  const total = sale.quantity * Number(sale.unit_price || 0);
+  const total = sale.items.reduce((s, i) => s + i.quantity * Number(i.unit_price || 0), 0);
   const ticketNumber = sale.id.slice(-6).toUpperCase();
 
   return (
@@ -39,12 +43,16 @@ export function SaleTicket({ sale, businessName, branchName }: SaleTicketProps) 
 
       <div className="ticket-dashed" />
 
-      <div className="text-[11px]">
-        <div className="font-semibold">{sale.product_name}</div>
-        <div className="flex justify-between">
-          <span>{sale.quantity} x {formatPYG(sale.unit_price)}</span>
-          <span>{formatPYG(total)}</span>
-        </div>
+      <div className="space-y-1.5 text-[11px]">
+        {sale.items.map((item, i) => (
+          <div key={i}>
+            <div className="font-semibold">{item.product_name}</div>
+            <div className="flex justify-between">
+              <span>{item.quantity} x {formatPYG(item.unit_price)}</span>
+              <span>{formatPYG(item.quantity * Number(item.unit_price || 0))}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="ticket-dashed" />
