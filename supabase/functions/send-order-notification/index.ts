@@ -40,16 +40,21 @@ Deno.serve(async (req) => {
     // sin una orden real detrás.
     const { data: ownedOrder } = await supabase
       .from("orders")
-      .select("id")
+      .select("id, company_id")
       .eq("order_number", order_number)
       .maybeSingle();
     if (!ownedOrder) return json({ error: "Orden no encontrada" }, 404);
 
-    // Fetch evolution instance from profile
+    // El WhatsApp conectado es un recurso de LA EMPRESA (lo conecta el admin
+    // desde Configuración), no de quien crea la orden — si un staff genera
+    // la orden, no tiene su propio WhatsApp conectado y antes esto quedaba
+    // en null. Se busca el perfil de la empresa que sí tiene WhatsApp activo.
     const { data: profile } = await supabase
       .from("profiles")
       .select("evolution_instance_name")
-      .eq("id", user.id)
+      .eq("company_id", ownedOrder.company_id)
+      .eq("whatsapp_connected", true)
+      .limit(1)
       .maybeSingle();
 
     const tracking_url = `${app_origin ?? ""}/tracking/${code}`;

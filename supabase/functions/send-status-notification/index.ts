@@ -46,15 +46,21 @@ Deno.serve(async (req) => {
     // La orden tiene que existir y ser visible para este usuario bajo RLS.
     const { data: ownedOrder } = await supabase
       .from("orders")
-      .select("id")
+      .select("id, company_id")
       .eq("order_number", order_number)
       .maybeSingle();
     if (!ownedOrder) return json({ error: "Orden no encontrada" }, 404);
 
+    // El WhatsApp conectado y las preferencias de notificación son de LA
+    // EMPRESA (configurados por el admin en Configuración), no de quien
+    // cambia el estado — si un staff actualiza la orden, antes se miraba su
+    // propio perfil (sin WhatsApp conectado) y nunca se enviaba nada.
     const { data: profile } = await supabase
       .from("profiles")
       .select("evolution_instance_name, notification_preferences")
-      .eq("id", user.id)
+      .eq("company_id", ownedOrder.company_id)
+      .eq("whatsapp_connected", true)
+      .limit(1)
       .maybeSingle();
 
     const prefs = (profile?.notification_preferences ?? {}) as Record<string, boolean>;
