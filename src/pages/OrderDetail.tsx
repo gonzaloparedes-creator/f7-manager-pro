@@ -1157,13 +1157,18 @@ export default function OrderDetail() {
             <CardContent className="space-y-4 p-4">
               <div className="text-sm font-semibold">Historial</div>
               <ol className="space-y-4">
-                {history.map((h) => (
+                {history.map((h, i) => (
                   <li key={h.id} className="relative pl-6">
                     <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-primary/20" />
                     <div className="flex items-center gap-2">
                       <StatusBadge status={h.status} />
                     </div>
                     {h.note && <p className="mt-1 text-sm text-muted-foreground">{h.note}</p>}
+                    {i === 0 && order.received_by_name && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                        <UserCheck className="h-3 w-3" /> Recepcionado por: {order.received_by_name}
+                      </p>
+                    )}
                     {h.image_urls && h.image_urls.length > 0 && (
                       <div className="mt-2 grid grid-cols-3 gap-1.5">
                         {h.image_urls.map((src, i) => (
