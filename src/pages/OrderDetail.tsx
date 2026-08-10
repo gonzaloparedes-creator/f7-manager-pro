@@ -14,6 +14,7 @@ import { WarrantyBadge } from "@/components/WarrantyBadge";
 import { STATUS_LABELS, STATUS_ORDER, formatPYG, type OrderStatus } from "@/lib/orders";
 import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock } from "lucide-react";
 import { PatternLock } from "@/components/PatternLock";
+import { CameraCapture } from "@/components/CameraCapture";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -94,6 +95,7 @@ export default function OrderDetail() {
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [assigning, setAssigning] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -101,13 +103,11 @@ export default function OrderDetail() {
   const [transferTargetId, setTransferTargetId] = useState<string>("");
   const [transferring, setTransferring] = useState(false);
 
-  const handleEvidenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
+  const addEvidenceFiles = (files: File[]) => {
     if (files.length === 0) return;
     const remaining = photoLimit - evidenceFiles.length;
     if (remaining <= 0) {
       sonnerToast.error(`Límite de ${photoLimit} fotos alcanzado${isStarter ? " (plan Starter)" : ""}.`);
-      e.target.value = "";
       return;
     }
     const accepted = files.slice(0, remaining);
@@ -116,6 +116,10 @@ export default function OrderDetail() {
     }
     setEvidenceFiles((prev) => [...prev, ...accepted]);
     setEvidencePreviews((prev) => [...prev, ...accepted.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const handleEvidenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addEvidenceFiles(Array.from(e.target.files ?? []));
     e.target.value = "";
   };
 
@@ -1039,16 +1043,13 @@ export default function OrderDetail() {
                         onChange={handleEvidenceSelect}
                       />
                     </label>
-                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition hover:bg-accent">
+                    <button
+                      type="button"
+                      onClick={() => setCameraOpen(true)}
+                      className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition hover:bg-accent"
+                    >
                       <Camera className="h-4 w-4" /> Cámara
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={handleEvidenceSelect}
-                      />
-                    </label>
+                    </button>
                   </div>
 
                   {evidencePreviews.length > 0 && (
@@ -1076,6 +1077,9 @@ export default function OrderDetail() {
               </Button>
             </CardContent>
           </Card>
+          {cameraOpen && (
+            <CameraCapture onClose={() => setCameraOpen(false)} onCapture={addEvidenceFiles} />
+          )}
 
           <Card>
             <CardContent className="space-y-4 p-4">

@@ -17,12 +17,13 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { PROBLEM_OPTIONS, formatPYG, DEFAULT_SERVICE_TERMS } from "@/lib/orders";
 import WarrantySelector from "@/components/WarrantySelector";
-import { Upload, X, CalendarIcon, Search, UserPlus, Check } from "lucide-react";
+import { Upload, X, CalendarIcon, Search, UserPlus, Check, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { PatternLock } from "@/components/PatternLock";
 import { SignaturePad } from "@/components/SignaturePad";
+import { CameraCapture } from "@/components/CameraCapture";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 
@@ -113,6 +114,7 @@ export default function NewOrderDialog({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const DRAFT_KEY = "f7_order_draft";
   const loadDraft = (): { form: FormState; selectedClientId: string | null } | null => {
     try {
@@ -395,7 +397,11 @@ export default function NewOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!loading) { onOpenChange(o); if (!o) reset(); } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+        onInteractOutside={(e) => { if (cameraOpen) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => { if (cameraOpen) e.preventDefault(); }}
+      >
         <DialogHeader>
           <DialogTitle>Nueva orden</DialogTitle>
           <DialogDescription>Registrá un nuevo equipo para reparación.</DialogDescription>
@@ -678,20 +684,14 @@ export default function NewOrderDialog({
                     }}
                   />
                 </label>
-                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted">
-                  <Upload className="h-4 w-4" />
+                <button
+                  type="button"
+                  onClick={() => setCameraOpen(true)}
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted"
+                >
+                  <Camera className="h-4 w-4" />
                   Cámara
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => {
-                      addFiles(Array.from(e.target.files ?? []));
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                </button>
               </div>
               <p className="text-xs text-muted-foreground">
                 {files.length} / {limits.photos} fotos{isStarter ? " (plan Starter)" : ""}
@@ -905,6 +905,9 @@ export default function NewOrderDialog({
           </div>
         </form>
       </DialogContent>
+      {cameraOpen && (
+        <CameraCapture onClose={() => setCameraOpen(false)} onCapture={(fs) => addFiles(fs)} />
+      )}
     </Dialog>
   );
 }
