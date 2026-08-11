@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
@@ -115,6 +115,20 @@ export default function NewOrderDialog({
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraTriggerRef = useRef<HTMLButtonElement>(null);
+  // El botón "Listo"/"Cerrar" de la cámara vive en un portal aparte y tiene
+  // el foco al desmontarse. Devolver el foco al botón "Cámara" evita el
+  // primer intento de cierre, pero en touch real de Android Radix dispara
+  // un SEGUNDO onOpenChange(false) unos instantes después (confirmado con
+  // pruebas), ya con cameraOpen=false en el closure — un ref, que no
+  // depende de un re-render, mantiene el bloqueo durante ese margen.
+  const suppressCloseRef = useRef(false);
+  const closeCamera = () => {
+    suppressCloseRef.current = true;
+    cameraTriggerRef.current?.focus();
+    setCameraOpen(false);
+    window.setTimeout(() => { suppressCloseRef.current = false; }, 600);
+  };
   const DRAFT_KEY = "f7_order_draft";
   const loadDraft = (): { form: FormState; selectedClientId: string | null } | null => {
     try {
@@ -396,12 +410,18 @@ export default function NewOrderDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!loading) { onOpenChange(o); if (!o) reset(); } }}>
-      <DialogContent
-        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
-        onInteractOutside={(e) => { if (cameraOpen) e.preventDefault(); }}
-        onEscapeKeyDown={(e) => { if (cameraOpen) e.preventDefault(); }}
-      >
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        // El overlay de cámara vive en su propio portal fuera del DOM del
+        // Dialog; Radix lo trata como "click afuera" y pide cerrar el
+        // Dialog. Mientras la cámara esté abierta (o recién se cerró), ese
+        // pedido se ignora por completo.
+        if (cameraOpen || suppressCloseRef.current) return;
+        if (!loading) { onOpenChange(o); if (!o) reset(); }
+      }}
+    >
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nueva orden</DialogTitle>
           <DialogDescription>Registrá un nuevo equipo para reparación.</DialogDescription>
@@ -685,6 +705,7 @@ export default function NewOrderDialog({
                   />
                 </label>
                 <button
+                  ref={cameraTriggerRef}
                   type="button"
                   onClick={() => setCameraOpen(true)}
                   className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted"
@@ -906,7 +927,7 @@ export default function NewOrderDialog({
         </form>
       </DialogContent>
       {cameraOpen && (
-        <CameraCapture onClose={() => setCameraOpen(false)} onCapture={(fs) => addFiles(fs)} />
+        <CameraCapture onClose={closeCamera} onCapture={(fs) => addFiles(fs)} />
       )}
     </Dialog>
   );
