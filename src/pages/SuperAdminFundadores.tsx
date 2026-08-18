@@ -40,6 +40,7 @@ interface Metrics {
 }
 
 const DAY_MS = 86_400_000;
+const FOUNDER_CHALLENGE_DAYS = 45;
 const dateKey = (iso: string) => iso.slice(0, 10);
 const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS);
 
@@ -48,8 +49,8 @@ function computeMetrics(clientDates: string[], actionDates: string[]): Metrics {
   const activated = clientDates.length > 0 && actionDates.length > 0 && activeDays.length >= 3;
   const activatedAt = activated ? activeDays[2] : null;
   const daysSinceActivation = activatedAt ? daysSince(activatedAt) : null;
-  const trialDaysLeft = daysSinceActivation !== null ? Math.max(0, 60 - daysSinceActivation) : null;
-  const trialExpired = daysSinceActivation !== null && daysSinceActivation > 60;
+  const trialDaysLeft = daysSinceActivation !== null ? Math.max(0, FOUNDER_CHALLENGE_DAYS - daysSinceActivation) : null;
+  const trialExpired = daysSinceActivation !== null && daysSinceActivation > FOUNDER_CHALLENGE_DAYS;
   return {
     clientCount: clientDates.length,
     actionCount: actionDates.length,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,8 @@ import { useCategories } from "@/hooks/useCategories";
 import { useBranches } from "@/hooks/useBranches";
 import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
-import { Loader2, ImagePlus, FolderPlus } from "lucide-react";
+import { Loader2, FolderPlus, Camera, Upload, X } from "lucide-react";
+import { CameraCapture } from "@/components/CameraCapture";
 
 const CREATE_CATEGORY = "__create_category__";
 const CREATE_SUBCATEGORY = "__create_subcategory__";
@@ -42,6 +43,20 @@ export default function NewInventoryItemDialog({
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraTriggerRef = useRef<HTMLButtonElement>(null);
+  // Mismo fix que en Nueva orden: el overlay de cámara vive en un portal
+  // aparte y, en touch real de Android, Radix puede disparar un segundo
+  // onOpenChange(false) tardío (ya con cameraOpen en false) que cierra el
+  // Dialog entero. Se devuelve el foco al botón "Cámara" y se sostiene el
+  // bloqueo con un ref durante un margen breve para absorberlo.
+  const suppressCloseRef = useRef(false);
+  const closeCamera = () => {
+    suppressCloseRef.current = true;
+    cameraTriggerRef.current?.focus();
+    setCameraOpen(false);
+    window.setTimeout(() => { suppressCloseRef.current = false; }, 600);
+  };
 
   const [newCatName, setNewCatName] = useState<string | null>(null);
   const [newSubName, setNewSubName] = useState<string | null>(null);
@@ -138,7 +153,14 @@ export default function NewInventoryItemDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (cameraOpen || suppressCloseRef.current) return;
+        if (!o) reset();
+        onOpenChange(o);
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Nuevo Artículo</DialogTitle>
@@ -246,13 +268,23 @@ export default function NewInventoryItemDialog({
 
           <div className="grid gap-2">
             <Label>Imagen (opcional)</Label>
-            <div className="flex items-center gap-3">
-              <label className="flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted/30 hover:bg-muted/50">
-                {preview ? (
-                  <img src={preview} alt="preview" className="h-full w-full object-cover" />
-                ) : (
-                  <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                )}
+            {preview && (
+              <div className="relative h-20 w-20">
+                <img src={preview} alt="preview" className="h-full w-full rounded-md border border-border object-cover" />
+                <button
+                  type="button"
+                  onClick={() => onFile(null)}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+                  aria-label="Quitar imagen"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted">
+                <Upload className="h-4 w-4" />
+                Galería
                 <input
                   type="file"
                   accept="image/*"
@@ -260,12 +292,21 @@ export default function NewInventoryItemDialog({
                   onChange={(e) => onFile(e.target.files?.[0] ?? null)}
                 />
               </label>
-              {compressing && (
-                <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Comprimiendo imagen...
-                </span>
-              )}
+              <button
+                ref={cameraTriggerRef}
+                type="button"
+                onClick={() => setCameraOpen(true)}
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted"
+              >
+                <Camera className="h-4 w-4" />
+                Cámara
+              </button>
             </div>
+            {compressing && (
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Comprimiendo imagen...
+              </span>
+            )}
           </div>
         </div>
 
@@ -277,6 +318,9 @@ export default function NewInventoryItemDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      {cameraOpen && (
+        <CameraCapture onClose={closeCamera} onCapture={(files) => onFile(files[0] ?? null)} />
+      )}
     </Dialog>
   );
 }
