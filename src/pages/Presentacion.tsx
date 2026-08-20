@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import UpgradeProDialog from "@/components/UpgradeProDialog";
-import { openUpgradeWhatsApp } from "@/lib/upgrade";
+import { openUpgradeWhatsApp, GENERAL_INTEREST_MESSAGE } from "@/lib/upgrade";
 import { type PlanType, type Cycle, PRICING, PLAN_MESSAGES, PLAN_FEATURES } from "@/lib/plans";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -124,7 +123,6 @@ const features = [
 
 export default function Presentacion() {
   const [openCard, setOpenCard] = useState<number | null>(null);
-  const [showPlans, setShowPlans] = useState(false);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -149,7 +147,7 @@ export default function Presentacion() {
             </Button>
             <Button
               size="sm"
-              onClick={() => setShowPlans(true)}
+              onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Ver planes
@@ -187,7 +185,7 @@ export default function Presentacion() {
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button
                 size="lg"
-                onClick={() => setShowPlans(true)}
+                onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevated"
               >
                 Empezar 14 días GRATIS <ArrowRight className="h-4 w-4" />
@@ -503,12 +501,10 @@ export default function Presentacion() {
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <Button
                   size="lg"
-                  asChild
+                  onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevated text-base h-12 px-7"
                 >
-                  <Link to="/register">
-                    Empezar 14 días GRATIS <ArrowRight className="h-4 w-4" />
-                  </Link>
+                  Empezar 14 días GRATIS <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   size="lg"
@@ -538,12 +534,15 @@ export default function Presentacion() {
           </div>
           <div className="flex items-center gap-4">
             <Link to="/login" className="hover:text-primary">Ingresar</Link>
-            <Link to="/register" className="hover:text-primary">Crear cuenta</Link>
+            <button
+              onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
+              className="hover:text-primary"
+            >
+              Empezar ahora
+            </button>
           </div>
         </div>
       </footer>
-
-      <UpgradeProDialog open={showPlans} onOpenChange={setShowPlans} />
     </div>
   );
 }
