@@ -1,6 +1,7 @@
 import { useWarrantyPresets } from "@/hooks/useWarrantyPresets";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 const CUSTOM = "__custom__";
 
@@ -19,9 +20,31 @@ export default function WarrantySelector({ value, onChange, className }: Props) 
   const isCustom = !loading && !presets.some((p) => p.days === value);
 
   const selectValue = isCustom ? CUSTOM : String(value);
+  // Los primeros presets como chips de un toque — el resto (y "personalizado")
+  // se sigue eligiendo en el desplegable de abajo, sin perder esa flexibilidad.
+  const quickPresets = presets.slice(0, 5);
 
   return (
     <div className="space-y-2">
+      {quickPresets.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {quickPresets.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onChange(p.days)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                value === p.days
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
       <Select
         value={selectValue}
         onValueChange={(v) => {

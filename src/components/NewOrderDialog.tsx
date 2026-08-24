@@ -17,7 +17,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { PROBLEM_OPTIONS, formatPYG, DEFAULT_SERVICE_TERMS } from "@/lib/orders";
 import WarrantySelector from "@/components/WarrantySelector";
-import { Upload, X, CalendarIcon, Search, UserPlus, Check, Camera } from "lucide-react";
+import { Upload, X, CalendarIcon, Search, UserPlus, Check, Camera, Type, Grid3x3, Loader2, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
@@ -68,6 +68,7 @@ type FormState = {
   problem_description: string; // observaciones iniciales
   quote_amount: string;
   deposit_amount: string;
+  deposit_payment_method: string;
   estimated_delivery_date: Date | undefined;
   device_pin: string;
   device_pattern: number[];
@@ -93,6 +94,7 @@ const INITIAL_STATE: FormState = {
   problem_description: "",
   quote_amount: "",
   deposit_amount: "",
+  deposit_payment_method: "Efectivo",
   estimated_delivery_date: undefined,
   device_pin: "",
   device_pattern: [],
@@ -155,6 +157,37 @@ export default function NewOrderDialog({
     const d = loadDraft();
     return !!(d?.form?.secondary_phone || d?.form?.secondary_contact_name);
   });
+  // Un equipo tiene un solo método de desbloqueo — mostrar PIN y patrón a la
+  // vez siempre desperdicia espacio en mobile. Se alterna cuál se ve, sin
+  // borrar el dato del que queda oculto.
+  const [lockInputMode, setLockInputMode] = useState<"text" | "pattern">(() => {
+    const d = loadDraft();
+    return d?.form?.device_pattern && d.form.device_pattern.length > 0 ? "pattern" : "text";
+  });
+  const [searchingCedula, setSearchingCedula] = useState(false);
+
+  const searchByCedula = async () => {
+    const cedula = form.customer_cedula.trim();
+    if (!cedula || !companyId) return;
+    setSearchingCedula(true);
+    try {
+      const { data } = await supabase
+        .from("clients")
+        .select("id,name,phone,cedula")
+        .eq("company_id", companyId)
+        .eq("cedula", cedula)
+        .maybeSingle();
+      if (data) {
+        setSelectedClientId(data.id);
+        setForm((f) => ({ ...f, customer_name: data.name, customer_phone: data.phone ?? "", customer_cedula: data.cedula ?? cedula }));
+        toast({ title: "Cliente encontrado", description: data.name });
+      } else {
+        toast({ title: "No hay ningún cliente con esa cédula", description: "Completá los datos para crear uno nuevo." });
+      }
+    } finally {
+      setSearchingCedula(false);
+    }
+  };
 
   useEffect(() => {
     if (!open || !user || !companyId) return;
@@ -183,6 +216,7 @@ export default function NewOrderDialog({
       setForm(d.form);
       setSelectedClientId(d.selectedClientId);
       setShowSecondaryContact(!!(d.form.secondary_phone || d.form.secondary_contact_name));
+      setLockInputMode(d.form.device_pattern && d.form.device_pattern.length > 0 ? "pattern" : "text");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -192,6 +226,7 @@ export default function NewOrderDialog({
     setFiles((prev) => { prev.forEach((p) => URL.revokeObjectURL(p.previewUrl)); return []; });
     setSelectedClientId(null);
     setClientSearch("");
+    setLockInputMode("text");
     setShowSecondaryContact(false);
     if (clearDraft) {
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
@@ -359,6 +394,7 @@ export default function NewOrderDialog({
           problem_description: form.problem_description || "",
           quote_amount: quote,
           deposit_amount: deposit,
+          deposit_payment_method: deposit > 0 ? form.deposit_payment_method : null,
           estimated_delivery_date: form.estimated_delivery_date
             ? format(form.estimated_delivery_date, "yyyy-MM-dd")
             : null,
@@ -421,7 +457,15 @@ export default function NewOrderDialog({
         if (!loading) { onOpenChange(o); if (!o) reset(); }
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className={cn(
+          // Mobile: pantalla completa, se siente como una página nativa en vez
+          // de un modal flotando con scroll interno recortado.
+          "inset-0 left-0 top-0 h-[100dvh] max-h-[100dvh] w-full max-w-full translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0",
+          // Desktop: el diálogo centrado de siempre.
+          "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[90vh] sm:w-full sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:border"
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Nueva orden</DialogTitle>
           <DialogDescription>Registrá un nuevo equipo para reparación.</DialogDescription>
@@ -444,6 +488,30 @@ export default function NewOrderDialog({
                   <X className="mr-1 h-3 w-3" /> Cambiar
                 </Button>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customer_cedula">DNI / Cédula</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="customer_cedula"
+                  inputMode="numeric"
+                  placeholder="Ingresá la cédula para buscar o crear"
+                  value={form.customer_cedula}
+                  onChange={(e) => setForm({ ...form, customer_cedula: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); searchByCedula(); }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={searchByCedula}
+                  disabled={searchingCedula || !form.customer_cedula.trim()}
+                >
+                  {searchingCedula ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -618,17 +686,6 @@ export default function NewOrderDialog({
                 </div>
               </div>
             )}
-
-            <div className="space-y-2">
-              <Label htmlFor="customer_cedula">Cédula de Identidad (opcional)</Label>
-              <Input
-                id="customer_cedula"
-                inputMode="numeric"
-                placeholder="1.234.567"
-                value={form.customer_cedula}
-                onChange={(e) => setForm({ ...form, customer_cedula: e.target.value })}
-              />
-            </div>
           </section>
 
           {/* Sección: Equipo y problemas */}
@@ -803,6 +860,37 @@ export default function NewOrderDialog({
               </div>
             </div>
 
+            {deposit > 0 && (
+              <div className="space-y-2">
+                <Label>Método de pago de la seña</Label>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: "Efectivo", label: "Efectivo", icon: Banknote },
+                    { value: "Transferencia", label: "Transferencia", icon: ArrowLeftRight },
+                    { value: "Otro", label: "Otro", icon: MoreHorizontal },
+                  ] as const).map((m) => {
+                    const active = form.deposit_payment_method === m.value;
+                    return (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => setForm({ ...form, deposit_payment_method: m.value })}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                          active
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <m.icon className="h-3.5 w-3.5" />
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Fecha estimada de entrega</Label>
               <Popover>
@@ -849,23 +937,54 @@ export default function NewOrderDialog({
             <p className="text-xs text-muted-foreground">
               Datos opcionales para que el técnico pueda acceder al equipo durante la reparación.
             </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="device_pin">PIN / Contraseña</Label>
-                <Input
-                  id="device_pin"
-                  type="text"
-                  autoComplete="off"
-                  placeholder="Ej: 1234 o contraseña"
-                  value={form.device_pin}
-                  onChange={(e) => setForm({ ...form, device_pin: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Se guarda asociado a la orden y solo es visible para el técnico.
-                </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor={lockInputMode === "text" ? "device_pin" : undefined}>
+                  {lockInputMode === "text" ? "PIN / Contraseña" : "Patrón de desbloqueo (Android)"}
+                </Label>
+                <div className="flex rounded-md border border-input p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setLockInputMode("text")}
+                    aria-label="Usar PIN o contraseña"
+                    aria-pressed={lockInputMode === "text"}
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-sm transition-colors",
+                      lockInputMode === "text" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    )}
+                  >
+                    <Type className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLockInputMode("pattern")}
+                    aria-label="Usar patrón de desbloqueo"
+                    aria-pressed={lockInputMode === "pattern"}
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-sm transition-colors",
+                      lockInputMode === "pattern" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    )}
+                  >
+                    <Grid3x3 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Patrón de desbloqueo (Android)</Label>
+
+              {lockInputMode === "text" ? (
+                <>
+                  <Input
+                    id="device_pin"
+                    type="text"
+                    autoComplete="off"
+                    placeholder="Ej: 1234 o contraseña"
+                    value={form.device_pin}
+                    onChange={(e) => setForm({ ...form, device_pin: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se guarda asociado a la orden y solo es visible para el técnico.
+                  </p>
+                </>
+              ) : (
                 <div className="flex flex-col items-start gap-2">
                   <PatternLock
                     value={form.device_pattern}
@@ -882,7 +1001,7 @@ export default function NewOrderDialog({
                     Borrar patrón
                   </Button>
                 </div>
-              </div>
+              )}
             </div>
           </section>
 

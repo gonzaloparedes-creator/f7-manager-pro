@@ -450,6 +450,7 @@ export type Database = {
           delivered_at: string | null
           deposit_amount: number
           deposit_date: string | null
+          deposit_payment_method: string | null
           device_pattern: number[] | null
           device_pin: string | null
           device_type: string
@@ -494,6 +495,7 @@ export type Database = {
           delivered_at?: string | null
           deposit_amount?: number
           deposit_date?: string | null
+          deposit_payment_method?: string | null
           device_pattern?: number[] | null
           device_pin?: string | null
           device_type: string
@@ -538,6 +540,7 @@ export type Database = {
           delivered_at?: string | null
           deposit_amount?: number
           deposit_date?: string | null
+          deposit_payment_method?: string | null
           device_pattern?: number[] | null
           device_pin?: string | null
           device_type?: string
