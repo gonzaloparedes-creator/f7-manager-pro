@@ -184,7 +184,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           {isAdmin && (
             <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[160px] sm:w-[200px]">
                 <SelectValue placeholder="Sucursal" />
               </SelectTrigger>
               <SelectContent>
@@ -195,15 +195,21 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
           )}
-          <Button variant="outline" onClick={() => setBatchOpen(true)} className="gap-2">
-            <Layers className="h-4 w-4" /> Modo Lote
-          </Button>
-          <Button variant="outline" onClick={() => setQuoteOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Nuevo Presupuesto
-          </Button>
-          <Button onClick={() => setOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Nueva Orden
-          </Button>
+          {/* En mobile el FAB (nav inferior) ya cubre Nueva Orden/Presupuesto/
+              Lote — mostrar estos botones también acá desbordaba el header
+              en pantallas chicas. Se muestran recién desde md, que es
+              donde el FAB deja de estar disponible (ver AppLayout). */}
+          <div className="hidden items-center gap-2 md:flex">
+            <Button variant="outline" onClick={() => setBatchOpen(true)} className="gap-2">
+              <Layers className="h-4 w-4" /> Modo Lote
+            </Button>
+            <Button variant="outline" onClick={() => setQuoteOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Nuevo Presupuesto
+            </Button>
+            <Button onClick={() => setOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Nueva Orden
+            </Button>
+          </div>
         </div>
       </div>
 
