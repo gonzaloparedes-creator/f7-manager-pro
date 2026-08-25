@@ -516,8 +516,14 @@ export default function NewOrderDialog({
             grid con overflow-x-auto pierde su alto mínimo basado en
             contenido (el navegador lo colapsa a ~0) y termina recortando
             los chips a la mitad. Separar scroll-horizontal (adentro) de
-            sticky (afuera) evita el problema de raíz. */}
-        <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-background shadow-sm">
+            sticky (afuera) evita ese problema — pero un hijo de grid
+            también tiene min-width:auto por default, así que sin min-w-0
+            este div crece para "abrazar" el ancho completo de los chips
+            en vez de respetar el ancho del diálogo, volviendo scrolleable
+            horizontalmente TODO el modal. min-w-0 fuerza a que respete el
+            ancho del contenedor y deje el overflow-x-auto de adentro
+            hacerse cargo. */}
+        <div className="sticky top-0 z-10 -mx-6 min-w-0 border-b border-border bg-background shadow-sm">
           <div className="flex gap-1.5 overflow-x-auto px-6 py-2.5">
             {SECTIONS.map((s) => (
               <button
