@@ -511,22 +511,30 @@ export default function NewOrderDialog({
           <DialogTitle>Nueva orden</DialogTitle>
           <DialogDescription>Registrá un nuevo equipo para reparación.</DialogDescription>
         </DialogHeader>
-        <div className="sticky top-0 z-10 -mx-6 flex gap-1.5 overflow-x-auto border-b border-border bg-background px-6 py-2">
-          {SECTIONS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => sectionRefs.current[s.key]?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              className={cn(
-                "whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                activeSection === s.key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {s.label}
-            </button>
-          ))}
+        {/* El scroll horizontal vive en un div interno, no en este mismo
+            elemento sticky: DialogContent es un grid, y un hijo directo de
+            grid con overflow-x-auto pierde su alto mínimo basado en
+            contenido (el navegador lo colapsa a ~0) y termina recortando
+            los chips a la mitad. Separar scroll-horizontal (adentro) de
+            sticky (afuera) evita el problema de raíz. */}
+        <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-background shadow-sm">
+          <div className="flex gap-1.5 overflow-x-auto px-6 py-2.5">
+            {SECTIONS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => sectionRefs.current[s.key]?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className={cn(
+                  "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+                  activeSection === s.key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
         <form onSubmit={onSubmit} className="space-y-6">
           {/* Sección: Cliente */}
