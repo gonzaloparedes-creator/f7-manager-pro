@@ -133,7 +133,7 @@ export default function NewQuoteDialog({
         clientId = created.id;
       }
 
-      const { data: numData, error: numErr } = await supabase.rpc("generate_order_number");
+      const { data: numData, error: numErr } = await supabase.rpc("generate_order_number", { _company_id: resolvedCompanyId });
       if (numErr) throw numErr;
       const order_number = numData as string;
 

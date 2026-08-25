@@ -408,8 +408,8 @@ export default function NewOrderDialog({
         await supabase.from("clients").update({ cedula: cedulaNorm }).eq("id", clientId);
       }
 
-      // Get next ORD-XXXX number from DB
-      const { data: numData, error: numErr } = await supabase.rpc("generate_order_number");
+      // Get next ORD-XXXX number from DB (correlativo por empresa)
+      const { data: numData, error: numErr } = await supabase.rpc("generate_order_number", { _company_id: companyId });
       if (numErr) throw numErr;
       const order_number = numData as string;
 

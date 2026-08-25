@@ -1,6 +1,17 @@
 {
   "rewrites": [
     {
+      "source": "/tracking/:code",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|WhatsApp|Twitterbot|Slackbot|TelegramBot|LinkedInBot|Discordbot|SkypeUriPreview|Pinterest|Applebot|redditbot|vkShare).*"
+        }
+      ],
+      "destination": "/api/tracking-og?code=:code"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

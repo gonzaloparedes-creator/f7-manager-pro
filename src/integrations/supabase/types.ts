@@ -830,7 +830,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_order_number: { Args: never; Returns: string }
+      generate_order_number: { Args: { _company_id: string }; Returns: string }
+      get_tracking_og_info: {
+        Args: { _code: string }
+        Returns: {
+          company_name: string
+          device_type: string
+          order_number: string
+          status: string
+        }[]
+      }
       get_history_by_code: {
         Args: { _code: string }
         Returns: {
