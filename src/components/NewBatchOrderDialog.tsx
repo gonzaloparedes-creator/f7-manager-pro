@@ -42,6 +42,18 @@ export default function NewBatchOrderDialog({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
+  // Cada equipo del lote es una orden independiente creada en secuencia;
+  // cerrar/recargar la pestaña a mitad de camino dejaría equipos sin crear
+  // sin avisar. La navegación dentro de la app (sidebar, back del router)
+  // no dispara beforeunload, pero esto cubre el caso más común (cerrar
+  // pestaña, refrescar, recargar el celular).
+  useEffect(() => {
+    if (!loading) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [loading]);
+
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCedula, setCustomerCedula] = useState("");
@@ -187,18 +199,21 @@ export default function NewBatchOrderDialog({
             order_id: order.id, status: "recibido", note: "Orden creada (Modo Lote)",
           });
 
-          try {
-            await supabase.functions.invoke("send-order-notification", {
-              body: {
-                customer_name: order.customer_name,
-                customer_phone: order.customer_phone,
-                device_type: order.device_type,
-                order_number: order.order_number,
-                order_code: order.order_number,
-                app_origin: window.location.origin,
-              },
-            });
-          } catch (e) { console.warn("notification failed", e); }
+          // No se espera la notificación: con varios equipos, esperar el
+          // WhatsApp de cada uno antes de pasar al siguiente multiplicaba
+          // el tiempo total y ampliaba la ventana en la que salir de la
+          // pantalla a mitad de camino dejaba equipos sin crear. Se dispara
+          // en paralelo y no bloquea el resto del lote.
+          supabase.functions.invoke("send-order-notification", {
+            body: {
+              customer_name: order.customer_name,
+              customer_phone: order.customer_phone,
+              device_type: order.device_type,
+              order_number: order.order_number,
+              order_code: order.order_number,
+              app_origin: window.location.origin,
+            },
+          }).catch((e) => console.warn("notification failed", e));
 
           createdNumbers.push(order_number);
         } catch (e: any) {
