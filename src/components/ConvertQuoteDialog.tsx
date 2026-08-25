@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { SignaturePad } from "@/components/SignaturePad";
 import WarrantySelector from "@/components/WarrantySelector";
+import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
+import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 
 type QuoteOrder = {
   id: string;
@@ -34,15 +36,15 @@ export default function ConvertQuoteDialog({
   order, open, onOpenChange, onConverted,
 }: { order: QuoteOrder; open: boolean; onOpenChange: (o: boolean) => void; onConverted: () => void }) {
   const { toast } = useToast();
+  const { presets: accessoryPresets } = useAccessoryPresets();
+  const { presets: checklistPresets } = useChecklistPresets();
   const [loading, setLoading] = useState(false);
 
   const [lockInputMode, setLockInputMode] = useState<"text" | "pattern">("text");
   const [devicePin, setDevicePin] = useState("");
   const [devicePattern, setDevicePattern] = useState<number[]>([]);
-  const [hasSim, setHasSim] = useState(false);
-  const [hasSd, setHasSd] = useState(false);
-  const [hasEsim, setHasEsim] = useState(false);
-  const [hasCase, setHasCase] = useState(false);
+  const [accessories, setAccessories] = useState<string[]>([]);
+  const [checklist, setChecklist] = useState<Record<string, "ok" | "fail">>({});
   const [warrantyDays, setWarrantyDays] = useState(30);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositMethod, setDepositMethod] = useState("Efectivo");
@@ -77,10 +79,8 @@ export default function ConvertQuoteDialog({
           status: "recibido",
           device_pin: devicePin || null,
           device_pattern: devicePattern,
-          has_sim: hasSim,
-          has_sd: hasSd,
-          has_esim: hasEsim,
-          has_case: hasCase,
+          accessories,
+          checklist: Object.entries(checklist).map(([label, status]) => ({ label, status })),
           warranty_days: warrantyDays,
           deposit_amount: deposit,
           deposit_payment_method: deposit > 0 ? depositMethod : null,
@@ -128,23 +128,71 @@ export default function ConvertQuoteDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Accesorios y Componentes</Label>
-            <p className="text-xs text-muted-foreground">Marcá lo que el cliente entrega junto al equipo.</p>
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { key: "sim", label: "SIM Card", value: hasSim, set: setHasSim },
-                { key: "sd", label: "Micro SD", value: hasSd, set: setHasSd },
-                { key: "esim", label: "eSIM", value: hasEsim, set: setHasEsim },
-                { key: "case", label: "Funda/Carcasa", value: hasCase, set: setHasCase },
-              ] as const).map((acc) => (
-                <div key={acc.key} className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2">
-                  <Label className="text-sm font-normal cursor-pointer">{acc.label}</Label>
-                  <Switch checked={acc.value} onCheckedChange={(c) => acc.set(c === true)} />
-                </div>
-              ))}
+          {accessoryPresets.length > 0 && (
+            <div className="space-y-2">
+              <Label>Accesorios y Componentes</Label>
+              <p className="text-xs text-muted-foreground">Marcá lo que el cliente entrega junto al equipo.</p>
+              <div className="grid grid-cols-2 gap-3">
+                {accessoryPresets.map((acc) => {
+                  const checked = accessories.includes(acc.label);
+                  return (
+                    <div key={acc.id} className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2">
+                      <Label className="text-sm font-normal cursor-pointer">{acc.label}</Label>
+                      <Switch
+                        checked={checked}
+                        onCheckedChange={(c) => setAccessories(c
+                          ? [...accessories, acc.label]
+                          : accessories.filter((x) => x !== acc.label))}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
+
+          {checklistPresets.length > 0 && (
+            <div className="space-y-2">
+              <Label>Checklist de Recepción</Label>
+              <p className="text-xs text-muted-foreground">Dejá constancia del estado del equipo al recibirlo.</p>
+              <div className="space-y-2">
+                {checklistPresets.map((c) => {
+                  const status = checklist[c.label];
+                  return (
+                    <div key={c.id} className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2">
+                      <span className="text-sm">{c.label}</span>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setChecklist({ ...checklist, [c.label]: "ok" })}
+                          className={cn(
+                            "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                            status === "ok"
+                              ? "border-transparent bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))]"
+                              : "border-input text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          OK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setChecklist({ ...checklist, [c.label]: "fail" })}
+                          className={cn(
+                            "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                            status === "fail"
+                              ? "border-transparent bg-destructive/10 text-destructive"
+                              : "border-input text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Falla
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">

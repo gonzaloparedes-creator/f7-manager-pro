@@ -10,9 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { STATUS_LABELS, formatPYG, type OrderStatus } from "@/lib/orders";
-import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon } from "lucide-react";
+import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
+import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
   const [collectingId, setCollectingId] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>("all");
@@ -84,12 +86,15 @@ export default function Dashboard() {
   // state.openNewQuote cuando se toca esa acción desde otra página — se
   // limpia el state al abrir para que no se re-dispare con el botón atrás.
   useEffect(() => {
-    const state = location.state as { openNewOrder?: boolean; openNewQuote?: boolean } | null;
+    const state = location.state as { openNewOrder?: boolean; openNewQuote?: boolean; openBatchOrder?: boolean } | null;
     if (state?.openNewOrder) {
       setOpen(true);
       navigate(location.pathname, { replace: true, state: null });
     } else if (state?.openNewQuote) {
       setQuoteOpen(true);
+      navigate(location.pathname, { replace: true, state: null });
+    } else if (state?.openBatchOrder) {
+      setBatchOpen(true);
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,6 +195,9 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
           )}
+          <Button variant="outline" onClick={() => setBatchOpen(true)} className="gap-2">
+            <Layers className="h-4 w-4" /> Modo Lote
+          </Button>
           <Button variant="outline" onClick={() => setQuoteOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Nuevo Presupuesto
           </Button>
@@ -373,6 +381,7 @@ export default function Dashboard() {
 
       <NewOrderDialog open={open} onOpenChange={setOpen} onCreated={load} />
       <NewQuoteDialog open={quoteOpen} onOpenChange={setQuoteOpen} onCreated={load} />
+      <NewBatchOrderDialog open={batchOpen} onOpenChange={setBatchOpen} onCreated={load} />
     </div>
   );
 }

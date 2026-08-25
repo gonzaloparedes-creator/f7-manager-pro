@@ -4,6 +4,8 @@ import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
+import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
+import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { supabase } from "@/integrations/supabase/client";
 import imageCompression from "browser-image-compression";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ const SECTIONS = [
   { key: "cliente", label: "Cliente" },
   { key: "equipo", label: "Equipo" },
   { key: "accesorios", label: "Accesorios" },
+  { key: "checklist", label: "Checklist" },
   { key: "financiero", label: "Financiero" },
   { key: "seguridad", label: "Seguridad" },
   { key: "firma", label: "Firma" },
@@ -83,10 +86,8 @@ type FormState = {
   device_pattern: number[];
   terms_accepted: boolean;
   client_signature: string;
-  has_sim: boolean;
-  has_sd: boolean;
-  has_esim: boolean;
-  has_case: boolean;
+  accessories: string[];
+  checklist: Record<string, "ok" | "fail">;
   warranty_days: number;
 };
 
@@ -109,10 +110,8 @@ const INITIAL_STATE: FormState = {
   device_pattern: [],
   terms_accepted: false,
   client_signature: "",
-  has_sim: false,
-  has_sd: false,
-  has_esim: false,
-  has_case: false,
+  accessories: [],
+  checklist: {},
   warranty_days: 30,
 };
 
@@ -122,6 +121,8 @@ export default function NewOrderDialog({
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { limits, isStarter } = usePlan();
+  const { presets: accessoryPresets } = useAccessoryPresets();
+  const { presets: checklistPresets } = useChecklistPresets();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -445,10 +446,8 @@ export default function NewOrderDialog({
           device_pattern: form.device_pattern,
           terms_accepted: form.terms_accepted,
           client_signature: form.client_signature || null,
-          has_sim: form.has_sim,
-          has_sd: form.has_sd,
-          has_esim: form.has_esim,
-          has_case: form.has_case,
+          accessories: form.accessories,
+          checklist: Object.entries(form.checklist).map(([label, status]) => ({ label, status })),
           received_by_id: user.id,
           warranty_days: form.warranty_days,
         })
@@ -872,28 +871,94 @@ export default function NewOrderDialog({
             <p className="text-xs text-muted-foreground">
               Marcá lo que el cliente entrega junto al equipo.
             </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {([
-                { key: "has_sim", label: "SIM Card" },
-                { key: "has_sd", label: "Micro SD" },
-                { key: "has_esim", label: "eSIM" },
-                { key: "has_case", label: "Funda/Carcasa" },
-              ] as const).map((acc) => (
-                <div
-                  key={acc.key}
-                  className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2"
-                >
-                  <Label htmlFor={acc.key} className="text-sm font-normal cursor-pointer">
-                    {acc.label}
-                  </Label>
-                  <Switch
-                    id={acc.key}
-                    checked={form[acc.key]}
-                    onCheckedChange={(c) => setForm({ ...form, [acc.key]: c === true })}
-                  />
-                </div>
-              ))}
-            </div>
+            {accessoryPresets.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No hay accesorios configurados. Agregalos en Configuración → Accesorios.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {accessoryPresets.map((acc) => {
+                  const checked = form.accessories.includes(acc.label);
+                  return (
+                    <div
+                      key={acc.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2"
+                    >
+                      <Label htmlFor={`acc_${acc.id}`} className="text-sm font-normal cursor-pointer">
+                        {acc.label}
+                      </Label>
+                      <Switch
+                        id={`acc_${acc.id}`}
+                        checked={checked}
+                        onCheckedChange={(c) => setForm({
+                          ...form,
+                          accessories: c
+                            ? [...form.accessories, acc.label]
+                            : form.accessories.filter((x) => x !== acc.label),
+                        })}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* Sección: Checklist de recepción */}
+          <section
+            ref={(el) => { sectionRefs.current.checklist = el; }}
+            data-section="checklist"
+            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+          >
+            <h3 className="text-sm font-semibold text-foreground">Checklist de Recepción</h3>
+            <p className="text-xs text-muted-foreground">
+              Dejá constancia del estado del equipo al recibirlo (opcional, item por item).
+            </p>
+            {checklistPresets.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No hay ítems configurados. Agregalos en Configuración → Accesorios.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {checklistPresets.map((c) => {
+                  const status = form.checklist[c.label];
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2"
+                    >
+                      <span className="text-sm">{c.label}</span>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "ok" } })}
+                          className={cn(
+                            "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                            status === "ok"
+                              ? "border-transparent bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))]"
+                              : "border-input text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          OK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "fail" } })}
+                          className={cn(
+                            "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                            status === "fail"
+                              ? "border-transparent bg-destructive/10 text-destructive"
+                              : "border-input text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Falla
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {/* Sección: Financiero */}

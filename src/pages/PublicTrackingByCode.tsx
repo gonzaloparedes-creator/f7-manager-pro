@@ -25,6 +25,8 @@ interface PublicOrder {
   problems?: string[] | null;
   problem_other?: string | null;
   problem_description?: string | null;
+  accessories?: string[] | null;
+  checklist?: { label: string; status: "ok" | "fail" }[] | null;
 }
 interface PublicHistory { id: string; status: string; note: string | null; created_at: string; image_urls?: string[] | null; }
 interface PublicTechNote { id: string; note: string; created_at: string; }
@@ -182,6 +184,39 @@ export default function PublicTrackingByCode() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {order.accessories && order.accessories.length > 0 && (
+              <div className="space-y-1.5 border-t border-border pt-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Accesorios entregados</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {order.accessories.map((a) => (
+                    <span key={a} className="rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium border border-primary/20">
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {order.checklist && order.checklist.length > 0 && (
+              <div className="space-y-1.5 border-t border-border pt-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Checklist de recepción</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {order.checklist.map((c) => (
+                    <span
+                      key={c.label}
+                      className={
+                        c.status === "ok"
+                          ? "rounded-full bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))] px-3 py-1 text-xs font-medium"
+                          : "rounded-full bg-destructive/10 text-destructive px-3 py-1 text-xs font-medium"
+                      }
+                    >
+                      {c.status === "ok" ? "✓" : "✗"} {c.label}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>

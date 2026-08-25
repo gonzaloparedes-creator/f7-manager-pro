@@ -15,6 +15,8 @@ import { PROBLEM_OPTIONS, formatPYG } from "@/lib/orders";
 import WarrantySelector from "@/components/WarrantySelector";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
+import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 
 interface CargoAdicional { motivo: string; monto: number }
 
@@ -36,10 +38,8 @@ type FormState = {
   quote_amount: string;
   deposit_amount: string;
   estimated_delivery_date: Date | undefined;
-  has_sim: boolean;
-  has_sd: boolean;
-  has_esim: boolean;
-  has_case: boolean;
+  accessories: string[];
+  checklist: Record<string, "ok" | "fail">;
   warranty_days: number;
 };
 
@@ -54,10 +54,8 @@ const EMPTY: FormState = {
   quote_amount: "",
   deposit_amount: "",
   estimated_delivery_date: undefined,
-  has_sim: false,
-  has_sd: false,
-  has_esim: false,
-  has_case: false,
+  accessories: [],
+  checklist: {},
   warranty_days: 30,
 };
 
@@ -72,6 +70,8 @@ const formatThousands = (s: string) => {
 
 export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated }: EditOrderDialogProps) {
   const { toast } = useToast();
+  const { presets: accessoryPresets } = useAccessoryPresets();
+  const { presets: checklistPresets } = useChecklistPresets();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
@@ -82,7 +82,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
     setFetching(true);
     supabase
       .from("orders")
-      .select("customer_name, customer_phone, device_type, imei, problems, problem_other, problem_description, quote_amount, deposit_amount, estimated_delivery_date, has_sim, has_sd, has_esim, has_case, cargos_adicionales, warranty_days")
+      .select("customer_name, customer_phone, device_type, imei, problems, problem_other, problem_description, quote_amount, deposit_amount, estimated_delivery_date, accessories, checklist, cargos_adicionales, warranty_days")
       .eq("id", orderId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -92,6 +92,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
           return;
         }
         const o: any = data;
+        const checklistArr = (o.checklist ?? []) as { label: string; status: "ok" | "fail" }[];
         setForm({
           customer_name: o.customer_name ?? "",
           customer_phone: o.customer_phone ?? "",
@@ -103,10 +104,8 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
           quote_amount: String(o.quote_amount ?? ""),
           deposit_amount: String(o.deposit_amount ?? ""),
           estimated_delivery_date: o.estimated_delivery_date ? new Date(o.estimated_delivery_date) : undefined,
-          has_sim: !!o.has_sim,
-          has_sd: !!o.has_sd,
-          has_esim: !!o.has_esim,
-          has_case: !!o.has_case,
+          accessories: (o.accessories ?? []) as string[],
+          checklist: Object.fromEntries(checklistArr.map((c) => [c.label, c.status])),
           warranty_days: typeof o.warranty_days === "number" ? o.warranty_days : 30,
         });
         setCargos((o.cargos_adicionales ?? []) as CargoAdicional[]);
@@ -152,10 +151,8 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
         quote_amount: quote,
         deposit_amount: deposit,
         estimated_delivery_date: form.estimated_delivery_date ? format(form.estimated_delivery_date, "yyyy-MM-dd") : null,
-        has_sim: form.has_sim,
-        has_sd: form.has_sd,
-        has_esim: form.has_esim,
-        has_case: form.has_case,
+        accessories: form.accessories,
+        checklist: Object.entries(form.checklist).map(([label, status]) => ({ label, status })),
         warranty_days: form.warranty_days,
       })
       .eq("id", orderId);
@@ -253,23 +250,72 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
             </section>
 
             {/* Accesorios */}
-            <section className="space-y-3 border-t border-border pt-4">
-              <h3 className="text-sm font-semibold text-foreground">Accesorios y Componentes</h3>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {([
-                  { key: "has_sim", label: "SIM Card" },
-                  { key: "has_sd", label: "Micro SD" },
-                  { key: "has_esim", label: "eSIM" },
-                  { key: "has_case", label: "Funda/Carcasa" },
-                ] as const).map((acc) => (
-                  <div key={acc.key} className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2">
-                    <Label htmlFor={`e_${acc.key}`} className="text-sm font-normal cursor-pointer">{acc.label}</Label>
-                    <Switch id={`e_${acc.key}`} checked={form[acc.key]}
-                      onCheckedChange={(c) => setForm({ ...form, [acc.key]: c === true })} />
-                  </div>
-                ))}
-              </div>
-            </section>
+            {accessoryPresets.length > 0 && (
+              <section className="space-y-3 border-t border-border pt-4">
+                <h3 className="text-sm font-semibold text-foreground">Accesorios y Componentes</h3>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {accessoryPresets.map((acc) => {
+                    const checked = form.accessories.includes(acc.label);
+                    return (
+                      <div key={acc.id} className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2">
+                        <Label htmlFor={`e_acc_${acc.id}`} className="text-sm font-normal cursor-pointer">{acc.label}</Label>
+                        <Switch
+                          id={`e_acc_${acc.id}`}
+                          checked={checked}
+                          onCheckedChange={(c) => setForm({
+                            ...form,
+                            accessories: c ? [...form.accessories, acc.label] : form.accessories.filter((x) => x !== acc.label),
+                          })}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Checklist de recepción */}
+            {checklistPresets.length > 0 && (
+              <section className="space-y-3 border-t border-border pt-4">
+                <h3 className="text-sm font-semibold text-foreground">Checklist de Recepción</h3>
+                <div className="space-y-2">
+                  {checklistPresets.map((c) => {
+                    const status = form.checklist[c.label];
+                    return (
+                      <div key={c.id} className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2">
+                        <span className="text-sm">{c.label}</span>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "ok" } })}
+                            className={cn(
+                              "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                              status === "ok"
+                                ? "border-transparent bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))]"
+                                : "border-input text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            OK
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "fail" } })}
+                            className={cn(
+                              "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                              status === "fail"
+                                ? "border-transparent bg-destructive/10 text-destructive"
+                                : "border-input text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            Falla
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* Financiero */}
             <section className="space-y-3 border-t border-border pt-4">

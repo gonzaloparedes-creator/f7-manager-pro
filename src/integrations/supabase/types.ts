@@ -12,8 +12,54 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      accessory_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       branches: {
         Row: {
           address: string | null
@@ -48,6 +94,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      checklist_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
       }
       clients: {
         Row: {
@@ -104,6 +171,7 @@ export type Database = {
           is_active: boolean
           is_paying: boolean
           name: string
+          order_seq: number
           plan_type: string
           previous_system: string | null
           referral_partner_id: string | null
@@ -123,6 +191,7 @@ export type Database = {
           is_active?: boolean
           is_paying?: boolean
           name: string
+          order_seq?: number
           plan_type?: string
           previous_system?: string | null
           referral_partner_id?: string | null
@@ -142,6 +211,7 @@ export type Database = {
           is_active?: boolean
           is_paying?: boolean
           name?: string
+          order_seq?: number
           plan_type?: string
           previous_system?: string | null
           referral_partner_id?: string | null
@@ -154,6 +224,35 @@ export type Database = {
             columns: ["referral_partner_id"]
             isOneToOne: false
             referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_categories: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -237,35 +336,6 @@ export type Database = {
           },
         ]
       }
-      inventory_categories: {
-        Row: {
-          company_id: string
-          created_at: string
-          id: string
-          name: string
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          id?: string
-          name: string
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_categories_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       inventory_subcategories: {
         Row: {
           category_id: string
@@ -301,6 +371,32 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_send_log: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_send_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -437,9 +533,11 @@ export type Database = {
       }
       orders: {
         Row: {
+          accessories: string[]
           alternative_phone: string | null
           assigned_technician_id: string | null
           cargos_adicionales: Json
+          checklist: Json
           client_id: string | null
           client_signature: string | null
           company_id: string
@@ -482,9 +580,11 @@ export type Database = {
           warranty_days: number
         }
         Insert: {
+          accessories?: string[]
           alternative_phone?: string | null
           assigned_technician_id?: string | null
           cargos_adicionales?: Json
+          checklist?: Json
           client_id?: string | null
           client_signature?: string | null
           company_id: string
@@ -527,9 +627,11 @@ export type Database = {
           warranty_days?: number
         }
         Update: {
+          accessories?: string[]
           alternative_phone?: string | null
           assigned_technician_id?: string | null
           cargos_adicionales?: Json
+          checklist?: Json
           client_id?: string | null
           client_signature?: string | null
           company_id?: string
@@ -616,6 +718,86 @@ export type Database = {
           },
         ]
       }
+      product_sales: {
+        Row: {
+          branch_id: string | null
+          category_name: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          inventory_item_id: string | null
+          payment_method: string | null
+          product_name: string
+          quantity: number
+          sale_group_id: string | null
+          subcategory_name: string | null
+          unit_cost: number
+          unit_price: number
+        }
+        Insert: {
+          branch_id?: string | null
+          category_name?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_item_id?: string | null
+          payment_method?: string | null
+          product_name: string
+          quantity?: number
+          sale_group_id?: string | null
+          subcategory_name?: string | null
+          unit_cost?: number
+          unit_price?: number
+        }
+        Update: {
+          branch_id?: string | null
+          category_name?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inventory_item_id?: string | null
+          payment_method?: string | null
+          product_name?: string
+          quantity?: number
+          sale_group_id?: string | null
+          subcategory_name?: string | null
+          unit_cost?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sales_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sales_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           branch_id: string | null
@@ -679,27 +861,6 @@ export type Database = {
           },
         ]
       }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
       referral_partners: {
         Row: {
           commission_rate: number
@@ -721,6 +882,27 @@ export type Database = {
           id?: string
           name?: string
           slug?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -748,98 +930,12 @@ export type Database = {
         }
         Relationships: []
       }
-      notification_send_log: {
-        Row: {
-          created_at: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      product_sales: {
-        Row: {
-          branch_id: string | null
-          category_name: string | null
-          company_id: string
-          created_at: string
-          created_by: string | null
-          id: string
-          inventory_item_id: string | null
-          payment_method: string | null
-          product_name: string
-          quantity: number
-          sale_group_id: string | null
-          subcategory_name: string | null
-          unit_cost: number
-          unit_price: number
-        }
-        Insert: {
-          branch_id?: string | null
-          category_name?: string | null
-          company_id: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          inventory_item_id?: string | null
-          payment_method?: string | null
-          product_name: string
-          quantity?: number
-          sale_group_id?: string | null
-          subcategory_name?: string | null
-          unit_cost?: number
-          unit_price?: number
-        }
-        Update: {
-          branch_id?: string | null
-          category_name?: string | null
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          inventory_item_id?: string | null
-          payment_method?: string | null
-          product_name?: string
-          quantity?: number
-          sale_group_id?: string | null
-          subcategory_name?: string | null
-          unit_cost?: number
-          unit_price?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_sales_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       generate_order_number: { Args: { _company_id: string }; Returns: string }
-      get_tracking_og_info: {
-        Args: { _code: string }
-        Returns: {
-          company_name: string
-          device_type: string
-          order_number: string
-          status: string
-        }[]
-      }
       get_history_by_code: {
         Args: { _code: string }
         Returns: {
@@ -850,18 +946,12 @@ export type Database = {
           status: string
         }[]
       }
-      get_technical_notes_by_tracking: {
-        Args: { _token: string }
-        Returns: {
-          created_at: string
-          id: string
-          note: string
-        }[]
-      }
       get_order_by_code: {
         Args: { _code: string }
         Returns: {
+          accessories: string[]
           cargos_adicionales: Json
+          checklist: Json
           created_at: string
           deposit_amount: number
           device_type: string
@@ -880,7 +970,9 @@ export type Database = {
       get_order_by_tracking: {
         Args: { _token: string }
         Returns: {
+          accessories: string[]
           cargos_adicionales: Json
+          checklist: Json
           created_at: string
           deposit_amount: number
           device_type: string
@@ -914,6 +1006,23 @@ export type Database = {
           note: string
         }[]
       }
+      get_technical_notes_by_tracking: {
+        Args: { _token: string }
+        Returns: {
+          created_at: string
+          id: string
+          note: string
+        }[]
+      }
+      get_tracking_og_info: {
+        Args: { _code: string }
+        Returns: {
+          company_name: string
+          device_type: string
+          order_number: string
+          status: string
+        }[]
+      }
       get_user_branch: { Args: { _user_id: string }; Returns: string }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       has_role: {
@@ -927,7 +1036,7 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "staff"
+      app_role: "admin" | "staff" | "superadmin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1053,9 +1162,12 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
-      app_role: ["admin", "staff"],
+      app_role: ["admin", "staff", "superadmin"],
     },
   },
 } as const

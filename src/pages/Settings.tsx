@@ -18,11 +18,13 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent } from "lucide-react";
+import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck } from "lucide-react";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
 import SubscriptionTab from "@/components/SubscriptionTab";
 import WarrantyPresetsTab from "@/components/WarrantyPresetsTab";
+import AccessoryPresetsTab from "@/components/AccessoryPresetsTab";
+import ChecklistPresetsTab from "@/components/ChecklistPresetsTab";
 import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
 
 type NotifPrefs = {
@@ -194,7 +196,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className={`grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 ${isStarterPlan ? "lg:grid-cols-7" : "lg:grid-cols-8"}`}>
+        <TabsList className={`grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 ${isStarterPlan ? "lg:grid-cols-8" : "lg:grid-cols-9"}`}>
           <TabsTrigger value="perfil" className="h-9">Perfil</TabsTrigger>
           <TabsTrigger value="whatsapp" className="h-9">WhatsApp</TabsTrigger>
           <TabsTrigger value="sucursales" className="h-9"><Building2 className="mr-1 h-4 w-4" /> Sucursales</TabsTrigger>
@@ -203,6 +205,7 @@ export default function Settings() {
           )}
           <TabsTrigger value="usuarios" className="h-9"><Users className="mr-1 h-4 w-4" /> Usuarios</TabsTrigger>
           <TabsTrigger value="garantias" className="h-9"><ShieldCheck className="mr-1 h-4 w-4" /> Garantías</TabsTrigger>
+          <TabsTrigger value="recepcion" className="h-9"><PackageCheck className="mr-1 h-4 w-4" /> Accesorios</TabsTrigger>
           <TabsTrigger value="seguridad" className="h-9"><Lock className="mr-1 h-4 w-4" /> Seguridad</TabsTrigger>
           <TabsTrigger value="suscripcion" className="h-9"><Crown className="mr-1 h-4 w-4" /> Suscripción</TabsTrigger>
         </TabsList>
@@ -322,6 +325,11 @@ export default function Settings() {
 
         <TabsContent value="garantias">
           <WarrantyPresetsTab />
+        </TabsContent>
+
+        <TabsContent value="recepcion" className="space-y-6">
+          <AccessoryPresetsTab />
+          <ChecklistPresetsTab />
         </TabsContent>
 
         <TabsContent value="seguridad">

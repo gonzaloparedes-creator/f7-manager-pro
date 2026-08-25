@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, ClipboardList, ShoppingCart, FileText } from "lucide-react";
+import { Plus, ClipboardList, ShoppingCart, FileText, Layers } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { usePlan } from "@/hooks/usePlan";
 
@@ -29,6 +29,13 @@ export default function QuickActionsFab() {
       desc: "Cotizar sin recibir el equipo todavía",
       icon: FileText,
       run: () => navigate("/dashboard", { state: { openNewQuote: true } }),
+    },
+    {
+      key: "batch",
+      label: "Modo Lote",
+      desc: "Recibir varios equipos del mismo cliente a la vez",
+      icon: Layers,
+      run: () => navigate("/dashboard", { state: { openBatchOrder: true } }),
     },
     ...(hasStore
       ? [{

@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import { STATUS_LABELS, STATUS_ORDER, formatPYG, type OrderStatus } from "@/lib/orders";
-import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock } from "lucide-react";
+import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
 import { format } from "date-fns";
@@ -45,7 +46,8 @@ interface Order {
   customer_cedula?: string | null;
   assigned_technician_id?: string | null;
   current_branch_id?: string | null;
-  has_sim?: boolean; has_sd?: boolean; has_esim?: boolean; has_case?: boolean;
+  accessories?: string[] | null;
+  checklist?: { label: string; status: "ok" | "fail" }[] | null;
   received_by_id?: string | null;
   received_by_name?: string | null;
   warranty_days?: number | null;
@@ -726,28 +728,43 @@ export default function OrderDetail() {
                 </div>
               )}
 
-              {(() => {
-                const accs: string[] = [];
-                if (order.has_sim) accs.push("SIM");
-                if (order.has_sd) accs.push("Micro SD");
-                if (order.has_esim) accs.push("eSIM");
-                if (order.has_case) accs.push("Funda/Carcasa");
-                if (accs.length === 0) return null;
-                return (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Package className="h-3.5 w-3.5" /> Accesorios entregados
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {accs.map((a) => (
-                        <span key={a} className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
-                          {a}
-                        </span>
-                      ))}
-                    </div>
+              {order.accessories && order.accessories.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Package className="h-3.5 w-3.5" /> Accesorios entregados
                   </div>
-                );
-              })()}
+                  <div className="flex flex-wrap gap-1.5">
+                    {order.accessories.map((a) => (
+                      <span key={a} className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
+                        {a}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {order.checklist && order.checklist.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ListChecks className="h-3.5 w-3.5" /> Checklist de recepción
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {order.checklist.map((c) => (
+                      <span
+                        key={c.label}
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-xs font-medium",
+                          c.status === "ok"
+                            ? "bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))]"
+                            : "bg-destructive/10 text-destructive"
+                        )}
+                      >
+                        {c.status === "ok" ? "✓" : "✗"} {c.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {(order.device_pin || (order.device_pattern && order.device_pattern.length > 0)) && (
                 <div className="border-t border-border pt-4 space-y-3">

@@ -22,10 +22,8 @@ interface PrintOrder {
   client_signature: string | null;
   created_at: string;
   customer_cedula?: string | null;
-  has_sim?: boolean;
-  has_sd?: boolean;
-  has_esim?: boolean;
-  has_case?: boolean;
+  accessories?: string[] | null;
+  checklist?: { label: string; status: "ok" | "fail" }[] | null;
   received_by_name?: string | null;
 }
 
@@ -145,25 +143,25 @@ function InfoGrid({ order }: { order: PrintOrder }) {
         </div>
       </div>
 
-      {(() => {
-        const accs: string[] = [];
-        if (order.has_sim) accs.push("SIM");
-        if (order.has_sd) accs.push("Micro SD");
-        if (order.has_esim) accs.push("eSIM");
-        if (order.has_case) accs.push("Funda");
-        return (
-          <div className="grid grid-cols-2 gap-x-3 text-[11px]">
-            <div>
-              <div className="text-black/60">Recepcionado por</div>
-              <div className="font-semibold">{order.received_by_name || "—"}</div>
-            </div>
-            <div>
-              <div className="text-black/60">Accesorios</div>
-              <div>{accs.length > 0 ? accs.join(" · ") : "Ninguno"}</div>
-            </div>
+      <div className="grid grid-cols-2 gap-x-3 text-[11px]">
+        <div>
+          <div className="text-black/60">Recepcionado por</div>
+          <div className="font-semibold">{order.received_by_name || "—"}</div>
+        </div>
+        <div>
+          <div className="text-black/60">Accesorios</div>
+          <div>{order.accessories && order.accessories.length > 0 ? order.accessories.join(" · ") : "Ninguno"}</div>
+        </div>
+      </div>
+
+      {order.checklist && order.checklist.length > 0 && (
+        <div className="text-[11px]">
+          <div className="text-black/60">Checklist de recepción</div>
+          <div>
+            {order.checklist.map((c) => `${c.status === "ok" ? "✓" : "✗"} ${c.label}`).join(" · ")}
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {order.problems?.length > 0 && (
         <div className="text-[11px]">
