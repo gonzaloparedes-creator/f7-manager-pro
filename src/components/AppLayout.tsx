@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -44,6 +44,16 @@ export default function AppLayout() {
     return filtered;
   }, [isAdmin, isSuperAdmin]);
 
+  // La barra inferior mobile no entra con más de ~5 ítems (peor todavía con
+  // el badge de bloqueo PRO/BUSINESS) — Configuración y Super Admin son de
+  // uso poco frecuente comparado con Órdenes/Clientes/Inventario/Productos,
+  // así que en mobile viven como íconos en el header en vez de competir por
+  // espacio en la barra inferior. En desktop el sidebar tiene lugar de sobra.
+  const mobileNav = useMemo(
+    () => nav.filter((i) => i.to !== "/configuracion" && i.to !== "/superadmin"),
+    [nav]
+  );
+
   useEffect(() => {
     if (!loading && !user) navigate("/login", { replace: true });
   }, [loading, user, navigate]);
@@ -69,18 +79,32 @@ export default function AppLayout() {
     const businessLocked = item.businessOnly && !hasExternalInventory;
     const locked = (item.proOnly && isStarter) || businessLocked;
     if (locked) {
+      if (mobile) {
+        return (
+          <button
+            key={item.to}
+            onClick={() => businessLocked ? openUpgradeWhatsApp(PLAN_MESSAGES.business) : setUpgradeOpen(true)}
+            className="flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium text-muted-foreground"
+            aria-label={`${item.label} (requiere plan ${businessLocked ? "Business" : "Pro"})`}
+          >
+            <span className="relative">
+              <item.icon className="h-5 w-5" />
+              <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-secondary ring-2 ring-card">
+                <Lock className="h-2 w-2 text-secondary-foreground" />
+              </span>
+            </span>
+            <span className="truncate text-[10px]">{item.label}</span>
+          </button>
+        );
+      }
       return (
         <button
           key={item.to}
           onClick={() => businessLocked ? openUpgradeWhatsApp(PLAN_MESSAGES.business) : setUpgradeOpen(true)}
-          className={cn(
-            mobile
-              ? "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium text-muted-foreground"
-              : "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
-          )}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
         >
-          <item.icon className={mobile ? "h-5 w-5" : "h-4 w-4"} />
-          <span className={cn("flex items-center gap-2", mobile && "text-[10px]")}>
+          <item.icon className="h-4 w-4" />
+          <span className="flex items-center gap-2">
             {item.label}
             <span
               className="rounded-sm bg-secondary px-1.5 py-0.5 text-[9px] font-bold leading-none text-secondary-foreground"
@@ -151,13 +175,33 @@ export default function AppLayout() {
           <img src={f7Logo} alt="F7 Manager Pro" className="h-8 w-8 rounded-md object-contain" />
           <span className="font-bold">F7 Manager Pro</span>
         </Link>
-        <button
-          onClick={signOut}
-          aria-label="Cerrar sesión"
-          className="-m-3 rounded-full p-3 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <LogOut className="h-5 w-5" />
-        </button>
+        <div className="-mr-2 flex items-center">
+          {isSuperAdmin && (
+            <Link
+              to="/superadmin"
+              aria-label="Super Admin"
+              className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <ShieldCheck className="h-5 w-5" />
+            </Link>
+          )}
+          {isAdmin && (
+            <Link
+              to="/configuracion"
+              aria-label="Configuración"
+              className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
+          )}
+          <button
+            onClick={signOut}
+            aria-label="Cerrar sesión"
+            className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       <main className="md:pl-64 pb-20 md:pb-0">
@@ -168,7 +212,7 @@ export default function AppLayout() {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex border-t bg-card md:hidden">
-        {nav.map((item) => renderNavItem(item, true))}
+        {mobileNav.map((item) => renderNavItem(item, true))}
         <QuickActionsFab />
       </nav>
     </div>

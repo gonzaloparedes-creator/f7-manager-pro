@@ -205,6 +205,7 @@ export default function NewOrderDialog({
   const [clients, setClients] = useState<ClientLite[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(initialDraft?.selectedClientId ?? null);
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const [deliveryDateOpen, setDeliveryDateOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [showSecondaryContact, setShowSecondaryContact] = useState(() => {
     const d = loadDraft();
@@ -996,7 +997,11 @@ export default function NewOrderDialog({
                       <div className="flex gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "ok" } })}
+                          onClick={() => {
+                            const next = { ...form.checklist };
+                            if (next[c.label] === "ok") delete next[c.label]; else next[c.label] = "ok";
+                            setForm({ ...form, checklist: next });
+                          }}
                           className={cn(
                             "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                             status === "ok"
@@ -1008,7 +1013,11 @@ export default function NewOrderDialog({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "fail" } })}
+                          onClick={() => {
+                            const next = { ...form.checklist };
+                            if (next[c.label] === "fail") delete next[c.label]; else next[c.label] = "fail";
+                            setForm({ ...form, checklist: next });
+                          }}
                           className={cn(
                             "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                             status === "fail"
@@ -1098,7 +1107,7 @@ export default function NewOrderDialog({
 
             <div className="space-y-2">
               <Label>Fecha estimada de entrega</Label>
-              <Popover>
+              <Popover open={deliveryDateOpen} onOpenChange={setDeliveryDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     type="button"
@@ -1118,7 +1127,7 @@ export default function NewOrderDialog({
                   <Calendar
                     mode="single"
                     selected={form.estimated_delivery_date}
-                    onSelect={(d) => setForm({ ...form, estimated_delivery_date: d })}
+                    onSelect={(d) => { setForm({ ...form, estimated_delivery_date: d }); setDeliveryDateOpen(false); }}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
                     locale={es}

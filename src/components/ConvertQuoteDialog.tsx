@@ -164,7 +164,11 @@ export default function ConvertQuoteDialog({
                       <div className="flex gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setChecklist({ ...checklist, [c.label]: "ok" })}
+                          onClick={() => {
+                            const next = { ...checklist };
+                            if (next[c.label] === "ok") delete next[c.label]; else next[c.label] = "ok";
+                            setChecklist(next);
+                          }}
                           className={cn(
                             "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                             status === "ok"
@@ -176,7 +180,11 @@ export default function ConvertQuoteDialog({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setChecklist({ ...checklist, [c.label]: "fail" })}
+                          onClick={() => {
+                            const next = { ...checklist };
+                            if (next[c.label] === "fail") delete next[c.label]; else next[c.label] = "fail";
+                            setChecklist(next);
+                          }}
                           className={cn(
                             "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                             status === "fail"

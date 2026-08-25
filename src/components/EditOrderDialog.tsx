@@ -74,6 +74,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
   const { presets: checklistPresets } = useChecklistPresets();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [deliveryDateOpen, setDeliveryDateOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [cargos, setCargos] = useState<CargoAdicional[]>([]);
 
@@ -287,7 +288,11 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
                         <div className="flex gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "ok" } })}
+                            onClick={() => {
+                              const next = { ...form.checklist };
+                              if (next[c.label] === "ok") delete next[c.label]; else next[c.label] = "ok";
+                              setForm({ ...form, checklist: next });
+                            }}
                             className={cn(
                               "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                               status === "ok"
@@ -299,7 +304,11 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
                           </button>
                           <button
                             type="button"
-                            onClick={() => setForm({ ...form, checklist: { ...form.checklist, [c.label]: "fail" } })}
+                            onClick={() => {
+                              const next = { ...form.checklist };
+                              if (next[c.label] === "fail") delete next[c.label]; else next[c.label] = "fail";
+                              setForm({ ...form, checklist: next });
+                            }}
                             className={cn(
                               "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                               status === "fail"
@@ -351,7 +360,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
 
               <div className="space-y-2">
                 <Label>Fecha estimada de entrega</Label>
-                <Popover>
+                <Popover open={deliveryDateOpen} onOpenChange={setDeliveryDateOpen}>
                   <PopoverTrigger asChild>
                     <Button type="button" variant="outline"
                       className={cn("w-full justify-start text-left font-normal sm:w-[280px]",
@@ -364,7 +373,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar mode="single" selected={form.estimated_delivery_date}
-                      onSelect={(d) => setForm({ ...form, estimated_delivery_date: d })}
+                      onSelect={(d) => { setForm({ ...form, estimated_delivery_date: d }); setDeliveryDateOpen(false); }}
                       initialFocus locale={es} className={cn("p-3 pointer-events-auto")} />
                   </PopoverContent>
                 </Popover>
