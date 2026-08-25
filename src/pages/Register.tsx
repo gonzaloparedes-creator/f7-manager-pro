@@ -137,7 +137,7 @@ export default function Register() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent/10 p-4">
       <Card className="w-full max-w-md shadow-elevated">
         <CardHeader className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-primary text-primary-foreground">
@@ -174,7 +174,7 @@ export default function Register() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
             </div>
 
             <div className="space-y-2">

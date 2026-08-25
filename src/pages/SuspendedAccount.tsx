@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { ShieldAlert } from "lucide-react";
+import { openUpgradeWhatsApp } from "@/lib/upgrade";
 
 export default function SuspendedAccount() {
   const navigate = useNavigate();
@@ -19,9 +20,17 @@ export default function SuspendedAccount() {
         <p className="text-muted-foreground">
           Tu cuenta ha sido suspendida. Por favor contactá al administrador para reactivar tu acceso a F7 Manager Pro.
         </p>
-        <Button onClick={signOut} variant="outline" className="w-full">
-          Cerrar sesión
-        </Button>
+        <div className="space-y-2">
+          <Button
+            onClick={() => openUpgradeWhatsApp("Hola, mi cuenta de F7 Manager Pro fue suspendida y quiero reactivarla.")}
+            className="w-full"
+          >
+            Contactar para reactivar
+          </Button>
+          <Button onClick={signOut} variant="outline" className="w-full">
+            Cerrar sesión
+          </Button>
+        </div>
       </div>
     </div>
   );

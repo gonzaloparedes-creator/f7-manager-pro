@@ -244,14 +244,14 @@ export default function NewBatchOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!loading) { onOpenChange(o); if (!o) reset(); } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Modo Lote</DialogTitle>
           <DialogDescription>
             Recibí varios equipos del mismo cliente de una sola vez. Cada equipo genera su propia orden.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="flex-1 space-y-4 overflow-y-auto">
           <div className="space-y-2">
             <Label htmlFor="batch_cedula">DNI / Cédula</Label>
             <div className="flex gap-2">
@@ -380,9 +380,10 @@ export default function NewBatchOrderDialog({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted-foreground">Equipo {idx + 1}</span>
                   <Button
-                    type="button" variant="ghost" size="icon" className="h-6 w-6"
+                    type="button" variant="ghost" size="icon" className="h-9 w-9"
                     onClick={() => removeRow(row.key)}
                     disabled={rows.length === 1}
+                    aria-label={`Quitar equipo ${idx + 1}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

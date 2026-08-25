@@ -224,7 +224,7 @@ export default function SuperAdminFundadores() {
           </Card>
           <Card className="p-4">
             <div className="text-xs text-muted-foreground">Pagando</div>
-            <div className="mt-1 text-2xl font-bold text-emerald-500">
+            <div className="mt-1 text-2xl font-bold text-success">
               {summary.paying}
               <span className="ml-1 text-sm font-normal text-muted-foreground">
                 ({summary.total > 0 ? Math.round((summary.paying / summary.total) * 100) : 0}%)
@@ -263,7 +263,7 @@ export default function SuperAdminFundadores() {
             <CardTitle className="text-lg">Empresas ({filtered.length})</CardTitle>
             <div className="relative w-full max-w-xs">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Buscar empresa..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+              <Input placeholder="Buscar empresa..." aria-label="Buscar empresa" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
             </div>
           </CardHeader>
           <CardContent>

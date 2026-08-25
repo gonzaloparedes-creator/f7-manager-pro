@@ -193,7 +193,7 @@ export default function SuperAdminMetrics() {
               </Card>
               <Card className="p-4">
                 <div className="text-xs text-muted-foreground">Pagando</div>
-                <div className="mt-1 text-2xl font-bold text-emerald-500">{summary.paying}</div>
+                <div className="mt-1 text-2xl font-bold text-success">{summary.paying}</div>
               </Card>
               <Card className="p-4">
                 <div className="text-xs text-muted-foreground">Altas este mes</div>

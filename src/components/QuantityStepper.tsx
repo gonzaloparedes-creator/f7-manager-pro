@@ -13,7 +13,8 @@ export default function QuantityStepper({
   size?: "default" | "sm";
 }) {
   const atMax = max !== undefined && value >= max;
-  const btnSize = size === "sm" ? "h-8 w-8" : "h-9 w-9";
+  const btnSize = size === "sm" ? "h-9 w-9" : "h-10 w-10";
+  const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
   return (
     <div className="flex items-center gap-1">
@@ -22,6 +23,7 @@ export default function QuantityStepper({
         onClick={() => onChange(Math.max(0, value - 1))}
         className={cn(
           btnSize,
+          focusRing,
           "flex shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-muted active:scale-95",
         )}
         aria-label="Restar unidad"
@@ -35,6 +37,7 @@ export default function QuantityStepper({
         disabled={atMax}
         className={cn(
           btnSize,
+          focusRing,
           "flex shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
         )}
         aria-label="Sumar unidad"

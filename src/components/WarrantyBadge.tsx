@@ -23,7 +23,7 @@ export function WarrantyBadge({ deliveredAt, warrantyDays, className }: Props) {
   }
   if (state.kind === "active") {
     return (
-      <span className={cn(base, "border-emerald-500/30 bg-emerald-500/10 text-emerald-400", className)}>
+      <span className={cn(base, "border-success/30 bg-success/10 text-success", className)}>
         <ShieldCheck className="h-3 w-3" /> Garantía activa: {state.daysRemaining} días restantes
       </span>
     );

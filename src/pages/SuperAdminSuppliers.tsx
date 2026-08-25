@@ -145,15 +145,15 @@ export default function SuperAdminSuppliers() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{a.supplier}</div>
-                        <div className="truncate text-xs text-muted-foreground">{a.part}</div>
+                        <div className="truncate text-sm font-semibold" title={a.supplier}>{a.supplier}</div>
+                        <div className="truncate text-xs text-muted-foreground" title={a.part}>{a.part}</div>
                       </div>
                       <Badge variant="secondary" className="shrink-0">{a.count}×</Badge>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                       <div>
                         <div className="text-[10px] uppercase text-muted-foreground">Min</div>
-                        <div className="text-xs font-semibold text-emerald-400">{fmtGs(a.min)}</div>
+                        <div className="text-xs font-semibold text-success">{fmtGs(a.min)}</div>
                       </div>
                       <div>
                         <div className="text-[10px] uppercase text-muted-foreground">Prom</div>
@@ -177,6 +177,7 @@ export default function SuperAdminSuppliers() {
             <CardTitle className="text-lg">Compras registradas</CardTitle>
             <Input
               placeholder="Buscar repuesto, proveedor o taller…"
+              aria-label="Buscar repuesto, proveedor o taller"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="sm:max-w-sm"
@@ -210,7 +211,7 @@ export default function SuperAdminSuppliers() {
                   ) : (
                     filtered.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className="max-w-xs truncate">{r.part_details ?? "—"}</TableCell>
+                        <TableCell className="max-w-xs truncate" title={r.part_details ?? undefined}>{r.part_details ?? "—"}</TableCell>
                         <TableCell className="font-medium">{r.supplier_name}</TableCell>
                         <TableCell className="text-muted-foreground">{r.company_name}</TableCell>
                         <TableCell className="text-right font-mono">{fmtGs(r.historical_cost)}</TableCell>

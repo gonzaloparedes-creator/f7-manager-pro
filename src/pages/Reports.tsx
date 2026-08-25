@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface CargoAdicional { motivo: string; monto: number }
 interface OrderRow {
@@ -277,6 +278,7 @@ export default function Reports() {
   const { isStarter, isPro, isBusiness, isRetail, loading: planLoading } = usePlan();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const { branches, hasMultipleBranches } = useBranches();
+  const { toast } = useToast();
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [parts, setParts] = useState<PartRow[]>([]);
@@ -299,19 +301,22 @@ export default function Reports() {
     const load = async () => {
       if (!user || !companyId || planLoading) return;
       setLoading(true);
+      let hadError = false;
 
       if (hasTaller) {
-        const { data: o } = await supabase
+        const { data: o, error: oErr } = await supabase
           .from("orders")
           .select("id, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, current_branch_id, assigned_technician_id")
           .eq("company_id", companyId);
+        if (oErr) hadError = true;
         const orderIds = (o ?? []).map((x: any) => x.id);
         let p: any[] = [];
         if (orderIds.length > 0) {
-          const { data } = await (supabase as any)
+          const { data, error: pErr } = await (supabase as any)
             .from("order_parts")
             .select("order_id, quantity, historical_cost, category_name, subcategory_name")
             .in("order_id", orderIds);
+          if (pErr) hadError = true;
           p = data ?? [];
         }
         setOrders((o ?? []) as unknown as OrderRow[]);
@@ -319,20 +324,25 @@ export default function Reports() {
       }
 
       if (hasTienda) {
-        const { data: s } = await (supabase as any)
+        const { data: s, error: sErr } = await (supabase as any)
           .from("product_sales")
           .select("quantity, unit_price, unit_cost, created_at, branch_id, category_name, subcategory_name, created_by")
           .eq("company_id", companyId);
+        if (sErr) hadError = true;
         setSales((s ?? []) as SaleRow[]);
       }
 
-      const [{ data: profs }, { data: company }] = await Promise.all([
+      const [{ data: profs, error: profsErr }, { data: company, error: companyErr }] = await Promise.all([
         supabase.from("profiles").select("id, full_name, commission_rate").eq("company_id", companyId),
         supabase.from("companies").select("commission_enabled").eq("id", companyId).maybeSingle(),
       ]);
+      if (profsErr || companyErr) hadError = true;
       setStaff((profs ?? []) as unknown as StaffRow[]);
       setCommissionEnabled(!!company?.commission_enabled);
 
+      if (hadError) {
+        toast({ title: "Error al cargar reportes", description: "Algunos datos no se pudieron cargar. Los números mostrados pueden estar incompletos.", variant: "destructive" });
+      }
       setLoading(false);
     };
     load();
@@ -448,7 +458,7 @@ export default function Reports() {
               {rangeLabel}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
+          <PopoverContent className="max-h-[80vh] w-auto overflow-y-auto p-0" align="end">
             <div className="flex flex-col sm:flex-row">
               <div className="flex w-full shrink-0 flex-col gap-0.5 border-b border-border p-2 sm:w-40 sm:border-b-0 sm:border-r">
                 {PRESET_ORDER.map((key) => (
@@ -524,8 +534,8 @@ export default function Reports() {
               icon={PackageMinus}
               label="Costo de Repuestos"
               value={costoRepuestos}
-              accent="text-orange-500 dark:text-orange-400"
-              iconBg="bg-orange-500/10 text-orange-500 dark:text-orange-400"
+              accent="text-secondary"
+              iconBg="bg-secondary/10 text-secondary"
               prefix="-"
             />
             <SummaryCard
@@ -551,8 +561,8 @@ export default function Reports() {
               icon={PackageMinus}
               label="Costo de Productos"
               value={costoProductosVendidos}
-              accent="text-orange-500 dark:text-orange-400"
-              iconBg="bg-orange-500/10 text-orange-500 dark:text-orange-400"
+              accent="text-secondary"
+              iconBg="bg-secondary/10 text-secondary"
               prefix="-"
             />
             <SummaryCard

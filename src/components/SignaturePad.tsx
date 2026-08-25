@@ -76,7 +76,7 @@ export function SignaturePad({ value, onChange, height = 180 }: SignaturePadProp
       >
         <SignatureCanvas
           ref={sigRef}
-          penColor="hsl(var(--foreground))"
+          penColor="#000000"
           onEnd={handleEnd}
           canvasProps={{ className: "w-full h-full rounded-md" }}
         />

@@ -151,7 +151,11 @@ export default function AppLayout() {
           <img src={f7Logo} alt="F7 Manager Pro" className="h-8 w-8 rounded-md object-contain" />
           <span className="font-bold">F7 Manager Pro</span>
         </Link>
-        <button onClick={signOut} className="text-sm text-sidebar-foreground/80">
+        <button
+          onClick={signOut}
+          aria-label="Cerrar sesión"
+          className="-m-3 rounded-full p-3 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
           <LogOut className="h-5 w-5" />
         </button>
       </header>

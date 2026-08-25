@@ -51,10 +51,13 @@ export default function Clients() {
   const load = async () => {
     if (!user || !companyId) return;
     setLoading(true);
-    const [{ data: c }, { data: o }] = await Promise.all([
+    const [{ data: c, error: cErr }, { data: o, error: oErr }] = await Promise.all([
       supabase.from("clients").select("id,name,phone,cedula,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
       supabase.from("orders").select("id,order_number,device_type,status,client_id,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
     ]);
+    if (cErr || oErr) {
+      toast({ title: "Error al cargar clientes", description: (cErr ?? oErr)?.message, variant: "destructive" });
+    }
     setClients((c ?? []) as Client[]);
     setOrders((o ?? []) as OrderRow[]);
     setLoading(false);
@@ -154,48 +157,91 @@ export default function Clients() {
           ) : filtered.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">Sin clientes.</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Cédula</TableHead>
-                  <TableHead className="text-center">Órdenes</TableHead>
-                  <TableHead className="w-[110px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile: tarjetas apiladas — la tabla de 5 columnas no entra en un viewport chico */}
+              <div className="space-y-2 sm:hidden">
                 {filtered.map((c) => {
                   const count = ordersByClient.get(c.id)?.length ?? 0;
                   return (
-                    <TableRow key={c.id} className="cursor-pointer" onClick={() => setSelectedClient(c)}>
-                      <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">{c.cedula ?? "—"}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={count > 0 ? "default" : "secondary"}>{count}</Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
+                    <div
+                      key={c.id}
+                      onClick={() => setSelectedClient(c)}
+                      className="flex items-center gap-2 rounded-lg border border-border bg-card p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-foreground">{c.name}</div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                          <span>{c.phone ?? "Sin teléfono"}</span>
+                          {c.cedula && <span className="font-mono">{c.cedula}</span>}
+                        </div>
+                      </div>
+                      <Badge variant={count > 0 ? "default" : "secondary"} className="shrink-0">{count}</Badge>
+                      <div className="flex shrink-0 items-center">
                         {c.phone && (
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="text-emerald-600 hover:text-emerald-600"
+                            className="text-success hover:text-success"
                             onClick={(e) => { e.stopPropagation(); openWhatsApp(c.phone!); }}
-                            title="Abrir chat de WhatsApp"
+                            aria-label="Abrir chat de WhatsApp"
                           >
                             <MessageCircle className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(c); }}>
+                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(c); }} aria-label={`Editar ${c.name}`}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Desktop/tablet: tabla completa */}
+              <Table className="hidden sm:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Cédula</TableHead>
+                    <TableHead className="text-center">Órdenes</TableHead>
+                    <TableHead className="w-[110px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((c) => {
+                    const count = ordersByClient.get(c.id)?.length ?? 0;
+                    return (
+                      <TableRow key={c.id} className="cursor-pointer" onClick={() => setSelectedClient(c)}>
+                        <TableCell className="font-medium">{c.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs">{c.cedula ?? "—"}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={count > 0 ? "default" : "secondary"}>{count}</Badge>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {c.phone && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-success hover:text-success"
+                              onClick={(e) => { e.stopPropagation(); openWhatsApp(c.phone!); }}
+                              title="Abrir chat de WhatsApp"
+                              aria-label="Abrir chat de WhatsApp"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(c); }} aria-label={`Editar ${c.name}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </>
           )}
         </CardContent>
       </Card>
@@ -209,12 +255,13 @@ export default function Clients() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label>Nombre</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <Label htmlFor="edit-client-name">Nombre</Label>
+              <Input id="edit-client-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Teléfono (sin 595)</Label>
+              <Label htmlFor="edit-client-phone">Teléfono (sin 595)</Label>
               <Input
+                id="edit-client-phone"
                 inputMode="tel"
                 placeholder="981 123 456"
                 value={editPhone}
@@ -222,8 +269,9 @@ export default function Clients() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Cédula de Identidad (opcional)</Label>
+              <Label htmlFor="edit-client-cedula">Cédula de Identidad (opcional)</Label>
               <Input
+                id="edit-client-cedula"
                 inputMode="numeric"
                 placeholder="1.234.567"
                 value={editCedula}
@@ -250,7 +298,7 @@ export default function Clients() {
               {selectedClient.phone && (
                 <Button
                   variant="outline"
-                  className="w-full gap-2 border-emerald-600/30 text-emerald-600 hover:bg-emerald-600/10 hover:text-emerald-600"
+                  className="w-full gap-2 border-success/30 text-success hover:bg-success/10 hover:text-success"
                   onClick={() => openWhatsApp(selectedClient.phone!)}
                 >
                   <MessageCircle className="h-4 w-4" /> Abrir chat de WhatsApp

@@ -21,14 +21,14 @@ export default function UpgradeProDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md border-secondary/30">
+      <DialogContent className="sm:max-w-md border-primary/30">
         <DialogHeader>
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-secondary/15 ring-1 ring-secondary/30">
-            <Sparkles className="h-6 w-6 text-secondary" />
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 ring-1 ring-primary/30">
+            <Sparkles className="h-6 w-6 text-primary" />
           </div>
           <DialogTitle className="text-center text-xl">¡Lleva tu taller al siguiente nivel!</DialogTitle>
           <DialogDescription className="text-center">
-            Desbloqueá todas las herramientas profesionales con el plan <span className="font-semibold text-secondary">PRO</span>.
+            Desbloqueá todas las herramientas profesionales con el plan <span className="font-semibold text-primary">PRO</span>.
           </DialogDescription>
         </DialogHeader>
 

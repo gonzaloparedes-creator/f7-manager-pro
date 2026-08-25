@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ export default function UpdatePassword() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [linkExpired, setLinkExpired] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -25,6 +26,12 @@ export default function UpdatePassword() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (ready) return;
+    const timeout = setTimeout(() => setLinkExpired(true), 8000);
+    return () => clearTimeout(timeout);
+  }, [ready]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +51,7 @@ export default function UpdatePassword() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent/10 p-4">
       <Card className="w-full max-w-md shadow-elevated">
         <CardHeader className="text-center">
           <img src={f7Logo} alt="F7 Manager Pro" className="mx-auto mb-3 h-16 w-16 rounded-xl object-contain" />
@@ -67,15 +74,25 @@ export default function UpdatePassword() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-[#00C2C7] text-white hover:bg-[#00C2C7]/90"
+              className="w-full"
               disabled={loading || !ready}
             >
               {loading ? "Guardando..." : "Guardar contraseña"}
             </Button>
             {!ready && (
-              <p className="text-center text-xs text-muted-foreground">
-                Validando enlace de recuperación...
-              </p>
+              linkExpired ? (
+                <p role="alert" className="text-center text-xs text-destructive">
+                  Este enlace no es válido o expiró.{" "}
+                  <Link to="/login" className="font-medium underline">
+                    Volvé al inicio de sesión
+                  </Link>{" "}
+                  para solicitar uno nuevo.
+                </p>
+              ) : (
+                <p className="text-center text-xs text-muted-foreground">
+                  Validando enlace de recuperación...
+                </p>
+              )
             )}
           </form>
         </CardContent>

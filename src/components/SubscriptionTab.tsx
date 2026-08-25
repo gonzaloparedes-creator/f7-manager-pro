@@ -89,7 +89,7 @@ export default function SubscriptionTab() {
               </div>
               <Progress
                 value={progress}
-                className={`h-2 ${urgent || trialOver ? "[&>div]:bg-secondary" : ""}`}
+                className={`h-2 bg-muted ${urgent || trialOver ? "[&>div]:bg-secondary" : ""}`}
               />
               <div className="text-xs text-muted-foreground">
                 {trialOver

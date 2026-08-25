@@ -133,7 +133,7 @@ export default function CartSheet({
         {completedSale ? (
           <>
             <SheetHeader>
-              <SheetTitle className="flex items-center gap-2 text-emerald-500">
+              <SheetTitle className="flex items-center gap-2 text-success">
                 <CheckCircle2 className="h-5 w-5" /> Venta registrada
               </SheetTitle>
               <SheetDescription>
@@ -161,10 +161,20 @@ export default function CartSheet({
 
             <div className="flex-1 space-y-3 overflow-y-auto py-2">
               {lines.map((l) => (
-                <div key={l.id} className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-foreground">{l.product.name}</div>
-                    <div className="mt-1 flex items-center gap-1.5">
+                <div key={l.id} className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{l.product.name}</div>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(l.id)}
+                      aria-label={`Quitar ${l.product.name} del carrito`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className="text-xs text-muted-foreground">Gs.</span>
                       <Input
                         type="number"
@@ -172,17 +182,14 @@ export default function CartSheet({
                         step="1"
                         value={l.unitPrice}
                         onChange={(e) => setPrice(l.id, parseFloat(e.target.value) || 0)}
-                        className="h-7 w-24 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        className="h-9 w-24 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     </div>
+                    <QuantityStepper value={l.quantity} max={l.product.stock} onChange={(q) => setQty(l.id, q)} size="sm" />
+                    <div className="w-20 shrink-0 text-right text-sm font-semibold">
+                      {formatPYG(l.quantity * l.unitPrice)}
+                    </div>
                   </div>
-                  <QuantityStepper value={l.quantity} max={l.product.stock} onChange={(q) => setQty(l.id, q)} size="sm" />
-                  <div className="w-20 shrink-0 text-right text-sm font-semibold">
-                    {formatPYG(l.quantity * l.unitPrice)}
-                  </div>
-                  <button type="button" onClick={() => removeLine(l.id)} className="shrink-0 text-muted-foreground hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
               ))}
             </div>
@@ -207,7 +214,7 @@ export default function CartSheet({
                   </div>
                 </div>
                 <SheetFooter>
-                  <Button onClick={checkout} disabled={loading} className="w-full">
+                  <Button onClick={checkout} disabled={loading} size="lg" className="w-full">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Confirmar venta
                   </Button>

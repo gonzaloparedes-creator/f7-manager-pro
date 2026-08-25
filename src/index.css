@@ -19,7 +19,7 @@
     --primary-glow: 182 100% 50%;
 
     --secondary: 27 100% 50%;           /* #FF7400 orange */
-    --secondary-foreground: 0 0% 100%;
+    --secondary-foreground: 212 52% 11%; /* dark navy — white on this orange was ~2.7:1, fails WCAG AA */
 
     --muted: 213 30% 22%;
     --muted-foreground: 216 15% 70%;
@@ -27,8 +27,15 @@
     --accent: 182 100% 39%;
     --accent-foreground: 212 52% 11%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    /* destructive doubles as plain text-on-dark-surface (menu items, outline buttons)
+       AND as a solid button background — no single red is light enough for the first
+       and dark enough for white text in the second, so (like primary/secondary) pair
+       it with dark navy foreground instead of white; lightened slightly from 60% so
+       text-destructive also clears 4.5:1 against --card/--background on its own. */
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 212 52% 11%;
+
+    --success: 152 65% 65%;
 
     --border: 213 30% 25%;
     --input: 213 30% 25%;
@@ -36,19 +43,19 @@
 
     --radius: 0.65rem;
 
-    /* Status semantic tokens */
-    --status-presupuesto: 245 60% 60%;
-    --status-presupuesto-bg: 245 70% 95%;
-    --status-recibido: 215 16% 47%;
-    --status-recibido-bg: 210 40% 94%;
-    --status-diagnostico: 217 91% 60%;
-    --status-diagnostico-bg: 217 91% 95%;
-    --status-reparacion: 38 92% 50%;
-    --status-reparacion-bg: 48 96% 92%;
-    --status-listo: 142 71% 45%;
-    --status-listo-bg: 142 71% 92%;
-    --status-entregado: 262 83% 58%;
-    --status-entregado-bg: 262 83% 95%;
+    /* Status semantic tokens — dark tonal chips (bg ~20% L, text ~75% L) to match the dark shell */
+    --status-presupuesto: 245 85% 78%;
+    --status-presupuesto-bg: 245 45% 21%;
+    --status-recibido: 215 25% 75%;
+    --status-recibido-bg: 215 20% 24%;
+    --status-diagnostico: 217 90% 75%;
+    --status-diagnostico-bg: 217 55% 21%;
+    --status-reparacion: 38 95% 68%;
+    --status-reparacion-bg: 38 55% 19%;
+    --status-listo: 142 70% 68%;
+    --status-listo-bg: 142 45% 18%;
+    --status-entregado: 262 80% 78%;
+    --status-entregado-bg: 262 50% 22%;
     --status-garantia: 280 90% 75%;
     --status-garantia-bg: 280 60% 22%;
 
@@ -67,28 +74,10 @@
     --shadow-elevated: 0 10px 25px -10px hsl(182 100% 39% / 0.35);
   }
 
-  .dark {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
-    --primary-glow: 221 83% 53%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 217 91% 60%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
-  }
+  /* No theme toggle is wired up (no next-themes/ThemeProvider) — :root above is the
+     only theme that ever renders. A stray .dark override used to live here with
+     off-brand generic-shadcn colors; removed so it can't be mistaken for a real
+     light/dark implementation or silently activated later. */
 }
 
 @layer base {

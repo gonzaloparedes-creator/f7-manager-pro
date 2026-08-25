@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -84,21 +84,25 @@ export default function PublicTrackingByCode() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div role="status" aria-live="polite" className="flex min-h-screen items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="sr-only">Cargando...</span>
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent/10 p-4">
         <Card className="max-w-md text-center">
-          <CardContent className="space-y-2 p-8">
+          <CardContent className="space-y-3 p-8">
             <h1 className="text-xl font-bold">Orden no encontrada</h1>
             <p className="text-sm text-muted-foreground">
               No encontramos ninguna orden con el código <span className="font-mono">{orderCode}</span>.
             </p>
+            <Link to="/" className="inline-block text-sm font-medium text-primary hover:underline">
+              Volver al inicio
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -108,7 +112,7 @@ export default function PublicTrackingByCode() {
   const Icon = ICONS[order.status] ?? Wrench;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/10">
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 overflow-hidden">

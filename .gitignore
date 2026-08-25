@@ -55,3 +55,4 @@ supabase/functions/.import_map.json
 
 # Segundo cerebro (notas de producto/negocio, no es código)
 segundo-cerebro/
+.gstack/

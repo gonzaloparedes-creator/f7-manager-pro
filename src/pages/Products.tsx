@@ -20,6 +20,7 @@ import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPYG } from "@/lib/orders";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Product = {
   id: string;
@@ -74,6 +75,8 @@ export default function Products() {
   const [items, setItems] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
@@ -150,11 +153,13 @@ export default function Products() {
 
   useEffect(() => { load(); }, [companyId]);
 
-  const remove = async (id: string) => {
-    if (!confirm("¿Eliminar este producto?")) return;
-    const { error } = await (supabase as any).from("inventory_items").delete().eq("id", id);
+  const remove = async (item: Product) => {
+    setDeleting(true);
+    const { error } = await (supabase as any).from("inventory_items").delete().eq("id", item.id);
+    setDeleting(false);
     if (error) return toast.error(error.message);
     toast.success("Producto eliminado");
+    setPendingDelete(null);
     load();
   };
 
@@ -251,7 +256,7 @@ export default function Products() {
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Ventas de hoy</div>
-          <div className="mt-1 text-2xl font-bold text-emerald-500">{formatPYG(totalToday)}</div>
+          <div className="mt-1 text-2xl font-bold text-success">{formatPYG(totalToday)}</div>
           <div className="text-[11px] text-muted-foreground">{salesToday.length} venta{salesToday.length !== 1 ? "s" : ""}</div>
         </Card>
         <Card className="p-4">
@@ -329,7 +334,7 @@ export default function Products() {
                       </div>
                     </div>
                     {isAdmin && (
-                      <Button size="icon" variant="ghost" onClick={() => remove(i.id)}>
+                      <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     )}
@@ -417,7 +422,8 @@ export default function Products() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7"
+                      className="h-10 w-10"
+                      aria-label="Imprimir ticket"
                       onClick={() => setPrintingSale({
                         id: g.key,
                         created_at: g.created_at,
@@ -468,6 +474,15 @@ export default function Products() {
           branchName={branches.find((b) => b.id === printingSale.branch_id)?.name ?? null}
         />
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="¿Eliminar producto?"
+        description={pendingDelete ? `Se eliminará "${pendingDelete.name}" del catálogo. Esta acción no se puede deshacer.` : ""}
+        loading={deleting}
+        onConfirm={() => pendingDelete && remove(pendingDelete)}
+      />
     </div>
   );
 }

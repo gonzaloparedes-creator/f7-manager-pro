@@ -26,6 +26,7 @@ import WarrantyPresetsTab from "@/components/WarrantyPresetsTab";
 import AccessoryPresetsTab from "@/components/AccessoryPresetsTab";
 import ChecklistPresetsTab from "@/components/ChecklistPresetsTab";
 import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type NotifPrefs = {
   recibido: boolean;
@@ -429,6 +430,9 @@ function BranchesTab() {
   const [editing, setEditing] = useState<Branch | null>(null);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Branch | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     if (!companyId) return;
@@ -448,9 +452,11 @@ function BranchesTab() {
     if (!editing && !companyId) {
       return toast({ title: "Error", description: "No se pudo determinar la empresa.", variant: "destructive" });
     }
+    setSaving(true);
     const { error } = editing
       ? await supabase.from("branches").update({ name: name.trim(), address: address.trim() || null }).eq("id", editing.id)
       : await supabase.from("branches").insert({ company_id: companyId!, name: name.trim(), address: address.trim() || null });
+    setSaving(false);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
     setOpen(false);
     toast({ title: editing ? "Sucursal actualizada" : "Sucursal creada" });
@@ -458,9 +464,11 @@ function BranchesTab() {
   };
 
   const remove = async (b: Branch) => {
-    if (!confirm(`¿Eliminar la sucursal "${b.name}"?`)) return;
+    setDeleting(true);
     const { error } = await supabase.from("branches").delete().eq("id", b.id);
+    setDeleting(false);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setPendingDelete(null);
     load();
   };
 
@@ -505,8 +513,8 @@ function BranchesTab() {
                     <TableCell className="font-medium">{b.name}</TableCell>
                     <TableCell className="text-muted-foreground">{b.address ?? "—"}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => remove(b)}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(b)} aria-label={`Editar ${b.name}`}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setPendingDelete(b)} aria-label={`Eliminar ${b.name}`}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -532,12 +540,21 @@ function BranchesTab() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button onClick={save}>{editing ? "Guardar" : "Crear"}</Button>
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancelar</Button>
+              <Button onClick={save} disabled={saving}>{saving ? "Guardando..." : editing ? "Guardar" : "Crear"}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </CardContent>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="¿Eliminar sucursal?"
+        description={pendingDelete ? `Se eliminará la sucursal "${pendingDelete.name}". Esta acción no se puede deshacer.` : ""}
+        loading={deleting}
+        onConfirm={() => pendingDelete && remove(pendingDelete)}
+      />
     </Card>
   );
 }
@@ -556,6 +573,11 @@ function CategoryManagerTab() {
   const [subName, setSubName] = useState("");
   const [savingSub, setSavingSub] = useState(false);
 
+  const [pendingDeleteCategory, setPendingDeleteCategory] = useState<{ id: string; name: string } | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState(false);
+  const [pendingDeleteSubcategory, setPendingDeleteSubcategory] = useState<{ id: string; name: string } | null>(null);
+  const [deletingSubcategory, setDeletingSubcategory] = useState(false);
+
   const createCategory = async () => {
     if (!catName.trim() || !companyId) return;
     setSavingCat(true);
@@ -568,10 +590,12 @@ function CategoryManagerTab() {
     reload();
   };
 
-  const removeCategory = async (id: string, name: string) => {
-    if (!confirm(`¿Eliminar la categoría "${name}" y sus subcategorías? Los artículos que la usan quedarán sin categoría.`)) return;
+  const removeCategory = async (id: string) => {
+    setDeletingCategory(true);
     const { error } = await supabase.from("inventory_categories").delete().eq("id", id);
+    setDeletingCategory(false);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setPendingDeleteCategory(null);
     reload();
   };
 
@@ -592,8 +616,11 @@ function CategoryManagerTab() {
   };
 
   const removeSubcategory = async (id: string) => {
+    setDeletingSubcategory(true);
     const { error } = await supabase.from("inventory_subcategories").delete().eq("id", id);
+    setDeletingSubcategory(false);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setPendingDeleteSubcategory(null);
     reload();
   };
 
@@ -626,7 +653,7 @@ function CategoryManagerTab() {
                     <Button size="sm" variant="ghost" onClick={() => openNewSub(cat)} className="gap-1 text-xs">
                       <Plus className="h-3.5 w-3.5" /> Subcategoría
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => removeCategory(cat.id, cat.name)}>
+                    <Button size="icon" variant="ghost" onClick={() => setPendingDeleteCategory(cat)} aria-label={`Eliminar categoría ${cat.name}`}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -636,7 +663,12 @@ function CategoryManagerTab() {
                     {subcategoriesFor(cat.id).map((sub) => (
                       <span key={sub.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground">
                         {sub.name}
-                        <button type="button" onClick={() => removeSubcategory(sub.id)} className="text-muted-foreground hover:text-destructive">
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteSubcategory(sub)}
+                          aria-label={`Eliminar subcategoría ${sub.name}`}
+                          className="rounded-full text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
                           ×
                         </button>
                       </span>
@@ -686,6 +718,23 @@ function CategoryManagerTab() {
           </DialogContent>
         </Dialog>
       </CardContent>
+
+      <ConfirmDialog
+        open={!!pendingDeleteCategory}
+        onOpenChange={(o) => !o && setPendingDeleteCategory(null)}
+        title="¿Eliminar categoría?"
+        description={pendingDeleteCategory ? `Se eliminará "${pendingDeleteCategory.name}" y sus subcategorías. Los artículos que la usan quedarán sin categoría.` : ""}
+        loading={deletingCategory}
+        onConfirm={() => pendingDeleteCategory && removeCategory(pendingDeleteCategory.id)}
+      />
+      <ConfirmDialog
+        open={!!pendingDeleteSubcategory}
+        onOpenChange={(o) => !o && setPendingDeleteSubcategory(null)}
+        title="¿Eliminar subcategoría?"
+        description={pendingDeleteSubcategory ? `Se eliminará "${pendingDeleteSubcategory.name}".` : ""}
+        loading={deletingSubcategory}
+        onConfirm={() => pendingDeleteSubcategory && removeSubcategory(pendingDeleteSubcategory.id)}
+      />
     </Card>
   );
 }
@@ -840,63 +889,121 @@ function UsersTab() {
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Sucursal</TableHead>
-                  {commissionEnabled && canUseCommissions && <TableHead>Comisión</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.full_name || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.phone || "—"}</TableCell>
-                    <TableCell>
+          <>
+            {/* Mobile: tarjetas — 2 selects a ancho fijo no entran junto al nombre en un viewport chico */}
+            <div className="space-y-3 sm:hidden">
+              {users.map((u) => (
+                <div key={u.id} className="space-y-3 rounded-lg border border-border bg-card p-3">
+                  <div>
+                    <div className="font-medium text-foreground">{u.full_name || "—"}</div>
+                    <div className="text-xs text-muted-foreground">{u.phone || "Sin teléfono"}</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Rol</Label>
                       <Select value={u.role ?? "staff"} onValueChange={(v) => updateUserRole(u.id, v as any)}>
-                        <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label={`Rol de ${u.full_name || "usuario"}`}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="staff">Staff</SelectItem>
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                    <TableCell>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Sucursal</Label>
                       <Select value={u.branch_id ?? ""} onValueChange={(v) => updateUserBranch(u.id, v)}>
-                        <SelectTrigger className="w-48"><SelectValue placeholder="Sin sucursal" /></SelectTrigger>
+                        <SelectTrigger aria-label={`Sucursal de ${u.full_name || "usuario"}`}><SelectValue placeholder="Sin sucursal" /></SelectTrigger>
                         <SelectContent>
                           {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                    {commissionEnabled && canUseCommissions && (
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step="0.5"
-                            defaultValue={u.commission_rate}
-                            onBlur={(e) => {
-                              const v = parseFloat(e.target.value);
-                              if (Number.isFinite(v) && v !== u.commission_rate) updateUserCommissionRate(u.id, v);
-                            }}
-                            className="w-20"
-                          />
-                          <span className="text-xs text-muted-foreground">%</span>
-                        </div>
-                      </TableCell>
-                    )}
+                    </div>
+                  </div>
+                  {commissionEnabled && canUseCommissions && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Comisión</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.5"
+                          defaultValue={u.commission_rate}
+                          onBlur={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (Number.isFinite(v) && v !== u.commission_rate) updateUserCommissionRate(u.id, v);
+                          }}
+                          className="w-20"
+                          aria-label={`Comisión de ${u.full_name || "usuario"}`}
+                        />
+                        <span className="text-xs text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop/tablet: tabla completa */}
+            <div className="hidden rounded-md border overflow-x-auto sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead>Sucursal</TableHead>
+                    {commissionEnabled && canUseCommissions && <TableHead>Comisión</TableHead>}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-medium">{u.full_name || "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{u.phone || "—"}</TableCell>
+                      <TableCell>
+                        <Select value={u.role ?? "staff"} onValueChange={(v) => updateUserRole(u.id, v as any)}>
+                          <SelectTrigger className="w-32" aria-label={`Rol de ${u.full_name || "usuario"}`}><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="staff">Staff</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select value={u.branch_id ?? ""} onValueChange={(v) => updateUserBranch(u.id, v)}>
+                          <SelectTrigger className="w-48" aria-label={`Sucursal de ${u.full_name || "usuario"}`}><SelectValue placeholder="Sin sucursal" /></SelectTrigger>
+                          <SelectContent>
+                            {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      {commissionEnabled && canUseCommissions && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step="0.5"
+                              defaultValue={u.commission_rate}
+                              onBlur={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (Number.isFinite(v) && v !== u.commission_rate) updateUserCommissionRate(u.id, v);
+                              }}
+                              className="w-20"
+                              aria-label={`Comisión de ${u.full_name || "usuario"}`}
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
 
         <Dialog open={open} onOpenChange={setOpen}>

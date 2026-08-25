@@ -28,6 +28,7 @@ import { OrderQRCode } from "@/components/OrderQRCode";
 import { PrintReceipt } from "@/components/PrintReceipt";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import OrderPartsSection from "@/components/OrderPartsSection";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import ConvertQuoteDialog from "@/components/ConvertQuoteDialog";
 import imageCompression from "browser-image-compression";
 
@@ -78,6 +79,10 @@ export default function OrderDetail() {
   const [techNotes, setTechNotes] = useState<TechNote[]>([]);
   const [newTechNote, setNewTechNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const [pendingDeleteNote, setPendingDeleteNote] = useState<TechNote | null>(null);
+  const [pendingRemoveChargeIdx, setPendingRemoveChargeIdx] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<"not_found" | "error" | null>(null);
   const STATUS_DRAFT_KEY = `f7_status_update_draft_${id ?? "new"}`;
   const loadStatusDraft = () => {
     try {
@@ -95,6 +100,8 @@ export default function OrderDetail() {
   const [showChargeForm, setShowChargeForm] = useState(false);
   const [chargeMotivo, setChargeMotivo] = useState("");
   const [chargeMonto, setChargeMonto] = useState<string>("");
+  const [savingCharge, setSavingCharge] = useState(false);
+  const [removingChargeIdx, setRemovingChargeIdx] = useState<number | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
@@ -166,7 +173,16 @@ export default function OrderDetail() {
   }, [lightboxIndex, order]);
 
   const load = async () => {
-    const { data: o } = await supabase.from("orders").select("*").eq("id", id!).maybeSingle();
+    const { data: o, error: orderErr } = await supabase.from("orders").select("*").eq("id", id!).maybeSingle();
+    if (orderErr) {
+      setLoadError("error");
+      return;
+    }
+    if (!o) {
+      setLoadError("not_found");
+      return;
+    }
+    setLoadError(null);
     if (o) {
       let cedula: string | null = null;
       if ((o as any).client_id) {
@@ -343,13 +359,17 @@ export default function OrderDetail() {
   };
 
   const deleteTechNote = async (noteId: string) => {
+    setDeletingNoteId(noteId);
     try {
       const { error } = await supabase.from("order_technical_notes").delete().eq("id", noteId);
       if (error) throw error;
       toast({ title: "Nota eliminada" });
+      setPendingDeleteNote(null);
       load();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setDeletingNoteId(null);
     }
   };
 
@@ -455,6 +475,7 @@ export default function OrderDetail() {
       ...(order.cargos_adicionales ?? []),
       { motivo: chargeMotivo.trim(), monto },
     ];
+    setSavingCharge(true);
     try {
       const { error } = await supabase
         .from("orders")
@@ -468,21 +489,27 @@ export default function OrderDetail() {
       load();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingCharge(false);
     }
   };
 
   const removeCharge = async (idx: number) => {
     if (!order) return;
     const updated = (order.cargos_adicionales ?? []).filter((_, i) => i !== idx);
+    setRemovingChargeIdx(idx);
     try {
       const { error } = await supabase
         .from("orders")
         .update({ cargos_adicionales: updated as any })
         .eq("id", order.id);
       if (error) throw error;
+      setPendingRemoveChargeIdx(null);
       load();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setRemovingChargeIdx(null);
     }
   };
 
@@ -524,6 +551,24 @@ export default function OrderDetail() {
       setSavingFinance(false);
     }
   };
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+        <p className="text-sm text-muted-foreground">
+          {loadError === "not_found"
+            ? "No se encontró esta orden."
+            : "No pudimos cargar la orden. Verificá tu conexión e intentá de nuevo."}
+        </p>
+        <div className="flex gap-2">
+          {loadError === "error" && (
+            <Button variant="outline" onClick={load}>Reintentar</Button>
+          )}
+          <Button onClick={() => navigate("/dashboard")}>Volver a Órdenes</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -796,7 +841,7 @@ export default function OrderDetail() {
                 <div className="border-t border-border pt-4 space-y-2">
                   <div className="text-xs font-semibold text-muted-foreground">Firma del cliente</div>
                   <div className="inline-block rounded-md border bg-white p-2">
-                    <img src={order.client_signature} alt="Firma del cliente" className="max-h-24 w-auto dark:invert" />
+                    <img src={order.client_signature} alt="Firma del cliente" className="max-h-24 w-auto" />
                   </div>
                 </div>
               )}
@@ -911,8 +956,9 @@ export default function OrderDetail() {
                                 <span className="font-medium">{formatPYG(c.monto)}</span>
                                 <button
                                   type="button"
-                                  onClick={() => removeCharge(i)}
-                                  className="text-muted-foreground hover:text-destructive"
+                                  onClick={() => setPendingRemoveChargeIdx(i)}
+                                  disabled={removingChargeIdx === i}
+                                  className="rounded-sm text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40"
                                   aria-label="Eliminar cargo"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -981,9 +1027,9 @@ export default function OrderDetail() {
             <CardContent className="space-y-4 p-4">
               <div className="text-sm font-semibold">Actualizar estado</div>
               <div className="space-y-2">
-                <Label>Nuevo estado</Label>
+                <Label htmlFor="order-new-status">Nuevo estado</Label>
                 <Select value={newStatus} onValueChange={(v) => setNewStatus(v as OrderStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="order-new-status"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {STATUS_ORDER.map((s) => (
                       <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
@@ -992,8 +1038,9 @@ export default function OrderDetail() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Nota (opcional)</Label>
+                <Label htmlFor="order-status-note">Nota (opcional)</Label>
                 <Textarea
+                  id="order-status-note"
                   rows={3}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
@@ -1056,8 +1103,8 @@ export default function OrderDetail() {
                         >
                           Cancelar
                         </Button>
-                        <Button type="button" size="sm" onClick={addCharge}>
-                          Guardar cargo
+                        <Button type="button" size="sm" onClick={addCharge} disabled={savingCharge}>
+                          {savingCharge ? "Guardando..." : "Guardar cargo"}
                         </Button>
                       </div>
                     </div>
@@ -1184,8 +1231,9 @@ export default function OrderDetail() {
                           {user?.id === tn.technician_id && (
                             <button
                               type="button"
-                              onClick={() => deleteTechNote(tn.id)}
-                              className="text-muted-foreground transition hover:text-destructive"
+                              onClick={() => setPendingDeleteNote(tn)}
+                              disabled={deletingNoteId === tn.id}
+                              className="rounded-sm text-muted-foreground transition hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40"
                               aria-label="Eliminar nota"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1295,6 +1343,28 @@ export default function OrderDetail() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingRemoveChargeIdx !== null}
+        onOpenChange={(o) => !o && setPendingRemoveChargeIdx(null)}
+        title="¿Eliminar cargo adicional?"
+        description={
+          pendingRemoveChargeIdx !== null && order.cargos_adicionales?.[pendingRemoveChargeIdx]
+            ? `Se eliminará "${order.cargos_adicionales[pendingRemoveChargeIdx].motivo}" (${formatPYG(order.cargos_adicionales[pendingRemoveChargeIdx].monto)}).`
+            : ""
+        }
+        loading={pendingRemoveChargeIdx !== null && removingChargeIdx === pendingRemoveChargeIdx}
+        onConfirm={() => pendingRemoveChargeIdx !== null && removeCharge(pendingRemoveChargeIdx)}
+      />
+
+      <ConfirmDialog
+        open={!!pendingDeleteNote}
+        onOpenChange={(o) => !o && setPendingDeleteNote(null)}
+        title="¿Eliminar nota de la bitácora?"
+        description={pendingDeleteNote ? `Se eliminará la nota: "${pendingDeleteNote.note}"` : ""}
+        loading={!!pendingDeleteNote && deletingNoteId === pendingDeleteNote.id}
+        onConfirm={() => pendingDeleteNote && deleteTechNote(pendingDeleteNote.id)}
+      />
 
       <PrintReceipt order={order} businessName={businessName} />
     </div>

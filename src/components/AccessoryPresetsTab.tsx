@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { PackageCheck, Plus, Trash2, Loader2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Preset = { id: string; label: string };
 
@@ -18,6 +19,8 @@ export default function AccessoryPresetsTab() {
   const [loading, setLoading] = useState(true);
   const [label, setLabel] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Preset | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     if (!companyId) return;
@@ -47,9 +50,11 @@ export default function AccessoryPresetsTab() {
   };
 
   const remove = async (p: Preset) => {
-    if (!confirm(`¿Eliminar "${p.label}"?`)) return;
+    setDeleting(true);
     const { error } = await supabase.from("accessory_presets").delete().eq("id", p.id);
+    setDeleting(false);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setPendingDelete(null);
     load();
   };
 
@@ -102,7 +107,9 @@ export default function AccessoryPresetsTab() {
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.label}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => remove(p)}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setPendingDelete(p)} aria-label={`Eliminar ${p.label}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -111,6 +118,14 @@ export default function AccessoryPresetsTab() {
           </div>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="¿Eliminar accesorio?"
+        description={pendingDelete ? `Se eliminará "${pendingDelete.label}". Esta acción no se puede deshacer.` : ""}
+        loading={deleting}
+        onConfirm={() => pendingDelete && remove(pendingDelete)}
+      />
     </Card>
   );
 }

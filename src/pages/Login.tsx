@@ -51,7 +51,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent/10 p-4">
       <Card className="w-full max-w-md shadow-elevated">
         <CardHeader className="text-center">
           <img
@@ -78,7 +78,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => { setRecoverEmail(email); setView("recover"); }}
-                    className="text-xs text-muted-foreground transition-colors hover:text-[#00C2C7]"
+                    className="text-xs text-muted-foreground transition-colors hover:text-primary"
                   >
                     ¿Olvidaste tu contraseña?
                   </button>
@@ -109,7 +109,7 @@ export default function Login() {
               </div>
               <Button
                 type="submit"
-                className="w-full bg-[#00C2C7] text-white hover:bg-[#00C2C7]/90"
+                className="w-full"
                 disabled={loading}
               >
                 {loading ? "Enviando..." : "Enviar enlace de recuperación"}
@@ -118,7 +118,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setView("login")}
-                  className="text-muted-foreground transition-colors hover:text-[#00C2C7]"
+                  className="text-muted-foreground transition-colors hover:text-primary"
                 >
                   Volver al inicio de sesión
                 </button>

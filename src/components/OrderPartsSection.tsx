@@ -14,6 +14,7 @@ import { Wrench, Plus, Trash2, Search, Loader2, PackagePlus, Package, Truck } fr
 import { useToast } from "@/hooks/use-toast";
 import { formatPYG } from "@/lib/orders";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Source = "inventory" | "external";
 
@@ -52,6 +53,8 @@ export default function OrderPartsSection({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<OrderPart | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const PARTS_DRAFT_KEY = `f7_order_parts_draft_${orderId}`;
   const _partsDraft = (() => {
@@ -145,6 +148,7 @@ export default function OrderPartsSection({
   };
 
   const removePart = async (part: OrderPart) => {
+    setRemovingId(part.id);
     try {
       // La restitución de stock (si corresponde) la hace un trigger de base
       // de datos al borrarse la fila — cubre tanto este borrado explícito
@@ -159,8 +163,11 @@ export default function OrderPartsSection({
         description: part.inventory_item_id ? "Stock restituido." : undefined,
       });
       await Promise.all([loadItems(), loadParts()]);
+      setPendingRemove(null);
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -433,10 +440,16 @@ export default function OrderPartsSection({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => removePart(p)}
+                    onClick={() => setPendingRemove(p)}
+                    disabled={removingId === p.id}
+                    aria-label={`Quitar ${p.inventory_items?.name ?? p.part_details ?? "repuesto"}`}
                     className="text-muted-foreground hover:text-destructive"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {removingId === p.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               );
@@ -487,6 +500,21 @@ export default function OrderPartsSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!pendingRemove}
+        onOpenChange={(o) => !o && setPendingRemove(null)}
+        title="¿Quitar repuesto de la orden?"
+        description={
+          pendingRemove
+            ? `Se quitará "${pendingRemove.inventory_items?.name ?? pendingRemove.part_details ?? "este repuesto"}" de la orden.${pendingRemove.inventory_item_id ? " El stock será restituido." : ""}`
+            : ""
+        }
+        confirmLabel="Quitar"
+        confirmingLabel="Quitando..."
+        loading={!!pendingRemove && removingId === pendingRemove.id}
+        onConfirm={() => pendingRemove && removePart(pendingRemove)}
+      />
     </Card>
   );
 }

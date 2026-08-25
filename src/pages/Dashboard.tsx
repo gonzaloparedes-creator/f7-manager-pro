@@ -103,11 +103,16 @@ export default function Dashboard() {
   const load = async () => {
     if (!user || roleLoading || !companyId) return;
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("orders")
       .select("id, order_number, customer_name, device_type, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false });
+    if (error) {
+      toast({ title: "Error al cargar órdenes", description: error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
     const list = (data ?? []) as unknown as Order[];
     setOrders(list);
 
@@ -224,8 +229,9 @@ export default function Dashboard() {
           <button
             key={f.value}
             onClick={() => setFilter(f.value)}
+            aria-pressed={filter === f.value}
             className={cn(
-              "whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+              "whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               filter === f.value
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card text-muted-foreground hover:text-foreground"
@@ -264,7 +270,7 @@ export default function Dashboard() {
                 <Link key={o.id} to={`/ordenes/${o.id}`}>
                   <div className={cn(
                     "flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors active:bg-accent",
-                    isFullyPaid ? "border-l-4 border-l-emerald-500" : "border-border"
+                    isFullyPaid ? "border-l-4 border-l-success" : "border-border"
                   )}>
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
                       {o.customer_name.charAt(0).toUpperCase()}
@@ -279,7 +285,7 @@ export default function Dashboard() {
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <StatusBadge status={o.status} />
                       {saldo > 0 ? (
-                        <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">{formatPYG(saldo)}</span>
+                        <span className="text-[11px] font-semibold text-secondary">{formatPYG(saldo)}</span>
                       ) : hasQuoteOnly ? (
                         <span className="text-[11px] font-medium text-muted-foreground">{formatPYG(total)}</span>
                       ) : null}
@@ -299,7 +305,7 @@ export default function Dashboard() {
               <Card className={cn(
                 "group h-full transition-all hover:shadow-elevated",
                 isFullyPaid
-                  ? "border-l-4 border-l-emerald-500 shadow-[0_0_12px_-2px_hsl(152_72%_45%/0.5)] hover:border-l-emerald-400"
+                  ? "border-l-4 border-l-success shadow-[0_0_12px_-2px_hsl(var(--success)/0.5)] hover:border-l-success/80"
                   : "hover:border-primary/50"
               )}>
                 <CardContent className="space-y-3 p-4">
@@ -307,7 +313,7 @@ export default function Dashboard() {
                     <span className="text-xs font-mono font-medium text-muted-foreground">{o.order_number}</span>
                     <div className="flex items-center gap-1.5">
                       {isFullyPaid && (
-                        <Badge variant="outline" className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+                        <Badge variant="outline" className="border border-success/20 bg-success/10 text-success">
                           Total Pagado: {formatPYG(total)}
                         </Badge>
                       )}
@@ -360,7 +366,7 @@ export default function Dashboard() {
                           {deposit > 0 && (
                             <span className="text-[11px] text-muted-foreground">Pagado: <span className="font-medium text-foreground">{formatPYG(deposit)}</span></span>
                           )}
-                          <span className="text-sm font-bold text-orange-600 dark:text-orange-400">Saldo: {formatPYG(saldo)}</span>
+                          <span className="text-sm font-bold text-secondary">Saldo: {formatPYG(saldo)}</span>
                         </div>
                         <Button
                           size="sm"

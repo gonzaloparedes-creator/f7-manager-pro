@@ -75,10 +75,11 @@ export default function MasterAdmin() {
     setBusy(null);
     if (error) {
       toast.error("Error al actualizar");
-      return;
+      return false;
     }
     setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     toast.success("Empresa actualizada");
+    return true;
   }
 
   async function toggleFounder(id: string, value: boolean) {
@@ -164,7 +165,7 @@ export default function MasterAdmin() {
                           onValueChange={(v) => updateCompany(c.id, { plan_type: v })}
                           disabled={busy === c.id}
                         >
-                          <SelectTrigger className="h-8 w-36">
+                          <SelectTrigger className="h-8 w-36" aria-label={`Plan de ${c.name}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -181,6 +182,7 @@ export default function MasterAdmin() {
                             checked={c.is_active}
                             disabled={busy === c.id}
                             onCheckedChange={(v) => updateCompany(c.id, { is_active: v })}
+                            aria-label={`${c.is_active ? "Desactivar" : "Activar"} ${c.name}`}
                           />
                           <Badge variant={c.is_active ? "default" : "destructive"}>
                             {c.is_active ? "Activa" : "Suspendida"}
@@ -192,6 +194,7 @@ export default function MasterAdmin() {
                           checked={c.founder_cohort}
                           disabled={busy === c.id}
                           onCheckedChange={(v) => toggleFounder(c.id, v)}
+                          aria-label={`${c.founder_cohort ? "Quitar" : "Agregar"} ${c.name} del cohorte fundadores`}
                         />
                       </TableCell>
                       <TableCell>
@@ -246,10 +249,17 @@ export default function MasterAdmin() {
                             value={cityDrafts[c.id] ?? c.city ?? ""}
                             disabled={busy === c.id}
                             onChange={(e) => setCityDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                            onBlur={() => {
+                            onBlur={async () => {
                               const draft = cityDrafts[c.id];
                               if (draft !== undefined && draft !== (c.city ?? "")) {
-                                updateCompany(c.id, { city: draft || null });
+                                const ok = await updateCompany(c.id, { city: draft || null });
+                                if (!ok) {
+                                  setCityDrafts((prev) => {
+                                    const next = { ...prev };
+                                    delete next[c.id];
+                                    return next;
+                                  });
+                                }
                               }
                             }}
                           />

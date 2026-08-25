@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldCheck, Plus, Trash2, Loader2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Preset = { id: string; label: string; days: number };
 
@@ -18,6 +19,8 @@ export default function WarrantyPresetsTab() {
   const [loading, setLoading] = useState(true);
   const [label, setLabel] = useState("");
   const [days, setDays] = useState<string>("");
+  const [pendingDelete, setPendingDelete] = useState<Preset | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -50,9 +53,11 @@ export default function WarrantyPresetsTab() {
   };
 
   const remove = async (p: Preset) => {
-    if (!confirm(`¿Eliminar "${p.label}"?`)) return;
+    setDeleting(true);
     const { error } = await supabase.from("warranty_presets").delete().eq("id", p.id);
+    setDeleting(false);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setPendingDelete(null);
     load();
   };
 
@@ -105,7 +110,7 @@ export default function WarrantyPresetsTab() {
                     <TableCell className="font-medium">{p.label}</TableCell>
                     <TableCell className="text-muted-foreground">{p.days}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => remove(p)}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setPendingDelete(p)} aria-label={`Eliminar preset ${p.label}`}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -114,6 +119,14 @@ export default function WarrantyPresetsTab() {
           </div>
         )}
       </CardContent>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="¿Eliminar preset de garantía?"
+        description={pendingDelete ? `Se eliminará "${pendingDelete.label}". Esta acción no se puede deshacer.` : ""}
+        loading={deleting}
+        onConfirm={() => pendingDelete && remove(pendingDelete)}
+      />
     </Card>
   );
 }

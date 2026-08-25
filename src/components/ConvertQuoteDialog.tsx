@@ -120,14 +120,14 @@ export default function ConvertQuoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!loading) onOpenChange(o); }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Convertir a orden</DialogTitle>
           <DialogDescription>
             {order.order_number} · {order.customer_name} · {order.device_type} — el equipo ya está en el taller.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="flex-1 space-y-4 overflow-y-auto">
           {accessoryPresets.length > 0 && (
             <div className="space-y-2">
               <Label>Accesorios y Componentes</Label>

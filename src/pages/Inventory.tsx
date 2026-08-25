@@ -17,6 +17,7 @@ import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPYG } from "@/lib/orders";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Item = {
   id: string;
@@ -44,6 +45,8 @@ export default function Inventory() {
   const { branches, hasMultipleBranches } = useBranches();
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<Item | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
@@ -65,11 +68,13 @@ export default function Inventory() {
 
   useEffect(() => { load(); }, [companyId]);
 
-  const remove = async (id: string) => {
-    if (!confirm("¿Eliminar este artículo?")) return;
-    const { error } = await (supabase as any).from("inventory_items").delete().eq("id", id);
+  const remove = async (item: Item) => {
+    setDeleting(true);
+    const { error } = await (supabase as any).from("inventory_items").delete().eq("id", item.id);
+    setDeleting(false);
     if (error) return toast.error(error.message);
     toast.success("Artículo eliminado");
+    setPendingDelete(null);
     load();
   };
 
@@ -155,83 +160,160 @@ export default function Inventory() {
             </Select>
           )}
         </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Imagen</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Categoría</TableHead>
-                {hasMultipleBranches && <TableHead>Sucursal</TableHead>}
-                <TableHead className="text-right">Stock</TableHead>
-                <TableHead className="text-right">Mín.</TableHead>
-                <TableHead className="text-right">Costo</TableHead>
-                <TableHead className="text-right">Precio</TableHead>
-                {isAdmin && <TableHead></TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Cargando...</TableCell></TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Sin artículos</TableCell></TableRow>
-              ) : filtered.map((i) => {
+        {loading ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">Cargando...</div>
+        ) : filtered.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">Sin artículos</div>
+        ) : (
+          <>
+            {/* Mobile: tarjetas — la tabla de hasta 9 columnas no entra en un viewport chico */}
+            <div className="space-y-2 sm:hidden">
+              {filtered.map((i) => {
                 const low = i.stock <= i.min_stock_alert;
                 const cat = categoryName(i.category_id);
                 const sub = subcategoryName(i.subcategory_id);
                 return (
-                  <TableRow key={i.id} className={cn(low && "bg-secondary/5")}>
-                    <TableCell>
+                  <div key={i.id} className={cn("rounded-lg border border-border bg-card p-3", low && "bg-secondary/5")}>
+                    <div className="flex items-start gap-3">
                       {i.image_url ? (
-                        <img src={i.image_url} alt={i.name} className="h-10 w-10 rounded-md object-cover" />
+                        <img src={i.image_url} alt={i.name} className="h-12 w-12 shrink-0 rounded-md object-cover" />
                       ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                          <Package className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-muted">
+                          <Package className="h-5 w-5 text-muted-foreground" />
                         </div>
                       )}
-                    </TableCell>
-                    <TableCell className="font-medium text-foreground">{i.name}</TableCell>
-                    <TableCell>
-                      {cat ? (
-                        <div className="flex flex-wrap items-center gap-1">
-                          <Badge variant="outline">{cat}</Badge>
-                          {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="truncate font-medium text-foreground">{i.name}</div>
+                          {isAdmin && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="-mr-2 -mt-1 h-9 w-9 shrink-0"
+                              onClick={() => setPendingDelete(i)}
+                              aria-label={`Eliminar ${i.name}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sin categoría</span>
-                      )}
-                    </TableCell>
-                    {hasMultipleBranches && (
-                      <TableCell className="text-muted-foreground">{branchName(i.branch_id) ?? "—"}</TableCell>
-                    )}
-                    <TableCell className="text-right">
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          {cat ? (
+                            <>
+                              <Badge variant="outline">{cat}</Badge>
+                              {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sin categoría</span>
+                          )}
+                          {hasMultipleBranches && branchName(i.branch_id) && (
+                            <span className="text-xs text-muted-foreground">· {branchName(i.branch_id)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2 text-sm">
                       <span className={cn(
                         "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold",
                         low ? "bg-secondary/15 text-secondary border border-secondary/30" : "text-foreground"
                       )}>
                         {low && <AlertTriangle className="h-3 w-3" />}
-                        {i.stock}
+                        Stock: {i.stock} <span className="font-normal text-muted-foreground">(mín. {i.min_stock_alert})</span>
                       </span>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{i.min_stock_alert}</TableCell>
-                    <TableCell className="text-right">{formatPYG(i.cost_price)}</TableCell>
-                    <TableCell className="text-right">{formatPYG(i.selling_price)}</TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => remove(i.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
+                      <span className="text-muted-foreground">
+                        {formatPYG(i.cost_price)} → <span className="font-medium text-foreground">{formatPYG(i.selling_price)}</span>
+                      </span>
+                    </div>
+                  </div>
                 );
               })}
-            </TableBody>
-          </Table>
-        </div>
+            </div>
+
+            {/* Desktop/tablet: tabla completa */}
+            <div className="hidden overflow-x-auto sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Imagen</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    {hasMultipleBranches && <TableHead>Sucursal</TableHead>}
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="text-right">Mín.</TableHead>
+                    <TableHead className="text-right">Costo</TableHead>
+                    <TableHead className="text-right">Precio</TableHead>
+                    {isAdmin && <TableHead></TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((i) => {
+                    const low = i.stock <= i.min_stock_alert;
+                    const cat = categoryName(i.category_id);
+                    const sub = subcategoryName(i.subcategory_id);
+                    return (
+                      <TableRow key={i.id} className={cn(low && "bg-secondary/5")}>
+                        <TableCell>
+                          {i.image_url ? (
+                            <img src={i.image_url} alt={i.name} className="h-10 w-10 rounded-md object-cover" />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                              <Package className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground">{i.name}</TableCell>
+                        <TableCell>
+                          {cat ? (
+                            <div className="flex flex-wrap items-center gap-1">
+                              <Badge variant="outline">{cat}</Badge>
+                              {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sin categoría</span>
+                          )}
+                        </TableCell>
+                        {hasMultipleBranches && (
+                          <TableCell className="text-muted-foreground">{branchName(i.branch_id) ?? "—"}</TableCell>
+                        )}
+                        <TableCell className="text-right">
+                          <span className={cn(
+                            "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold",
+                            low ? "bg-secondary/15 text-secondary border border-secondary/30" : "text-foreground"
+                          )}>
+                            {low && <AlertTriangle className="h-3 w-3" />}
+                            {i.stock}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">{i.min_stock_alert}</TableCell>
+                        <TableCell className="text-right">{formatPYG(i.cost_price)}</TableCell>
+                        <TableCell className="text-right">{formatPYG(i.selling_price)}</TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
       </Card>
 
       <NewInventoryItemDialog open={open} onOpenChange={setOpen} onCreated={load} />
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="¿Eliminar artículo?"
+        description={pendingDelete ? `Se eliminará "${pendingDelete.name}" del inventario. Esta acción no se puede deshacer.` : ""}
+        loading={deleting}
+        onConfirm={() => pendingDelete && remove(pendingDelete)}
+      />
     </div>
   );
 }

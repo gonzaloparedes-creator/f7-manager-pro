@@ -147,7 +147,7 @@ export default function Presentacion() {
             </Button>
             <Button
               size="sm"
-              onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
+              onClick={() => document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Ver planes
@@ -665,7 +665,7 @@ function PricingSection({ onContact }: { onContact: (message?: string) => void }
                 key={s}
                 onClick={() => setSegment(s)}
                 className={
-                  "px-4 py-1.5 text-xs font-semibold rounded-full transition-colors " +
+                  "px-4 py-2.5 text-xs font-semibold rounded-full transition-colors " +
                   (segment === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
@@ -683,7 +683,7 @@ function PricingSection({ onContact }: { onContact: (message?: string) => void }
                 key={c}
                 onClick={() => setCurrency(c)}
                 className={
-                  "px-4 py-1.5 text-xs font-semibold rounded-full transition-colors " +
+                  "px-4 py-2.5 text-xs font-semibold rounded-full transition-colors " +
                   (currency === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
@@ -702,7 +702,7 @@ function PricingSection({ onContact }: { onContact: (message?: string) => void }
                 key={c}
                 onClick={() => setCycle(c)}
                 className={
-                  "px-3.5 py-1.5 text-xs font-semibold rounded-full transition-colors " +
+                  "px-3.5 py-2.5 text-xs font-semibold rounded-full transition-colors " +
                   (cycle === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
