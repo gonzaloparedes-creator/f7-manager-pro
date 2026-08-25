@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { STATUS_LABELS, formatPYG, type OrderStatus } from "@/lib/orders";
 import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
+import NewQuoteDialog from "@/components/NewQuoteDialog";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,7 @@ function orderMoney(o: Order) {
 
 const FILTERS: { value: "todos" | OrderStatus; label: string }[] = [
   { value: "todos", label: "Activas" },
+  { value: "presupuesto", label: "Presupuestos" },
   { value: "recibido", label: "Recibidas" },
   { value: "en_diagnostico", label: "Diagnóstico" },
   { value: "en_reparacion", label: "Reparación" },
@@ -68,6 +70,7 @@ export default function Dashboard() {
   const [filter, setFilter] = useState<"todos" | OrderStatus>("todos");
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const [collectingId, setCollectingId] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>("all");
@@ -77,12 +80,16 @@ export default function Dashboard() {
 
   useEffect(() => { document.title = "Órdenes | F7 Manager Pro"; }, []);
 
-  // El FAB de acciones rápidas navega acá con state.openNewOrder cuando se
-  // toca "Nueva Orden" desde otra página — se limpia el state al abrir para
-  // que no se re-dispare al volver con el botón atrás del navegador.
+  // El FAB de acciones rápidas navega acá con state.openNewOrder o
+  // state.openNewQuote cuando se toca esa acción desde otra página — se
+  // limpia el state al abrir para que no se re-dispare con el botón atrás.
   useEffect(() => {
-    if ((location.state as { openNewOrder?: boolean } | null)?.openNewOrder) {
+    const state = location.state as { openNewOrder?: boolean; openNewQuote?: boolean } | null;
+    if (state?.openNewOrder) {
       setOpen(true);
+      navigate(location.pathname, { replace: true, state: null });
+    } else if (state?.openNewQuote) {
+      setQuoteOpen(true);
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -151,14 +158,15 @@ export default function Dashboard() {
   }, [orders, isAdmin, branchFilter]);
 
   const stats = useMemo(() => {
-    const total = branchScoped.length;
-    const pending = branchScoped.filter((o) => ["recibido", "en_diagnostico", "en_reparacion"].includes(o.status)).length;
-    const ready = branchScoped.filter((o) => o.status === "listo").length;
+    const real = branchScoped.filter((o) => o.status !== "presupuesto");
+    const total = real.length;
+    const pending = real.filter((o) => ["recibido", "en_diagnostico", "en_reparacion"].includes(o.status)).length;
+    const ready = real.filter((o) => o.status === "listo").length;
     return { total, pending, ready };
   }, [branchScoped]);
 
   const filtered = filter === "todos"
-    ? branchScoped.filter((o) => o.status !== "entregado")
+    ? branchScoped.filter((o) => o.status !== "entregado" && o.status !== "presupuesto")
     : branchScoped.filter((o) => o.status === filter);
 
   return (
@@ -182,6 +190,9 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
           )}
+          <Button variant="outline" onClick={() => setQuoteOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuevo Presupuesto
+          </Button>
           <Button onClick={() => setOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Nueva Orden
           </Button>
@@ -361,6 +372,7 @@ export default function Dashboard() {
       )}
 
       <NewOrderDialog open={open} onOpenChange={setOpen} onCreated={load} />
+      <NewQuoteDialog open={quoteOpen} onOpenChange={setQuoteOpen} onCreated={load} />
     </div>
   );
 }

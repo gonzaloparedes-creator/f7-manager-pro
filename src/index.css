@@ -37,6 +37,8 @@
     --radius: 0.65rem;
 
     /* Status semantic tokens */
+    --status-presupuesto: 245 60% 60%;
+    --status-presupuesto-bg: 245 70% 95%;
     --status-recibido: 215 16% 47%;
     --status-recibido-bg: 210 40% 94%;
     --status-diagnostico: 217 91% 60%;

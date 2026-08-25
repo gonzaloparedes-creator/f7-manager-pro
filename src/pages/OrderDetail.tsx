@@ -27,6 +27,7 @@ import { OrderQRCode } from "@/components/OrderQRCode";
 import { PrintReceipt } from "@/components/PrintReceipt";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import OrderPartsSection from "@/components/OrderPartsSection";
+import ConvertQuoteDialog from "@/components/ConvertQuoteDialog";
 import imageCompression from "browser-image-compression";
 
 interface Order {
@@ -70,6 +71,7 @@ export default function OrderDetail() {
   const [editDeposit, setEditDeposit] = useState<string>("");
   const [savingFinance, setSavingFinance] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
+  const [convertOpen, setConvertOpen] = useState(false);
   const [history, setHistory] = useState<History[]>([]);
   const [techNotes, setTechNotes] = useState<TechNote[]>([]);
   const [newTechNote, setNewTechNote] = useState("");
@@ -573,6 +575,39 @@ export default function OrderDetail() {
           />
         </div>
       </div>
+
+      {order.status === "presupuesto" && (
+        <Card className="border-[hsl(var(--status-presupuesto))]/40 bg-[hsl(var(--status-presupuesto))]/5">
+          <CardContent className="flex flex-col items-start justify-between gap-3 p-4 sm:flex-row sm:items-center">
+            <div>
+              <div className="font-semibold">Todavía es un presupuesto — el equipo no fue recibido.</div>
+              <p className="text-sm text-muted-foreground">
+                Cuando el cliente traiga el equipo, convertilo en orden real para cargar accesorios, seguridad, garantía, seña y firma.
+              </p>
+            </div>
+            <Button onClick={() => setConvertOpen(true)} className="shrink-0 gap-2">
+              Convertir a orden
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {order.status === "presupuesto" && (
+        <ConvertQuoteDialog
+          order={{
+            id: order.id,
+            order_number: order.order_number,
+            customer_name: order.customer_name,
+            customer_phone: order.customer_phone,
+            secondary_phone: order.secondary_phone,
+            device_type: order.device_type,
+            quote_amount: order.quote_amount,
+          }}
+          open={convertOpen}
+          onOpenChange={setConvertOpen}
+          onConverted={load}
+        />
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

@@ -1,4 +1,5 @@
 export type OrderStatus =
+  | "presupuesto"
   | "recibido"
   | "en_diagnostico"
   | "en_reparacion"
@@ -7,6 +8,7 @@ export type OrderStatus =
   | "garantia";
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
+  presupuesto: "Presupuesto",
   recibido: "Recibido",
   en_diagnostico: "En diagnóstico",
   en_reparacion: "En reparación",
@@ -26,6 +28,8 @@ export const STATUS_ORDER: OrderStatus[] = [
 
 export function statusBadgeClasses(status: string) {
   switch (status) {
+    case "presupuesto":
+      return "bg-[hsl(var(--status-presupuesto-bg))] text-[hsl(var(--status-presupuesto))]";
     case "recibido":
       return "bg-[hsl(var(--status-recibido-bg))] text-[hsl(var(--status-recibido))]";
     case "en_diagnostico":

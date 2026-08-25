@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, ClipboardList, ShoppingCart } from "lucide-react";
+import { Plus, ClipboardList, ShoppingCart, FileText } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { usePlan } from "@/hooks/usePlan";
 
@@ -22,6 +22,13 @@ export default function QuickActionsFab() {
       desc: "Recibir un equipo para reparación",
       icon: ClipboardList,
       run: () => navigate("/dashboard", { state: { openNewOrder: true } }),
+    },
+    {
+      key: "quote",
+      label: "Nuevo Presupuesto",
+      desc: "Cotizar sin recibir el equipo todavía",
+      icon: FileText,
+      run: () => navigate("/dashboard", { state: { openNewQuote: true } }),
     },
     ...(hasStore
       ? [{
