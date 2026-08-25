@@ -135,7 +135,25 @@ export default function NewOrderDialog({
   // correr apenas el nodo real aparece.
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const chipRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].key);
+  // Si la sección activa cambia a una cuyo chip quedó fuera de vista en la
+  // fila horizontal (ej. "Firma" cuando arrancaste viendo "Cliente"), lo
+  // centra solo — sin esto el usuario pierde de vista cuál está resaltada.
+  // Ojo: NO usar scrollIntoView acá — afecta el scroll de CUALQUIER
+  // ancestro scrolleable, y como el chip vive dentro del mismo diálogo que
+  // scrollea verticalmente hacia la sección, terminaba interrumpiendo a
+  // mitad de camino ese scroll vertical (confirmado: el tap en "Firma"
+  // dejaba el scroll trabado a los ~500px de los ~2500px necesarios).
+  // Seteando scrollLeft a mano en el contenedor de los chips, el ajuste
+  // queda 100% acotado al scroll horizontal, sin tocar nada más.
+  useEffect(() => {
+    const chip = chipRefs.current[activeSection];
+    const row = chip?.parentElement;
+    if (!chip || !row) return;
+    const target = chip.offsetLeft - row.clientWidth / 2 + chip.offsetWidth / 2;
+    row.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+  }, [activeSection]);
   // El botón "Listo"/"Cerrar" de la cámara vive en un portal aparte y tiene
   // el foco al desmontarse. Devolver el foco al botón "Cámara" evita el
   // primer intento de cierre, pero en touch real de Android Radix dispara
@@ -499,6 +517,7 @@ export default function NewOrderDialog({
     >
       <DialogContent
         ref={setContentEl}
+        hideClose
         className={cn(
           // Mobile: pantalla completa, se siente como una página nativa en vez
           // de un modal flotando con scroll interno recortado.
@@ -507,27 +526,41 @@ export default function NewOrderDialog({
           "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[90vh] sm:w-full sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:border"
         )}
       >
-        <DialogHeader>
-          <DialogTitle>Nueva orden</DialogTitle>
-          <DialogDescription>Registrá un nuevo equipo para reparación.</DialogDescription>
-        </DialogHeader>
-        {/* El scroll horizontal vive en un div interno, no en este mismo
-            elemento sticky: DialogContent es un grid, y un hijo directo de
-            grid con overflow-x-auto pierde su alto mínimo basado en
-            contenido (el navegador lo colapsa a ~0) y termina recortando
-            los chips a la mitad. Separar scroll-horizontal (adentro) de
-            sticky (afuera) evita ese problema — pero un hijo de grid
-            también tiene min-width:auto por default, así que sin min-w-0
-            este div crece para "abrazar" el ancho completo de los chips
-            en vez de respetar el ancho del diálogo, volviendo scrolleable
-            horizontalmente TODO el modal. min-w-0 fuerza a que respete el
-            ancho del contenedor y deje el overflow-x-auto de adentro
-            hacerse cargo. */}
-        <div className="sticky top-0 z-10 -mx-6 min-w-0 border-b border-border bg-background shadow-sm">
-          <div className="flex gap-1.5 overflow-x-auto px-6 py-2.5">
+        {/* Header + nav de secciones combinados en un solo bloque sticky,
+            pegado arriba desde el primer pixel (antes: el título no era
+            sticky y recién al scrollearlo fuera de vista el nav quedaba
+            "pegado", con un salto visual justo ahí). Además de verse mejor,
+            esto resuelve que el botón de cerrar (que Radix posiciona
+            "absolute" dentro del propio contenedor con scroll) se perdiera
+            scrolleando hacia abajo: ahora vive en este mismo bloque fijo.
+
+            DialogContent tiene p-6 de padding — el bloque se extiende con
+            -mx-6 -mt-6 hasta los bordes reales y vuelve a poner su propio
+            padding adentro. min-w-0 es necesario porque DialogContent es un
+            grid: sin eso, este hijo crece para "abrazar" el ancho de los
+            chips en vez de respetar el ancho del diálogo, volviendo
+            scrolleable horizontalmente el modal entero. */}
+        <div className="sticky top-0 z-20 -mx-6 -mt-6 min-w-0 border-b border-border bg-background pt-[env(safe-area-inset-top)] shadow-sm sm:rounded-t-lg">
+          <div className="flex items-center justify-between gap-3 px-6 pb-3 pt-4">
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base sm:text-lg">Nueva orden</DialogTitle>
+              <DialogDescription className="sr-only">Registrá un nuevo equipo para reparación.</DialogDescription>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+              aria-label="Cerrar"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-70 transition-opacity hover:bg-accent hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none disabled:opacity-40"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto px-6 pb-3">
             {SECTIONS.map((s) => (
               <button
                 key={s.key}
+                ref={(el) => { chipRefs.current[s.key] = el; }}
                 type="button"
                 onClick={() => sectionRefs.current[s.key]?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 className={cn(
@@ -547,7 +580,7 @@ export default function NewOrderDialog({
           <section
             ref={(el) => { sectionRefs.current.cliente = el; }}
             data-section="cliente"
-            className="scroll-mt-14 space-y-3"
+            className="scroll-mt-[120px] space-y-3"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Datos del cliente</h3>
@@ -768,7 +801,7 @@ export default function NewOrderDialog({
           <section
             ref={(el) => { sectionRefs.current.equipo = el; }}
             data-section="equipo"
-            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+            className="scroll-mt-[120px] space-y-3 border-t border-border pt-4"
           >
             <h3 className="text-sm font-semibold text-foreground">Equipo y problemas</h3>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -879,7 +912,7 @@ export default function NewOrderDialog({
           <section
             ref={(el) => { sectionRefs.current.accesorios = el; }}
             data-section="accesorios"
-            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+            className="scroll-mt-[120px] space-y-3 border-t border-border pt-4"
           >
             <h3 className="text-sm font-semibold text-foreground">Accesorios y Componentes</h3>
             <p className="text-xs text-muted-foreground">
@@ -922,7 +955,7 @@ export default function NewOrderDialog({
           <section
             ref={(el) => { sectionRefs.current.checklist = el; }}
             data-section="checklist"
-            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+            className="scroll-mt-[120px] space-y-3 border-t border-border pt-4"
           >
             <h3 className="text-sm font-semibold text-foreground">Checklist de Recepción</h3>
             <p className="text-xs text-muted-foreground">
@@ -979,7 +1012,7 @@ export default function NewOrderDialog({
           <section
             ref={(el) => { sectionRefs.current.financiero = el; }}
             data-section="financiero"
-            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+            className="scroll-mt-[120px] space-y-3 border-t border-border pt-4"
           >
             <h3 className="text-sm font-semibold text-foreground">Información financiera</h3>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -1089,7 +1122,7 @@ export default function NewOrderDialog({
           <section
             ref={(el) => { sectionRefs.current.seguridad = el; }}
             data-section="seguridad"
-            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+            className="scroll-mt-[120px] space-y-3 border-t border-border pt-4"
           >
             <h3 className="text-sm font-semibold text-foreground">Seguridad del equipo</h3>
             <p className="text-xs text-muted-foreground">
@@ -1167,7 +1200,7 @@ export default function NewOrderDialog({
           <section
             ref={(el) => { sectionRefs.current.firma = el; }}
             data-section="firma"
-            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+            className="scroll-mt-[120px] space-y-3 border-t border-border pt-4"
           >
             <h3 className="text-sm font-semibold text-foreground">Términos y firma del cliente</h3>
             <div className="space-y-2">
