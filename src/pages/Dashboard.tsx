@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -38,6 +38,17 @@ interface Order {
 interface Branch { id: string; name: string }
 interface ProfileLite { id: string; full_name: string | null }
 
+function orderMoney(o: Order) {
+  const cargosTotal = (o.cargos_adicionales ?? []).reduce((s, c) => s + Number(c?.monto ?? 0), 0);
+  const total = Number(o.quote_amount ?? 0) + cargosTotal;
+  const deposit = Number(o.deposit_amount ?? 0);
+  const saldo = Math.max(0, total - deposit);
+  const isFullyPaid = total > 0 && saldo === 0;
+  const hasPartial = total > 0 && saldo > 0 && deposit > 0;
+  const hasQuoteOnly = total > 0 && deposit === 0;
+  return { total, deposit, saldo, isFullyPaid, hasPartial, hasQuoteOnly };
+}
+
 const FILTERS: { value: "todos" | OrderStatus; label: string }[] = [
   { value: "todos", label: "Activas" },
   { value: "recibido", label: "Recibidas" },
@@ -61,8 +72,21 @@ export default function Dashboard() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [techMap, setTechMap] = useState<Record<string, string>>({});
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => { document.title = "Órdenes | F7 Manager Pro"; }, []);
+
+  // El FAB de acciones rápidas navega acá con state.openNewOrder cuando se
+  // toca "Nueva Orden" desde otra página — se limpia el state al abrir para
+  // que no se re-dispare al volver con el botón atrás del navegador.
+  useEffect(() => {
+    if ((location.state as { openNewOrder?: boolean } | null)?.openNewOrder) {
+      setOpen(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const load = async () => {
     if (!user || roleLoading || !companyId) return;
@@ -206,15 +230,45 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <>
+          {/* Mobile: filas compactas, una línea de info por orden */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {filtered.map((o) => {
+              const { saldo, isFullyPaid, hasQuoteOnly, total } = orderMoney(o);
+              return (
+                <Link key={o.id} to={`/ordenes/${o.id}`}>
+                  <div className={cn(
+                    "flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors active:bg-accent",
+                    isFullyPaid ? "border-l-4 border-l-emerald-500" : "border-border"
+                  )}>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                      {o.customer_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{o.customer_name}</div>
+                      <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <Smartphone className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{o.device_type} · {o.order_number}</span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <StatusBadge status={o.status} />
+                      {saldo > 0 ? (
+                        <span className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">{formatPYG(saldo)}</span>
+                      ) : hasQuoteOnly ? (
+                        <span className="text-[11px] font-medium text-muted-foreground">{formatPYG(total)}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Desktop/tablet: cards completas con toda la info */}
+          <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((o) => {
-            const cargosTotal = (o.cargos_adicionales ?? []).reduce((s, c) => s + Number(c?.monto ?? 0), 0);
-            const total = Number(o.quote_amount ?? 0) + cargosTotal;
-            const deposit = Number(o.deposit_amount ?? 0);
-            const saldo = Math.max(0, total - deposit);
-            const isFullyPaid = total > 0 && saldo === 0;
-            const hasPartial = total > 0 && saldo > 0 && deposit > 0;
-            const hasQuoteOnly = total > 0 && deposit === 0;
+            const { total, deposit, saldo, isFullyPaid, hasPartial, hasQuoteOnly } = orderMoney(o);
             return (
             <Link key={o.id} to={`/ordenes/${o.id}`}>
               <Card className={cn(
@@ -302,7 +356,8 @@ export default function Dashboard() {
             </Link>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
       <NewOrderDialog open={open} onOpenChange={setOpen} onCreated={load} />

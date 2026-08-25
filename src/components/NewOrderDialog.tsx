@@ -27,6 +27,15 @@ import { CameraCapture } from "@/components/CameraCapture";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 
+const SECTIONS = [
+  { key: "cliente", label: "Cliente" },
+  { key: "equipo", label: "Equipo" },
+  { key: "accesorios", label: "Accesorios" },
+  { key: "financiero", label: "Financiero" },
+  { key: "seguridad", label: "Seguridad" },
+  { key: "firma", label: "Firma" },
+] as const;
+
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
 type PhotoEntry = { file: File; previewUrl: string };
 
@@ -118,6 +127,14 @@ export default function NewOrderDialog({
   const [compressing, setCompressing] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraTriggerRef = useRef<HTMLButtonElement>(null);
+  // Radix monta el contenido del Dialog un tick después de que `open` pasa a
+  // true (para permitir la animación de entrada) — un useRef normal quedaría
+  // en null en el momento en que corre el efecto de abajo, y como no es
+  // reactivo, el efecto nunca se reintenta. Con estado, el efecto vuelve a
+  // correr apenas el nodo real aparece.
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].key);
   // El botón "Listo"/"Cerrar" de la cámara vive en un portal aparte y tiene
   // el foco al desmontarse. Devolver el foco al botón "Cámara" evita el
   // primer intento de cierre, pero en touch real de Android Radix dispara
@@ -220,6 +237,30 @@ export default function NewOrderDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Resalta en la navegación por secciones cuál está a la vista, observando
+  // contra el propio DialogContent (que scrollea internamente), no la ventana.
+  useEffect(() => {
+    if (!open) return;
+    const root = contentEl;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length === 0) return;
+        // Entre las secciones que tocan la franja superior, la "actual" es la
+        // que tiene el top más alto (la que acaba de entrar desde abajo) — no
+        // la que tiene el top más negativo, que suele ser una sección larga
+        // que ya casi se scrolleó por completo.
+        const topmost = visible.reduce((a, b) => (a.boundingClientRect.top > b.boundingClientRect.top ? a : b));
+        const key = (topmost.target as HTMLElement).dataset.section;
+        if (key) setActiveSection(key);
+      },
+      { root, rootMargin: "0px 0px -70% 0px", threshold: 0 }
+    );
+    Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [open, contentEl]);
 
   const reset = (clearDraft = false) => {
     setForm(INITIAL_STATE);
@@ -458,6 +499,7 @@ export default function NewOrderDialog({
       }}
     >
       <DialogContent
+        ref={setContentEl}
         className={cn(
           // Mobile: pantalla completa, se siente como una página nativa en vez
           // de un modal flotando con scroll interno recortado.
@@ -470,9 +512,30 @@ export default function NewOrderDialog({
           <DialogTitle>Nueva orden</DialogTitle>
           <DialogDescription>Registrá un nuevo equipo para reparación.</DialogDescription>
         </DialogHeader>
+        <div className="sticky top-0 z-10 -mx-6 flex gap-1.5 overflow-x-auto border-b border-border bg-background px-6 py-2">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => sectionRefs.current[s.key]?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className={cn(
+                "whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                activeSection === s.key
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
         <form onSubmit={onSubmit} className="space-y-6">
           {/* Sección: Cliente */}
-          <section className="space-y-3">
+          <section
+            ref={(el) => { sectionRefs.current.cliente = el; }}
+            data-section="cliente"
+            className="scroll-mt-14 space-y-3"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Datos del cliente</h3>
               {selectedClientId && (
@@ -689,7 +752,11 @@ export default function NewOrderDialog({
           </section>
 
           {/* Sección: Equipo y problemas */}
-          <section className="space-y-3 border-t border-border pt-4">
+          <section
+            ref={(el) => { sectionRefs.current.equipo = el; }}
+            data-section="equipo"
+            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+          >
             <h3 className="text-sm font-semibold text-foreground">Equipo y problemas</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
@@ -796,7 +863,11 @@ export default function NewOrderDialog({
           </section>
 
           {/* Sección: Accesorios y Componentes */}
-          <section className="space-y-3 border-t border-border pt-4">
+          <section
+            ref={(el) => { sectionRefs.current.accesorios = el; }}
+            data-section="accesorios"
+            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+          >
             <h3 className="text-sm font-semibold text-foreground">Accesorios y Componentes</h3>
             <p className="text-xs text-muted-foreground">
               Marcá lo que el cliente entrega junto al equipo.
@@ -826,7 +897,11 @@ export default function NewOrderDialog({
           </section>
 
           {/* Sección: Financiero */}
-          <section className="space-y-3 border-t border-border pt-4">
+          <section
+            ref={(el) => { sectionRefs.current.financiero = el; }}
+            data-section="financiero"
+            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+          >
             <h3 className="text-sm font-semibold text-foreground">Información financiera</h3>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-2">
@@ -932,7 +1007,11 @@ export default function NewOrderDialog({
             </div>
           </section>
 
-          <section className="space-y-3 border-t border-border pt-4">
+          <section
+            ref={(el) => { sectionRefs.current.seguridad = el; }}
+            data-section="seguridad"
+            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+          >
             <h3 className="text-sm font-semibold text-foreground">Seguridad del equipo</h3>
             <p className="text-xs text-muted-foreground">
               Datos opcionales para que el técnico pueda acceder al equipo durante la reparación.
@@ -1006,7 +1085,11 @@ export default function NewOrderDialog({
           </section>
 
           {/* Sección: Términos y firma */}
-          <section className="space-y-3 border-t border-border pt-4">
+          <section
+            ref={(el) => { sectionRefs.current.firma = el; }}
+            data-section="firma"
+            className="scroll-mt-14 space-y-3 border-t border-border pt-4"
+          >
             <h3 className="text-sm font-semibold text-foreground">Términos y firma del cliente</h3>
             <div className="space-y-2">
               <Label htmlFor="terms">Términos del servicio</Label>

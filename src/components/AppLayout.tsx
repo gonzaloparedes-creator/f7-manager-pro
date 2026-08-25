@@ -13,6 +13,7 @@ import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { PLAN_MESSAGES } from "@/lib/plans";
 import SuspendedAccount from "@/pages/SuspendedAccount";
 import UpgradeProDialog from "@/components/UpgradeProDialog";
+import QuickActionsFab from "@/components/QuickActionsFab";
 
 const baseNav = [
   { to: "/dashboard", label: "Órdenes", icon: LayoutDashboard, proOnly: false, businessOnly: false, adminOnly: false },
@@ -164,6 +165,7 @@ export default function AppLayout() {
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex border-t bg-card md:hidden">
         {nav.map((item) => renderNavItem(item, true))}
+        <QuickActionsFab />
       </nav>
     </div>
   );
