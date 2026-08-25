@@ -540,7 +540,7 @@ export default function NewOrderDialog({
             grid: sin eso, este hijo crece para "abrazar" el ancho de los
             chips en vez de respetar el ancho del diálogo, volviendo
             scrolleable horizontalmente el modal entero. */}
-        <div className="sticky top-0 z-20 -mx-6 -mt-6 min-w-0 border-b border-border bg-background pt-[env(safe-area-inset-top)] shadow-sm sm:rounded-t-lg">
+        <div className="sticky top-0 z-20 -mx-6 -mt-6 min-w-0 border-b border-border bg-background shadow-sm sm:rounded-t-lg">
           <div className="flex items-center justify-between gap-3 px-6 pb-3 pt-4">
             <div className="min-w-0">
               <DialogTitle className="truncate text-base sm:text-lg">Nueva orden</DialogTitle>
