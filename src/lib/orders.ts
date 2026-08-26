@@ -47,6 +47,29 @@ export function statusBadgeClasses(status: string) {
   }
 }
 
+// Respuesta del cliente a un Presupuesto, dejada desde el link público de
+// tracking (solo vía tracking_token — ver PublicTrackingByCode.tsx y la
+// Edge Function respond-to-quote). El cliente no puede editar el monto
+// (lo fija el técnico), solo aceptar, rechazar o pedir cambios con una nota.
+export type QuoteResponse = "aceptado" | "rechazado" | "cambios_solicitados";
+
+export const QUOTE_RESPONSE_LABELS: Record<QuoteResponse, string> = {
+  aceptado: "Aceptado por el cliente",
+  rechazado: "Rechazado por el cliente",
+  cambios_solicitados: "Cliente pidió cambios",
+};
+
+export function quoteResponseBadgeClasses(response: QuoteResponse) {
+  switch (response) {
+    case "aceptado":
+      return "bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))]";
+    case "rechazado":
+      return "bg-destructive/10 text-destructive";
+    case "cambios_solicitados":
+      return "bg-primary/10 text-primary";
+  }
+}
+
 export const WARRANTY_OPTIONS: { value: number; label: string }[] = [
   { value: 0, label: "Sin garantía (0 días)" },
   { value: 15, label: "15 días" },

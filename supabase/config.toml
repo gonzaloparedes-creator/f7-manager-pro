@@ -15,5 +15,8 @@ verify_jwt = false
 [functions.send-status-notification]
 verify_jwt = false
 
+[functions.respond-to-quote]
+verify_jwt = false
+
 [functions.admin-create-user]
 verify_jwt = true

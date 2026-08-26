@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { STATUS_LABELS, formatPYG, type OrderStatus } from "@/lib/orders";
+import { STATUS_LABELS, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
 import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
@@ -36,6 +36,7 @@ interface Order {
   assigned_technician_id: string | null;
   warranty_days: number | null;
   delivered_at: string | null;
+  quote_response: QuoteResponse | null;
 }
 interface Branch { id: string; name: string }
 interface ProfileLite { id: string; full_name: string | null }
@@ -105,7 +106,7 @@ export default function Dashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, customer_name, device_type, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at")
+      .select("id, order_number, customer_name, device_type, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false });
     if (error) {
@@ -284,6 +285,11 @@ export default function Dashboard() {
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <StatusBadge status={o.status} />
+                      {o.status === "presupuesto" && o.quote_response && (
+                        <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
+                          {QUOTE_RESPONSE_LABELS[o.quote_response]}
+                        </span>
+                      )}
                       {saldo > 0 ? (
                         <span className="text-[11px] font-semibold text-secondary">{formatPYG(saldo)}</span>
                       ) : hasQuoteOnly ? (
@@ -318,6 +324,11 @@ export default function Dashboard() {
                         </Badge>
                       )}
                       <StatusBadge status={o.status} />
+                      {o.status === "presupuesto" && o.quote_response && (
+                        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
+                          {QUOTE_RESPONSE_LABELS[o.quote_response]}
+                        </span>
+                      )}
                       <OrderActionsMenu
                         orderId={o.id}
                         orderNumber={o.order_number}

@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, CalendarDays, Smartphone, Wallet } from "lucide-react";
-import { STATUS_LABELS, formatPYG, type OrderStatus } from "@/lib/orders";
+import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2 } from "lucide-react";
+import { STATUS_LABELS, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
 import f7Logo from "@/assets/f7-logo.png";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -27,6 +29,9 @@ interface PublicOrder {
   problem_description?: string | null;
   accessories?: string[] | null;
   checklist?: { label: string; status: "ok" | "fail" }[] | null;
+  quote_response?: QuoteResponse | null;
+  quote_response_note?: string | null;
+  quote_responded_at?: string | null;
 }
 interface PublicHistory { id: string; status: string; note: string | null; created_at: string; image_urls?: string[] | null; }
 interface PublicTechNote { id: string; note: string; created_at: string; }
@@ -43,10 +48,41 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export default function PublicTrackingByCode() {
   const { orderCode } = useParams();
+  const isToken = !!orderCode && UUID_RE.test(orderCode);
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [history, setHistory] = useState<PublicHistory[]>([]);
   const [techNotes, setTechNotes] = useState<PublicTechNote[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Responder un Presupuesto (aceptar/rechazar/pedir cambios) solo se
+  // habilita con tracking_token (isToken) — nunca con el código corto
+  // ORD-XXXX, que es adivinable/enumerable. Ver respond-to-quote (Edge Fn).
+  const [responding, setResponding] = useState<QuoteResponse | null>(null);
+  const [showChangesInput, setShowChangesInput] = useState(false);
+  const [changesNote, setChangesNote] = useState("");
+  const [respondError, setRespondError] = useState<string | null>(null);
+
+  const submitQuoteResponse = async (response: QuoteResponse, note?: string) => {
+    if (!orderCode || responding) return;
+    setResponding(response);
+    setRespondError(null);
+    try {
+      const { error } = await supabase.functions.invoke("respond-to-quote", {
+        body: { tracking_token: orderCode, response, note: note || undefined },
+      });
+      if (error) throw error;
+      setOrder((prev) =>
+        prev
+          ? { ...prev, quote_response: response, quote_response_note: note || null, quote_responded_at: new Date().toISOString() }
+          : prev
+      );
+      setShowChangesInput(false);
+    } catch {
+      setRespondError("No pudimos registrar tu respuesta. Probá de nuevo en un momento.");
+    } finally {
+      setResponding(null);
+    }
+  };
 
   useEffect(() => {
     document.title = orderCode
@@ -273,6 +309,89 @@ export default function PublicTrackingByCode() {
             </Card>
           );
         })()}
+
+        {isToken && order.status === "presupuesto" && (
+          <Card>
+            <CardContent className="space-y-4 p-6">
+              <h2 className="font-semibold">¿Qué querés hacer con este presupuesto?</h2>
+
+              {order.quote_response ? (
+                <div className="space-y-1.5">
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${quoteResponseBadgeClasses(order.quote_response)}`}>
+                    {QUOTE_RESPONSE_LABELS[order.quote_response]}
+                  </span>
+                  {order.quote_response_note && (
+                    <p className="text-sm text-muted-foreground">"{order.quote_response_note}"</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Si necesitás cambiar tu respuesta, contactanos directamente.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => submitQuoteResponse("aceptado")}
+                      disabled={!!responding}
+                      className="gap-2"
+                    >
+                      {responding === "aceptado" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Aceptar presupuesto
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowChangesInput((s) => !s)}
+                      disabled={!!responding}
+                      className="gap-2"
+                    >
+                      <MessageSquareText className="h-4 w-4" />
+                      Pedir cambios
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (window.confirm("¿Seguro que querés rechazar este presupuesto? Se le va a avisar al taller.")) {
+                          submitQuoteResponse("rechazado");
+                        }
+                      }}
+                      disabled={!!responding}
+                      className="gap-2 text-destructive hover:text-destructive"
+                    >
+                      {responding === "rechazado" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                      Rechazar
+                    </Button>
+                  </div>
+
+                  {showChangesInput && (
+                    <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                      <Textarea
+                        placeholder="Contanos qué te gustaría cambiar (opcional)…"
+                        rows={3}
+                        value={changesNote}
+                        onChange={(e) => setChangesNote(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => submitQuoteResponse("cambios_solicitados", changesNote)}
+                        disabled={!!responding}
+                        className="gap-2"
+                      >
+                        {responding === "cambios_solicitados" && <Loader2 className="h-4 w-4 animate-spin" />}
+                        Enviar
+                      </Button>
+                    </div>
+                  )}
+
+                  {respondError && <p className="text-sm text-destructive">{respondError}</p>}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {techNotes.length > 0 && (
           <Card>

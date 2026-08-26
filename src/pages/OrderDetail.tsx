@@ -11,12 +11,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
-import { STATUS_LABELS, STATUS_ORDER, formatPYG, type OrderStatus } from "@/lib/orders";
+import { STATUS_LABELS, STATUS_ORDER, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
 import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,6 +53,9 @@ interface Order {
   received_by_name?: string | null;
   warranty_days?: number | null;
   delivered_at?: string | null;
+  quote_response?: QuoteResponse | null;
+  quote_response_note?: string | null;
+  quote_responded_at?: string | null;
 }
 interface CargoAdicional { motivo: string; monto: number; }
 interface History { id: string; status: string; note: string | null; created_at: string; is_internal?: boolean; image_urls?: string[] | null; }
@@ -631,6 +634,21 @@ export default function OrderDetail() {
               <p className="text-sm text-muted-foreground">
                 Cuando el cliente traiga el equipo, convertilo en orden real para cargar accesorios, seguridad, garantía, seña y firma.
               </p>
+              {order.quote_response && (
+                <div className="mt-2 space-y-1">
+                  <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", quoteResponseBadgeClasses(order.quote_response))}>
+                    {QUOTE_RESPONSE_LABELS[order.quote_response]}
+                  </span>
+                  {order.quote_responded_at && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      hace {formatDistanceToNow(new Date(order.quote_responded_at), { locale: es })}
+                    </span>
+                  )}
+                  {order.quote_response_note && (
+                    <p className="text-sm text-muted-foreground">"{order.quote_response_note}"</p>
+                  )}
+                </div>
+              )}
             </div>
             <Button onClick={() => setConvertOpen(true)} className="shrink-0 gap-2">
               Convertir a orden

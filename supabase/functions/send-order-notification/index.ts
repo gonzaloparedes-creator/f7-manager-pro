@@ -26,9 +26,12 @@ Deno.serve(async (req) => {
       order_number,
       order_code,
       app_origin,
+      kind, // "order" (default) | "quote" — un Presupuesto todavía no tiene el equipo recibido
+      quote_amount,
     } = body ?? {};
 
     const code = order_code ?? order_number;
+    const isQuote = kind === "quote";
 
     if (!customer_name || !customer_phone || !device_type || !order_number || !code) {
       return json({ error: "Campos requeridos faltantes" }, 400);
@@ -58,13 +61,16 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const tracking_url = `${app_origin ?? ""}/tracking/${code}`;
-    const message_template =
-      `¡Hola ${customer_name}! Recibimos tu ${device_type} en F7 Manager Pro. ` +
-      `Tu número de orden es *${order_number}*. ` +
-      `Seguí el estado de tu reparación aquí: ${tracking_url} 🔧`;
+    const message_template = isQuote
+      ? `¡Hola ${customer_name}! Te dejamos el presupuesto para tu ${device_type}: ` +
+        `*Gs. ${Number(quote_amount ?? 0).toLocaleString("es-PY")}*. ` +
+        `Podés ver el detalle y responder (aceptar, rechazar o pedir cambios) acá: ${tracking_url} 🔧`
+      : `¡Hola ${customer_name}! Recibimos tu ${device_type} en F7 Manager Pro. ` +
+        `Tu número de orden es *${order_number}*. ` +
+        `Seguí el estado de tu reparación aquí: ${tracking_url} 🔧`;
 
     const payload = {
-      event: "new_order",
+      event: isQuote ? "new_quote" : "new_order",
       technician_id: user.id,
       evolutionInstance: profile?.evolution_instance_name ?? null,
       customer_name,

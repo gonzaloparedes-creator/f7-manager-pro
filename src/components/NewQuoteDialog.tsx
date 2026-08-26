@@ -168,6 +168,25 @@ export default function NewQuoteDialog({
         order_id: created.id, status: "presupuesto", note: "Presupuesto creado",
       });
 
+      try {
+        // order_code va con el tracking_token (uuid), nunca el order_number:
+        // es el único link desde el que el cliente puede aceptar/rechazar/
+        // pedir cambios (ver respond-to-quote), y ese código corto es
+        // adivinable/enumerable.
+        await supabase.functions.invoke("send-order-notification", {
+          body: {
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            device_type: deviceType,
+            order_number,
+            order_code: created.tracking_token,
+            kind: "quote",
+            quote_amount: parseAmount(quoteAmount),
+            app_origin: window.location.origin,
+          },
+        });
+      } catch (e) { console.warn("notification failed", e); }
+
       toast({ title: "¡Presupuesto creado!", description: `${order_number} fue registrado.` });
       reset();
       onOpenChange(false);
