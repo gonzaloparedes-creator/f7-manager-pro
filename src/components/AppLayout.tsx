@@ -53,15 +53,6 @@ export default function AppLayout() {
     () => nav.filter((i) => i.to !== "/configuracion" && i.to !== "/superadmin"),
     [nav]
   );
-  // El FAB central flota "absolute" sobre la barra — con una cantidad impar
-  // de items (el caso más común: 5) el 50% del ancho cae exacto sobre el
-  // item del medio si todos son flex-1 parejos, tapando su ícono. En vez de
-  // desparejar el ancho de los items para "hacerle lugar", se calcula el
-  // borde real entre el grupo de la izquierda y el de la derecha y el FAB
-  // se ubica ahí (50% cuando hay una cantidad par, corrido cuando es impar)
-  // — todos los items quedan con el mismo ancho y el FAB nunca los tapa.
-  const mobileNavFabPosition = (Math.ceil(mobileNav.length / 2) / mobileNav.length) * 100;
-
   useEffect(() => {
     if (!loading && !user) navigate("/login", { replace: true });
   }, [loading, user, navigate]);
@@ -221,8 +212,8 @@ export default function AppLayout() {
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex border-t bg-card md:hidden">
         {mobileNav.map((item) => renderNavItem(item, true))}
-        <QuickActionsFab leftPercent={mobileNavFabPosition} />
       </nav>
+      <QuickActionsFab />
     </div>
   );
 }

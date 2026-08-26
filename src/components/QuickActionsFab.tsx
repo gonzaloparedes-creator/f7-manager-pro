@@ -4,14 +4,15 @@ import { Plus, ClipboardList, ShoppingCart, FileText, Layers } from "lucide-reac
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { usePlan } from "@/hooks/usePlan";
 
-// Botón central flotante en la barra inferior mobile, accesible desde
-// cualquier pantalla — antes "Nueva Orden" solo vivía arriba de la página
-// de Órdenes, así que si estabas en Clientes o Inventario había que volver
-// y scrollear. Se posiciona relativo al <nav>, no como un ítem más del flex,
-// porque la cantidad de tabs varía según plan/rol — leftPercent lo ubica
-// exacto en el borde entre dos tabs (no siempre el 50% del todo, con una
-// cantidad impar de tabs) para que nunca quede tapando el ícono de ninguno.
-export default function QuickActionsFab({ leftPercent = 50 }: { leftPercent?: number }) {
+// Botón flotante accesible desde cualquier pantalla mobile — antes "Nueva
+// Orden" solo vivía arriba de la página de Órdenes, así que si estabas en
+// Clientes o Inventario había que volver y scrollear. Vive en la esquina
+// inferior derecha (zona natural del pulgar a una mano) y por encima de la
+// barra de tabs, no incrustado en ella: centrarlo en la barra requería
+// correrlo del 50% real según la cantidad de tabs (impar vs. par) para no
+// tapar ningún ícono, y quedaba visualmente descentrado. Al vivir aparte,
+// la barra queda simétrica y el botón ya no depende de cuántos tabs haya.
+export default function QuickActionsFab() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { isBusiness, isRetail } = usePlan();
@@ -61,8 +62,7 @@ export default function QuickActionsFab({ leftPercent = 50 }: { leftPercent?: nu
         type="button"
         onClick={handleTap}
         aria-label="Acciones rápidas"
-        style={{ left: `${leftPercent}%` }}
-        className="absolute -top-5 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated ring-4 ring-background transition-transform active:scale-95"
+        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated ring-4 ring-background transition-transform active:scale-95 md:hidden"
       >
         <Plus className="h-6 w-6" />
       </button>
