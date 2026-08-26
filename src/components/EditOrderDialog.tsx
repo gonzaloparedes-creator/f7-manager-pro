@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { PROBLEM_OPTIONS, formatPYG } from "@/lib/orders";
+import { formatPYG } from "@/lib/orders";
 import WarrantySelector from "@/components/WarrantySelector";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
+import { useProblemPresets } from "@/hooks/useProblemPresets";
 
 interface CargoAdicional { motivo: string; monto: number }
 
@@ -72,6 +73,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
   const { toast } = useToast();
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
+  const { presets: problemPresets } = useProblemPresets();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [deliveryDateOpen, setDeliveryDateOpen] = useState(false);
@@ -217,7 +219,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
               <div className="space-y-2">
                 <Label>Problemas detectados *</Label>
                 <div className="flex flex-wrap gap-2">
-                  {PROBLEM_OPTIONS.map((p) => {
+                  {problemPresets.map(({ label: p }) => {
                     const active = form.problems.includes(p);
                     return (
                       <button key={p} type="button" onClick={() => toggleProblem(p)}

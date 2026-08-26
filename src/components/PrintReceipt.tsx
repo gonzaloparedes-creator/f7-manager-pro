@@ -25,11 +25,13 @@ interface PrintOrder {
   accessories?: string[] | null;
   checklist?: { label: string; status: "ok" | "fail" }[] | null;
   received_by_name?: string | null;
+  warranty_days?: number | null;
 }
 
 interface PrintReceiptProps {
   order: PrintOrder;
   businessName?: string | null;
+  serviceTerms?: string;
 }
 
 function PatternPreview({ pattern }: { pattern: number[] | null }) {
@@ -199,7 +201,7 @@ function InfoGrid({ order }: { order: PrintOrder }) {
   );
 }
 
-export function PrintReceipt({ order, businessName }: PrintReceiptProps) {
+export function PrintReceipt({ order, businessName, serviceTerms }: PrintReceiptProps) {
   const shopName = businessName?.trim() || "F7 Manager Pro";
   const trackingUrl = `${window.location.origin}/tracking/${order.tracking_token || order.order_number}`;
 
@@ -278,7 +280,7 @@ export function PrintReceipt({ order, businessName }: PrintReceiptProps) {
         <div className="mt-2 border-t border-black/30 pt-1">
           <div className="text-[10px] font-semibold">Términos y condiciones</div>
           <div className="mt-0.5 whitespace-pre-wrap text-[8px] leading-tight text-black/80">
-            {DEFAULT_SERVICE_TERMS}
+            {serviceTerms ?? DEFAULT_SERVICE_TERMS}
           </div>
         </div>
       </section>

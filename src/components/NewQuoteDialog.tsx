@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { PROBLEM_OPTIONS } from "@/lib/orders";
+import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -28,6 +28,7 @@ export default function NewQuoteDialog({
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const { presets: problemPresets } = useProblemPresets();
   const [loading, setLoading] = useState(false);
 
   const [customerName, setCustomerName] = useState("");
@@ -332,7 +333,7 @@ export default function NewQuoteDialog({
           <div className="space-y-2">
             <Label>Problemas a cotizar</Label>
             <div className="flex flex-wrap gap-2">
-              {PROBLEM_OPTIONS.map((p) => {
+              {problemPresets.map(({ label: p }) => {
                 const active = problems.includes(p);
                 return (
                   <button

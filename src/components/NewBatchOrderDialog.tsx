@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { PROBLEM_OPTIONS } from "@/lib/orders";
+import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -40,6 +40,7 @@ export default function NewBatchOrderDialog({
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const { presets: problemPresets } = useProblemPresets();
   const [loading, setLoading] = useState(false);
 
   // Cada equipo del lote es una orden independiente creada en secuencia;
@@ -414,7 +415,7 @@ export default function NewBatchOrderDialog({
                 <div className="space-y-1.5">
                   <Label className="text-xs">Problemas</Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {PROBLEM_OPTIONS.map((p) => {
+                    {problemPresets.map(({ label: p }) => {
                       const active = row.problems.includes(p);
                       return (
                         <button

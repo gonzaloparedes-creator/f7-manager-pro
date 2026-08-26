@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, DEFAULT_SERVICE_TERMS } from "@/lib/orders";
+import { formatPYG, renderServiceTerms } from "@/lib/orders";
 import { Type, Grid3x3, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
@@ -16,6 +16,7 @@ import { SignaturePad } from "@/components/SignaturePad";
 import WarrantySelector from "@/components/WarrantySelector";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
+import { useServiceTerms } from "@/hooks/useServiceTerms";
 
 type QuoteOrder = {
   id: string;
@@ -38,6 +39,7 @@ export default function ConvertQuoteDialog({
   const { toast } = useToast();
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
+  const { template: serviceTermsTemplate } = useServiceTerms();
   const [loading, setLoading] = useState(false);
 
   const [lockInputMode, setLockInputMode] = useState<"text" | "pattern">("text");
@@ -291,7 +293,7 @@ export default function ConvertQuoteDialog({
 
           <div className="space-y-2">
             <Label>Términos del servicio</Label>
-            <Textarea readOnly rows={6} value={DEFAULT_SERVICE_TERMS} className="resize-none bg-muted/30 font-mono text-xs leading-relaxed" />
+            <Textarea readOnly rows={6} value={renderServiceTerms(serviceTermsTemplate, warrantyDays)} className="resize-none bg-muted/30 font-mono text-xs leading-relaxed" />
           </div>
           <div className="flex items-start gap-2">
             <Checkbox id="convert_terms" checked={termsAccepted} onCheckedChange={(c) => setTermsAccepted(c === true)} />

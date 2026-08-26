@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
-import { STATUS_LABELS, STATUS_ORDER, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
+import { STATUS_LABELS, STATUS_ORDER, formatPYG, renderServiceTerms, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
+import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
@@ -70,6 +71,7 @@ export default function OrderDetail() {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { isStarter, limits } = usePlan();
+  const { template: serviceTermsTemplate } = useServiceTerms();
   const photoLimit = limits.photos;
   const { isAdmin } = useUserRole();
   const [editingFinance, setEditingFinance] = useState(false);
@@ -1384,7 +1386,7 @@ export default function OrderDetail() {
         onConfirm={() => pendingDeleteNote && deleteTechNote(pendingDeleteNote.id)}
       />
 
-      <PrintReceipt order={order} businessName={businessName} />
+      <PrintReceipt order={order} businessName={businessName} serviceTerms={renderServiceTerms(serviceTermsTemplate, order.warranty_days)} />
     </div>
   );
 }

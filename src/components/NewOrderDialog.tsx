@@ -6,6 +6,8 @@ import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
+import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { supabase } from "@/integrations/supabase/client";
 import imageCompression from "browser-image-compression";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { PROBLEM_OPTIONS, formatPYG, DEFAULT_SERVICE_TERMS } from "@/lib/orders";
+import { formatPYG, renderServiceTerms } from "@/lib/orders";
 import WarrantySelector from "@/components/WarrantySelector";
 import { Upload, X, CalendarIcon, Search, UserPlus, Check, Camera, Type, Grid3x3, Loader2, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -123,6 +125,8 @@ export default function NewOrderDialog({
   const { limits, isStarter } = usePlan();
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
+  const { presets: problemPresets } = useProblemPresets();
+  const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -839,7 +843,7 @@ export default function NewOrderDialog({
             <div className="space-y-2">
               <Label>Problemas detectados *</Label>
               <div className="flex flex-wrap gap-2">
-                {PROBLEM_OPTIONS.map((p) => {
+                {problemPresets.map(({ label: p }) => {
                   const active = form.problems.includes(p);
                   return (
                     <button
@@ -1236,7 +1240,7 @@ export default function NewOrderDialog({
                 id="terms"
                 readOnly
                 rows={8}
-                value={DEFAULT_SERVICE_TERMS}
+                value={renderServiceTerms(serviceTermsTemplate, form.warranty_days)}
                 className="resize-none bg-muted/30 font-mono text-xs leading-relaxed"
               />
             </div>

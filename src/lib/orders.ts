@@ -97,34 +97,18 @@ export function computeWarrantyState(
   return { kind: "expired" };
 }
 
-export const PROBLEM_OPTIONS = [
-  "Display",
-  "Glass",
-  "Batería",
-  "Face ID",
-  "No enciende",
-  "No carga",
-  "Mojado",
-  "Sin señal",
-  "WiFi / Bluetooth",
-  "Cámaras",
-  "Audio",
-  "Tapa",
-  "Watch",
-  "Flex",
-  "Otro",
-] as const;
-
-export type ProblemOption = (typeof PROBLEM_OPTIONS)[number];
-
 export function formatPYG(value: number | null | undefined) {
   const n = Number(value ?? 0);
   return `Gs. ${n.toLocaleString("es-PY")}`;
 }
 
+// {{garantia_dias}} se reemplaza por renderServiceTerms() con la garantía
+// real elegida en cada orden (WarrantySelector) — así, tanto este texto por
+// defecto como cualquier texto personalizado que un admin escriba desde
+// Configuración > Términos quedan sincronizados con la garantía real.
 export const DEFAULT_SERVICE_TERMS = `TÉRMINOS Y CONDICIONES DEL SERVICIO
 
-1. GARANTÍA: Toda reparación cuenta con 30 (treinta) días de garantía sobre el trabajo realizado y los repuestos instalados, contados desde la entrega del equipo. La garantía no cubre golpes, humedad, manipulación por terceros, ni daños posteriores al retiro.
+1. GARANTÍA: Toda reparación cuenta con {{garantia_dias}} de garantía sobre el trabajo realizado y los repuestos instalados, contados desde la entrega del equipo. La garantía no cubre golpes, humedad, manipulación por terceros, ni daños posteriores al retiro.
 
 2. DIAGNÓSTICO: Al ingresar el equipo se realiza un diagnóstico previo. El presupuesto puede ajustarse si al abrir el equipo se detectan daños adicionales no visibles, en cuyo caso se notificará al cliente antes de continuar.
 
@@ -138,3 +122,8 @@ export const DEFAULT_SERVICE_TERMS = `TÉRMINOS Y CONDICIONES DEL SERVICIO
 
 7. ACEPTACIÓN: La firma del presente documento implica la aceptación total de estas condiciones.`;
 
+export function renderServiceTerms(template: string, warrantyDays: number | null | undefined) {
+  const days = Number(warrantyDays ?? 0);
+  const phrase = `${days} ${days === 1 ? "día" : "días"}`;
+  return template.replaceAll("{{garantia_dias}}", phrase);
+}
