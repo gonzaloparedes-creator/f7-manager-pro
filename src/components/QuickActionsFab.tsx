@@ -8,8 +8,10 @@ import { usePlan } from "@/hooks/usePlan";
 // cualquier pantalla — antes "Nueva Orden" solo vivía arriba de la página
 // de Órdenes, así que si estabas en Clientes o Inventario había que volver
 // y scrollear. Se posiciona relativo al <nav>, no como un ítem más del flex,
-// porque la cantidad de tabs varía según plan/rol.
-export default function QuickActionsFab() {
+// porque la cantidad de tabs varía según plan/rol — leftPercent lo ubica
+// exacto en el borde entre dos tabs (no siempre el 50% del todo, con una
+// cantidad impar de tabs) para que nunca quede tapando el ícono de ninguno.
+export default function QuickActionsFab({ leftPercent = 50 }: { leftPercent?: number }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { isBusiness, isRetail } = usePlan();
@@ -59,7 +61,8 @@ export default function QuickActionsFab() {
         type="button"
         onClick={handleTap}
         aria-label="Acciones rápidas"
-        className="absolute -top-5 left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated ring-4 ring-background transition-transform active:scale-95"
+        style={{ left: `${leftPercent}%` }}
+        className="absolute -top-5 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated ring-4 ring-background transition-transform active:scale-95"
       >
         <Plus className="h-6 w-6" />
       </button>
