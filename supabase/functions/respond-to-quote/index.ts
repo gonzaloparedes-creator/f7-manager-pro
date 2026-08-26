@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/cors.ts";
+import { sendWhatsAppText } from "../_shared/evolution.ts";
 
-const WEBHOOK_URL = "https://clienteswebhook.wolclic.com/webhook/nueva-orden-repairdesk";
 const VALID_RESPONSES = ["aceptado", "rechazado", "cambios_solicitados"] as const;
 type QuoteResponse = (typeof VALID_RESPONSES)[number];
 
@@ -101,23 +101,9 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      const payload = {
-        event: "quote_response",
-        evolutionInstance: profile?.evolution_instance_name ?? null,
-        customer_name: order.customer_name,
-        customer_phone: order.customer_phone,
-        device_type: order.device_type,
-        order_number: order.order_number,
-        quote_response: response,
-        quote_response_note: cleanNote,
-        message_template: CLIENT_MESSAGE[response as QuoteResponse](order.customer_name),
-      };
-
-      await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }).catch((e) => console.error("respond-to-quote webhook failed", e));
+      const text = CLIENT_MESSAGE[response as QuoteResponse](order.customer_name);
+      const result = await sendWhatsAppText(profile?.evolution_instance_name, order.customer_phone, text);
+      if (!result.ok) console.error("respond-to-quote: no se pudo enviar el WhatsApp de confirmación", result.error);
     }
 
     return json({ success: true });

@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/cors.ts";
-
-const WEBHOOK_URL = "https://clienteswebhook.wolclic.com/webhook/nueva-orden-repairdesk";
+import { sendWhatsAppText } from "../_shared/evolution.ts";
 
 const STATUS_LABELS: Record<string, string> = {
   recibido: "Recibido",
@@ -79,29 +78,12 @@ Deno.serve(async (req) => {
           `(Orden *${order_number}*) fue actualizado a: *${statusLabel}*. ` +
           `Revisá los detalles aquí: ${tracking_url} 🔧`;
 
-    const payload = {
-      event: "status_update",
-      technician_id: user.id,
-      evolutionInstance: profile?.evolution_instance_name ?? null,
-      customer_name,
-      customer_phone,
-      device_type,
-      order_number,
-      order_code: code,
-      new_status,
-      tracking_url,
-      message_template,
-    };
-
-    const res = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const result = await sendWhatsAppText(profile?.evolution_instance_name, customer_phone, message_template);
 
     await supabase.from("notification_send_log").insert({ user_id: user.id });
 
-    return json({ success: res.ok, status: res.status });
+    if (!result.ok) return json({ error: result.error }, 502);
+    return json({ success: true });
   } catch (e) {
     console.error("send-status-notification error", e);
     return json({ error: (e as Error).message }, 500);
