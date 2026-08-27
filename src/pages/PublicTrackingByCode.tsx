@@ -17,6 +17,7 @@ interface PublicOrder {
   order_number: string;
   device_type: string;
   status: string;
+  status_label?: string | null;
   technician_notes: string | null;
   estimated_delivery_date: string | null;
   created_at: string;
@@ -35,7 +36,7 @@ interface PublicOrder {
   company_name?: string | null;
   company_logo_url?: string | null;
 }
-interface PublicHistory { id: string; status: string; note: string | null; created_at: string; image_urls?: string[] | null; }
+interface PublicHistory { id: string; status: string; status_label?: string | null; note: string | null; created_at: string; image_urls?: string[] | null; }
 interface PublicTechNote { id: string; note: string; created_at: string; }
 
 const ICONS: Record<string, any> = {
@@ -180,10 +181,10 @@ export default function PublicTrackingByCode() {
               <div className="flex-1">
                 <div className="text-xs text-muted-foreground">Estado actual</div>
                 <div className="font-semibold">
-                  {STATUS_LABELS[order.status as OrderStatus] ?? order.status}
+                  {order.status_label ?? STATUS_LABELS[order.status as OrderStatus] ?? order.status}
                 </div>
               </div>
-              <StatusBadge status={order.status} />
+              <StatusBadge status={order.status} label={order.status_label ?? undefined} />
             </div>
 
             {order.estimated_delivery_date && (
@@ -432,9 +433,9 @@ export default function PublicTrackingByCode() {
                     </span>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">
-                        {STATUS_LABELS[h.status as OrderStatus] ?? h.status}
+                        {h.status_label ?? STATUS_LABELS[h.status as OrderStatus] ?? h.status}
                       </span>
-                      <StatusBadge status={h.status} />
+                      <StatusBadge status={h.status} label={h.status_label ?? undefined} />
                     </div>
                     {h.note && <p className="mt-1 text-sm text-muted-foreground">{h.note}</p>}
                     {h.image_urls && h.image_urls.length > 0 && (

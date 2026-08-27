@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { STATUS_LABELS, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
+import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
+import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
@@ -52,15 +53,9 @@ function orderMoney(o: Order) {
   return { total, deposit, saldo, isFullyPaid, hasPartial, hasQuoteOnly };
 }
 
-const FILTERS: { value: "todos" | OrderStatus; label: string }[] = [
+const FIXED_FILTERS: { value: string; label: string }[] = [
   { value: "todos", label: "Activas" },
   { value: "presupuesto", label: "Presupuestos" },
-  { value: "recibido", label: "Recibidas" },
-  { value: "en_diagnostico", label: "Diagnóstico" },
-  { value: "en_reparacion", label: "Reparación" },
-  { value: "listo", label: "Listas" },
-  { value: "garantia", label: "Garantía" },
-  { value: "entregado", label: "Entregadas" },
 ];
 
 export default function Dashboard() {
@@ -69,7 +64,12 @@ export default function Dashboard() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filter, setFilter] = useState<"todos" | OrderStatus>("todos");
+  const [filter, setFilter] = useState<string>("todos");
+  const { presets: statusPresets } = useOrderStatusPresets();
+  const FILTERS = useMemo(
+    () => [...FIXED_FILTERS, ...statusPresets.map((p) => ({ value: p.key, label: p.label }))],
+    [statusPresets]
+  );
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -252,7 +252,7 @@ export default function Dashboard() {
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <Smartphone className="h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground">
-              {filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${STATUS_LABELS[filter as OrderStatus]}.`}
+              {filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${resolveStatusLabel(filter, statusPresets)}.`}
             </p>
             {filter === "todos" && (
               <Button onClick={() => setOpen(true)} variant="outline" className="gap-2">
@@ -284,7 +284,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <StatusBadge status={o.status} />
+                      <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
                       {o.status === "presupuesto" && o.quote_response && (
                         <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
                           {QUOTE_RESPONSE_LABELS[o.quote_response]}
@@ -323,7 +323,7 @@ export default function Dashboard() {
                           Total Pagado: {formatPYG(total)}
                         </Badge>
                       )}
-                      <StatusBadge status={o.status} />
+                      <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
                       {o.status === "presupuesto" && o.quote_response && (
                         <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
                           {QUOTE_RESPONSE_LABELS[o.quote_response]}

@@ -32,6 +32,7 @@ interface PrintReceiptProps {
   order: PrintOrder;
   businessName?: string | null;
   serviceTerms?: string;
+  statusLabel?: string;
 }
 
 function PatternPreview({ pattern }: { pattern: number[] | null }) {
@@ -98,7 +99,7 @@ function HalfHeader({ businessName, copyLabel }: { businessName: string; copyLab
   );
 }
 
-function InfoGrid({ order }: { order: PrintOrder }) {
+function InfoGrid({ order, statusLabel }: { order: PrintOrder; statusLabel?: string }) {
   const balance = Math.max(0, (order.quote_amount ?? 0) - (order.deposit_amount ?? 0));
   return (
     <>
@@ -133,7 +134,7 @@ function InfoGrid({ order }: { order: PrintOrder }) {
         </div>
         <div>
           <div className="text-black/60">Estado</div>
-          <div>{STATUS_LABELS[order.status as OrderStatus] ?? order.status}</div>
+          <div>{statusLabel ?? STATUS_LABELS[order.status as OrderStatus] ?? order.status}</div>
         </div>
         <div>
           <div className="text-black/60">Entrega estimada</div>
@@ -201,7 +202,7 @@ function InfoGrid({ order }: { order: PrintOrder }) {
   );
 }
 
-export function PrintReceipt({ order, businessName, serviceTerms }: PrintReceiptProps) {
+export function PrintReceipt({ order, businessName, serviceTerms, statusLabel }: PrintReceiptProps) {
   const shopName = businessName?.trim() || "F7 Manager Pro";
   const trackingUrl = `${window.location.origin}/tracking/${order.tracking_token || order.order_number}`;
 
@@ -211,7 +212,7 @@ export function PrintReceipt({ order, businessName, serviceTerms }: PrintReceipt
       <section className="print-half">
         <HalfHeader businessName={shopName} copyLabel="Copia Taller" />
         <div className="mt-2 space-y-2">
-          <InfoGrid order={order} />
+          <InfoGrid order={order} statusLabel={statusLabel} />
 
           <div className="grid grid-cols-2 gap-3 border-t border-black/30 pt-2 text-[11px]">
             <div>
@@ -262,7 +263,7 @@ export function PrintReceipt({ order, businessName, serviceTerms }: PrintReceipt
         <HalfHeader businessName={shopName} copyLabel="Copia Cliente" />
         <div className="mt-2 grid grid-cols-[1fr_auto] gap-3">
           <div className="space-y-2">
-            <InfoGrid order={order} />
+            <InfoGrid order={order} statusLabel={statusLabel} />
           </div>
           <div className="flex flex-col items-center justify-start">
             <div className="border border-black/30 bg-white p-1">

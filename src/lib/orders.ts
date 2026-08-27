@@ -26,6 +26,16 @@ export const STATUS_ORDER: OrderStatus[] = [
   "garantia",
 ];
 
+// Resuelve el label a mostrar para un status: el preset configurado por la
+// empresa (ver order_status_presets / useOrderStatusPresets) tiene
+// prioridad; si no hay match (preset borrado, o call site sin presets a
+// mano) cae al label por defecto, y en último caso muestra la key cruda.
+export function resolveStatusLabel(status: string, presets?: { key: string; label: string }[]) {
+  const fromPreset = presets?.find((p) => p.key === status)?.label;
+  if (fromPreset) return fromPreset;
+  return STATUS_LABELS[status as OrderStatus] ?? status;
+}
+
 export function statusBadgeClasses(status: string) {
   switch (status) {
     case "presupuesto":

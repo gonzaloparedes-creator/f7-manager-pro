@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -166,7 +167,7 @@ export default function NewQuoteDialog({
       if (error) throw error;
 
       await supabase.from("order_status_history").insert({
-        order_id: created.id, status: "presupuesto", note: "Presupuesto creado",
+        order_id: created.id, status: "presupuesto", status_label: STATUS_LABELS.presupuesto, note: "Presupuesto creado",
       });
 
       try {

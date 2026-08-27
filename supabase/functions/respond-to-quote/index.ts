@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
     await supabase.from("order_status_history").insert({
       order_id: order.id,
       status: order.status,
+      status_label: "Presupuesto",
       note: historyNote,
       is_internal: false,
     });

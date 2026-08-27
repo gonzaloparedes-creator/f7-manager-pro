@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -197,7 +198,7 @@ export default function NewBatchOrderDialog({
           if (error) throw error;
 
           await supabase.from("order_status_history").insert({
-            order_id: order.id, status: "recibido", note: "Orden creada (Modo Lote)",
+            order_id: order.id, status: "recibido", status_label: STATUS_LABELS.recibido, note: "Orden creada (Modo Lote)",
           });
 
           // No se espera la notificación: con varios equipos, esperar el

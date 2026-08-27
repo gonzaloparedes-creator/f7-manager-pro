@@ -67,8 +67,19 @@ Deno.serve(async (req) => {
       return json({ skipped: true, reason: "notification disabled for status" });
     }
 
+    // El label real puede haber sido renombrado por la empresa en
+    // Configuración > Estados (order_status_presets) — prioridad sobre el
+    // mapa fijo de acá, que queda como fallback (empresas que nunca
+    // entraron a ese tab, o una key que ya no tiene preset).
+    const { data: statusPreset } = await supabase
+      .from("order_status_presets")
+      .select("label")
+      .eq("company_id", ownedOrder.company_id)
+      .eq("key", new_status)
+      .maybeSingle();
+
     const tracking_url = `${app_origin ?? ""}/tracking/${code}`;
-    const statusLabel = STATUS_LABELS[new_status] ?? new_status;
+    const statusLabel = statusPreset?.label ?? STATUS_LABELS[new_status] ?? new_status;
     const message_template =
       new_status === "listo"
         ? `¡Hola ${customer_name}! 🎉 Tu ${device_type} ya está listo para retirar. ` +

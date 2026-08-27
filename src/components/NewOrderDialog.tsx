@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, renderServiceTerms } from "@/lib/orders";
+import { formatPYG, renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
 import WarrantySelector from "@/components/WarrantySelector";
 import { Upload, X, CalendarIcon, Search, UserPlus, Check, Camera, Type, Grid3x3, Loader2, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -496,7 +496,7 @@ export default function NewOrderDialog({
       if (error) throw error;
 
       await supabase.from("order_status_history").insert({
-        order_id: order.id, status: "recibido", note: "Orden creada",
+        order_id: order.id, status: "recibido", status_label: STATUS_LABELS.recibido, note: "Orden creada",
       });
 
       try {

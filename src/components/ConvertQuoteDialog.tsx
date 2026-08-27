@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, renderServiceTerms } from "@/lib/orders";
+import { formatPYG, renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
 import { Type, Grid3x3, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
@@ -94,7 +94,7 @@ export default function ConvertQuoteDialog({
       if (error) throw error;
 
       await supabase.from("order_status_history").insert({
-        order_id: order.id, status: "recibido", note: "Presupuesto convertido a orden — equipo recibido",
+        order_id: order.id, status: "recibido", status_label: STATUS_LABELS.recibido, note: "Presupuesto convertido a orden — equipo recibido",
       });
 
       try {

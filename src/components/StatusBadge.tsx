@@ -1,8 +1,8 @@
 import { STATUS_LABELS, statusBadgeClasses, type OrderStatus } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 
-export function StatusBadge({ status, className }: { status: string; className?: string }) {
-  const label = STATUS_LABELS[status as OrderStatus] ?? status;
+export function StatusBadge({ status, label: labelProp, className }: { status: string; label?: string; className?: string }) {
+  const label = labelProp ?? STATUS_LABELS[status as OrderStatus] ?? status;
   return (
     <span
       className={cn(

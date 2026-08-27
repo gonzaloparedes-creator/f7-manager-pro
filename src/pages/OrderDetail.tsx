@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
-import { STATUS_LABELS, STATUS_ORDER, formatPYG, renderServiceTerms, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
+import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
+import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
@@ -59,7 +60,7 @@ interface Order {
   quote_responded_at?: string | null;
 }
 interface CargoAdicional { motivo: string; monto: number; }
-interface History { id: string; status: string; note: string | null; created_at: string; is_internal?: boolean; image_urls?: string[] | null; }
+interface History { id: string; status: string; status_label?: string | null; note: string | null; created_at: string; is_internal?: boolean; image_urls?: string[] | null; }
 interface TechNote { id: string; note: string; created_at: string; technician_id: string; }
 interface StaffUser { id: string; full_name: string | null }
 interface Branch { id: string; name: string }
@@ -72,6 +73,7 @@ export default function OrderDetail() {
   const { companyId } = useCompany();
   const { isStarter, limits } = usePlan();
   const { template: serviceTermsTemplate } = useServiceTerms();
+  const { presets: statusPresets } = useOrderStatusPresets();
   const photoLimit = limits.photos;
   const { isAdmin } = useUserRole();
   const [editingFinance, setEditingFinance] = useState(false);
@@ -93,11 +95,11 @@ export default function OrderDetail() {
     try {
       const raw = localStorage.getItem(STATUS_DRAFT_KEY);
       if (!raw) return null;
-      return JSON.parse(raw) as { newStatus?: OrderStatus; note?: string; noteVisible?: boolean };
+      return JSON.parse(raw) as { newStatus?: string; note?: string; noteVisible?: boolean };
     } catch { return null; }
   };
   const _statusDraft = loadStatusDraft();
-  const [newStatus, setNewStatus] = useState<OrderStatus>(_statusDraft?.newStatus ?? "recibido");
+  const [newStatus, setNewStatus] = useState<string>(_statusDraft?.newStatus ?? "recibido");
   const [note, setNote] = useState(_statusDraft?.note ?? "");
   const [noteVisible, setNoteVisible] = useState(_statusDraft?.noteVisible ?? true);
   const [updating, setUpdating] = useState(false);
@@ -217,7 +219,7 @@ export default function OrderDetail() {
       };
       setOrder(normalized);
       // Only adopt server status if user has no in-progress draft
-      if (!loadStatusDraft()) setNewStatus(o.status as OrderStatus);
+      if (!loadStatusDraft()) setNewStatus(o.status);
       document.title = `${o.order_number} | F7 Manager Pro`;
     }
     const { data: h } = await supabase
@@ -277,6 +279,7 @@ export default function OrderDetail() {
       await supabase.from("order_status_history").insert({
         order_id: orderId,
         status,
+        status_label: resolveStatusLabel(status, statusPresets),
         note,
         is_internal: true,
         image_urls: [],
@@ -434,7 +437,8 @@ export default function OrderDetail() {
         .eq("id", order.id);
       if (error) throw error;
       await supabase.from("order_status_history").insert({
-        order_id: order.id, status: newStatus, note: note || null, is_internal: !noteVisible,
+        order_id: order.id, status: newStatus, status_label: resolveStatusLabel(newStatus, statusPresets),
+        note: note || null, is_internal: !noteVisible,
         image_urls: imageUrls,
       } as any);
 
@@ -610,7 +614,7 @@ export default function OrderDetail() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={order.status} className="text-sm" />
+          <StatusBadge status={order.status} label={resolveStatusLabel(order.status, statusPresets)} className="text-sm" />
           <WarrantyBadge deliveredAt={order.delivered_at} warrantyDays={order.warranty_days} />
           <Button variant="outline" size="sm" onClick={copyTracking} className="gap-2">
             <Copy className="h-4 w-4" /> Link tracking
@@ -1048,11 +1052,11 @@ export default function OrderDetail() {
               <div className="text-sm font-semibold">Actualizar estado</div>
               <div className="space-y-2">
                 <Label htmlFor="order-new-status">Nuevo estado</Label>
-                <Select value={newStatus} onValueChange={(v) => setNewStatus(v as OrderStatus)}>
+                <Select value={newStatus} onValueChange={(v) => setNewStatus(v)}>
                   <SelectTrigger id="order-new-status"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {STATUS_ORDER.map((s) => (
-                      <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
+                    {statusPresets.map((p) => (
+                      <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1285,7 +1289,7 @@ export default function OrderDetail() {
                   <li key={h.id} className="relative pl-6">
                     <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-primary/20" />
                     <div className="flex items-center gap-2">
-                      <StatusBadge status={h.status} />
+                      <StatusBadge status={h.status} label={h.status_label ?? resolveStatusLabel(h.status, statusPresets)} />
                     </div>
                     {h.note && <p className="mt-1 text-sm text-muted-foreground">{h.note}</p>}
                     {i === 0 && order.received_by_name && (
@@ -1386,7 +1390,7 @@ export default function OrderDetail() {
         onConfirm={() => pendingDeleteNote && deleteTechNote(pendingDeleteNote.id)}
       />
 
-      <PrintReceipt order={order} businessName={businessName} serviceTerms={renderServiceTerms(serviceTermsTemplate, order.warranty_days)} />
+      <PrintReceipt order={order} businessName={businessName} serviceTerms={renderServiceTerms(serviceTermsTemplate, order.warranty_days)} statusLabel={resolveStatusLabel(order.status, statusPresets)} />
     </div>
   );
 }
