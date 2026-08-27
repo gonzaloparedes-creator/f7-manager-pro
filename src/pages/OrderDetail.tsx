@@ -238,10 +238,10 @@ export default function OrderDetail() {
   }, [newStatus, note, noteVisible, STATUS_DRAFT_KEY]);
 
   useEffect(() => {
-    if (!user) return;
-    supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle()
-      .then(({ data }) => setBusinessName(data?.business_name ?? null));
-  }, [user]);
+    if (!companyId) return;
+    supabase.from("companies").select("name").eq("id", companyId).maybeSingle()
+      .then(({ data }) => setBusinessName(data?.name ?? null));
+  }, [companyId]);
 
   // Load staff users (for "Técnico Asignado" dropdown) — scoped to company
   useEffect(() => {
@@ -446,7 +446,7 @@ export default function OrderDetail() {
               customer_phone: order.alternative_phone || order.customer_phone,
               device_type: order.device_type,
               order_number: order.order_number,
-              order_code: order.order_number,
+              order_code: order.tracking_token,
               new_status: newStatus,
               app_origin: window.location.origin,
             },

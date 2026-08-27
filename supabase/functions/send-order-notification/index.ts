@@ -47,6 +47,13 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!ownedOrder) return json({ error: "Orden no encontrada" }, 404);
 
+    const { data: company } = await supabase
+      .from("companies")
+      .select("name")
+      .eq("id", ownedOrder.company_id)
+      .maybeSingle();
+    const businessName = company?.name || "F7 Manager Pro";
+
     // El WhatsApp conectado es un recurso de LA EMPRESA (lo conecta el admin
     // desde Configuración), no de quien crea la orden — si un staff genera
     // la orden, no tiene su propio WhatsApp conectado y antes esto quedaba
@@ -64,7 +71,7 @@ Deno.serve(async (req) => {
       ? `¡Hola ${customer_name}! Te dejamos el presupuesto para tu ${device_type}: ` +
         `*Gs. ${Number(quote_amount ?? 0).toLocaleString("es-PY")}*. ` +
         `Podés ver el detalle y responder (aceptar, rechazar o pedir cambios) acá: ${tracking_url} 🔧`
-      : `¡Hola ${customer_name}! Recibimos tu ${device_type} en F7 Manager Pro. ` +
+      : `¡Hola ${customer_name}! Recibimos tu ${device_type} en ${businessName}. ` +
         `Tu número de orden es *${order_number}*. ` +
         `Seguí el estado de tu reparación aquí: ${tracking_url} 🔧`;
 

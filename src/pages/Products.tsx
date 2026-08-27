@@ -94,10 +94,10 @@ export default function Products() {
   const [printingSale, setPrintingSale] = useState<CompletedCartSale | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle()
-      .then(({ data }) => setBusinessName(data?.business_name ?? null));
-  }, [user]);
+    if (!companyId) return;
+    supabase.from("companies").select("name").eq("id", companyId).maybeSingle()
+      .then(({ data }) => setBusinessName(data?.name ?? null));
+  }, [companyId]);
 
   useEffect(() => {
     try { localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart)); } catch { /* ignore */ }

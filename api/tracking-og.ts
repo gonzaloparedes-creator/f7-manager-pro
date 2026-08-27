@@ -31,9 +31,10 @@ function escapeHtml(s: string) {
     .replace(/'/g, "&#39;");
 }
 
-function renderHtml(title: string, description: string, url: string) {
+function renderHtml(title: string, description: string, url: string, image: string = OG_IMAGE) {
   const t = escapeHtml(title);
   const d = escapeHtml(description);
+  const img = escapeHtml(image);
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -44,12 +45,12 @@ function renderHtml(title: string, description: string, url: string) {
 <meta property="og:type" content="website" />
 <meta property="og:title" content="${t}" />
 <meta property="og:description" content="${d}" />
-<meta property="og:image" content="${OG_IMAGE}" />
+<meta property="og:image" content="${img}" />
 <meta property="og:url" content="${escapeHtml(url)}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${t}" />
 <meta name="twitter:description" content="${d}" />
-<meta name="twitter:image" content="${OG_IMAGE}" />
+<meta name="twitter:image" content="${img}" />
 <meta http-equiv="refresh" content="0; url=${escapeHtml(url)}" />
 </head>
 <body></body>
@@ -88,7 +89,7 @@ export default async function handler(req: any, res: any) {
     const title = `Seguimiento ${info.order_number} · ${info.company_name}`;
     const statusLabel = STATUS_LABELS[info.status] ?? info.status;
     const description = `${info.device_type} — Estado: ${statusLabel}. Consultá el estado de tu equipo en tiempo real.`;
-    res.status(200).send(renderHtml(title, description, url));
+    res.status(200).send(renderHtml(title, description, url, info.company_logo_url || OG_IMAGE));
   } catch {
     res.status(200).send(renderHtml(DEFAULT_TITLE, DEFAULT_DESCRIPTION, url));
   }

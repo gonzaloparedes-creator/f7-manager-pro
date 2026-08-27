@@ -32,6 +32,8 @@ interface PublicOrder {
   quote_response?: QuoteResponse | null;
   quote_response_note?: string | null;
   quote_responded_at?: string | null;
+  company_name?: string | null;
+  company_logo_url?: string | null;
 }
 interface PublicHistory { id: string; status: string; note: string | null; created_at: string; image_urls?: string[] | null; }
 interface PublicTechNote { id: string; note: string; created_at: string; }
@@ -85,9 +87,7 @@ export default function PublicTrackingByCode() {
   };
 
   useEffect(() => {
-    document.title = orderCode
-      ? `Seguimiento ${orderCode} | F7 Manager Pro`
-      : "Seguimiento de reparación | F7 Manager Pro";
+    document.title = "Seguimiento de reparación | F7 Manager Pro";
 
     (async () => {
       if (!orderCode) {
@@ -111,6 +111,7 @@ export default function PublicTrackingByCode() {
             Promise.resolve({ data: [] as PublicTechNote[] }),
           ]);
       const found: any = Array.isArray(o) ? o[0] : null;
+      if (found?.company_name) document.title = `Seguimiento ${found.order_number} | ${found.company_name}`;
       setOrder(found ? { ...found, cargos_adicionales: Array.isArray(found.cargos_adicionales) ? found.cargos_adicionales : [] } : null);
       setHistory((h ?? []) as PublicHistory[]);
       setTechNotes((tn ?? []) as PublicTechNote[]);
@@ -152,10 +153,10 @@ export default function PublicTrackingByCode() {
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 overflow-hidden">
-            <img src={f7Logo} alt="F7 Manager Pro" className="h-full w-full object-contain" />
+            <img src={order.company_logo_url || f7Logo} alt={order.company_name || "F7 Manager Pro"} className="h-full w-full object-contain" />
           </div>
           <div>
-            <div className="font-bold leading-tight">F7 Manager Pro</div>
+            <div className="font-bold leading-tight">{order.company_name || "F7 Manager Pro"}</div>
             <div className="text-xs text-muted-foreground">Seguimiento de reparación</div>
           </div>
         </div>

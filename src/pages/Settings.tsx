@@ -18,7 +18,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText } from "lucide-react";
+import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus } from "lucide-react";
+import imageCompression from "browser-image-compression";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
 import SubscriptionTab from "@/components/SubscriptionTab";
@@ -51,7 +52,7 @@ const STATUS_LABELS: { key: keyof NotifPrefs; label: string }[] = [
 ];
 
 interface Profile {
-  full_name: string | null; business_name: string | null; phone: string | null;
+  full_name: string | null; phone: string | null;
   whatsapp_connected: boolean; whatsapp_phone: string | null;
   notification_preferences: NotifPrefs;
   branch_id: string | null;
@@ -102,7 +103,7 @@ export default function Settings() {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, business_name, phone, whatsapp_connected, whatsapp_phone, notification_preferences, branch_id")
+      .select("full_name, phone, whatsapp_connected, whatsapp_phone, notification_preferences, branch_id")
       .eq("id", user.id).maybeSingle();
     if (data) {
       const prefs = { ...DEFAULT_PREFS, ...((data as any).notification_preferences as Partial<NotifPrefs> ?? {}) };
@@ -132,7 +133,7 @@ export default function Settings() {
     if (!user || !profile) return;
     setSavingProfile(true);
     const { error } = await supabase.from("profiles").update({
-      full_name: profile.full_name, business_name: profile.business_name, phone: profile.phone,
+      full_name: profile.full_name, phone: profile.phone,
     }).eq("id", user.id);
     setSavingProfile(false);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -224,10 +225,6 @@ export default function Settings() {
                   <Input value={profile.full_name ?? ""} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Nombre del taller</Label>
-                  <Input value={profile.business_name ?? ""} onChange={(e) => setProfile({ ...profile, business_name: e.target.value })} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
                   <Label>Teléfono</Label>
                   <Input value={profile.phone ?? ""} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
                 </div>
@@ -235,6 +232,8 @@ export default function Settings() {
               <Button onClick={saveProfile} disabled={savingProfile}>{savingProfile ? "Guardando..." : "Guardar cambios"}</Button>
             </CardContent>
           </Card>
+
+          <BusinessIdentityCard />
 
           <LocationCard />
 
@@ -350,6 +349,103 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/* ---------- Identidad del taller (nombre + logo) ---------- */
+// companies.name es la fuente correcta para lo que el CLIENTE ve (WhatsApp,
+// preview del link, página de seguimiento) — es de toda la empresa, no de
+// un usuario particular. profiles.business_name (usado antes acá) nunca
+// llegó a alimentar esas pantallas, quedaba desincronizado.
+function BusinessIdentityCard() {
+  const { toast } = useToast();
+  const { companyId } = useCompany();
+  const [name, setName] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const load = async () => {
+    if (!companyId) return;
+    const { data } = await supabase.from("companies").select("name, logo_url").eq("id", companyId)
+      .maybeSingle<{ name: string | null; logo_url: string | null }>();
+    if (data) { setName(data.name ?? ""); setLogoUrl(data.logo_url ?? null); }
+  };
+  useEffect(() => { load(); }, [companyId]);
+
+  const saveName = async () => {
+    if (!companyId || !name.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from("companies").update({ name: name.trim() }).eq("id", companyId);
+    setSaving(false);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    toast({ title: "Nombre del taller actualizado" });
+  };
+
+  const uploadLogo = async (file: File) => {
+    if (!companyId) return;
+    setUploading(true);
+    try {
+      const compressed = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true });
+      const path = `${companyId}/${crypto.randomUUID()}-${compressed.name}`;
+      const { error: upErr } = await supabase.storage.from("company-logos").upload(path, compressed, { contentType: compressed.type });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("company-logos").getPublicUrl(path);
+      const { error } = await supabase.from("companies").update({ logo_url: data.publicUrl }).eq("id", companyId);
+      if (error) throw error;
+      setLogoUrl(data.publicUrl);
+      toast({ title: "Logo actualizado" });
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo subir el logo", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-6">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-primary" />
+          <div>
+            <div className="font-semibold">Identidad del taller</div>
+            <div className="text-xs text-muted-foreground">
+              El nombre y el logo que ven tus clientes en el WhatsApp y en el link de seguimiento.
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted/30">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo del taller" className="h-full w-full object-contain" />
+            ) : (
+              <ImagePlus className="h-6 w-6 text-muted-foreground" />
+            )}
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="logo_upload" className="cursor-pointer text-sm font-medium text-primary hover:underline">
+              {uploading ? "Subiendo..." : logoUrl ? "Cambiar logo" : "Subir logo"}
+            </Label>
+            <input
+              id="logo_upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploading}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = ""; }}
+            />
+            <p className="text-xs text-muted-foreground">Si no subís uno, se usa el logo de F7 Manager Pro.</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="company_name">Nombre del taller</Label>
+          <Input id="company_name" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <Button onClick={saveName} disabled={saving || !companyId}>{saving ? "Guardando..." : "Guardar cambios"}</Button>
+      </CardContent>
+    </Card>
   );
 }
 
