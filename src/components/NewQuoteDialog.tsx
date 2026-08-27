@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,12 +31,14 @@ export default function NewQuoteDialog({
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { presets: problemPresets } = useProblemPresets();
+  const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
   const [loading, setLoading] = useState(false);
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCedula, setCustomerCedula] = useState("");
   const [deviceType, setDeviceType] = useState("");
+  const [deviceOtro, setDeviceOtro] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [problemOther, setProblemOther] = useState("");
   const [notes, setNotes] = useState("");
@@ -59,7 +62,7 @@ export default function NewQuoteDialog({
 
   const reset = () => {
     setCustomerName(""); setCustomerPhone(""); setCustomerCedula("");
-    setDeviceType(""); setProblems([]); setProblemOther(""); setNotes(""); setQuoteAmount("");
+    setDeviceType(""); setDeviceOtro(false); setProblems([]); setProblemOther(""); setNotes(""); setQuoteAmount("");
     setSelectedClientId(null); setClientSearch("");
   };
 
@@ -89,6 +92,16 @@ export default function NewQuoteDialog({
 
   const toggleProblem = (p: string) => {
     setProblems((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  };
+
+  const selectDeviceType = (label: string) => {
+    if (label === "Otro") {
+      setDeviceOtro(true);
+      setDeviceType("");
+    } else {
+      setDeviceOtro(false);
+      setDeviceType(label);
+    }
   };
 
   const parseAmount = (s: string) => {
@@ -327,8 +340,37 @@ export default function NewQuoteDialog({
 
           <div className="space-y-2">
             <Label htmlFor="quote_device">Equipo *</Label>
-            <Input id="quote_device" required placeholder="iPhone 13, Apple Watch S8…" value={deviceType}
-              onChange={(e) => setDeviceType(e.target.value)} />
+            {deviceTypeSelectionMode && deviceTypePresets.length > 0 ? (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {deviceTypePresets.map((p) => {
+                    const active = p.label === "Otro" ? deviceOtro : (!deviceOtro && deviceType === p.label);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => selectDeviceType(p.label)}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                          active
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {deviceOtro && (
+                  <Input id="quote_device" placeholder="Especificá el equipo…" value={deviceType}
+                    onChange={(e) => setDeviceType(e.target.value)} />
+                )}
+              </div>
+            ) : (
+              <Input id="quote_device" required placeholder="iPhone 13, Apple Watch S8…" value={deviceType}
+                onChange={(e) => setDeviceType(e.target.value)} />
+            )}
           </div>
 
           <div className="space-y-2">

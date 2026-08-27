@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,11 +18,12 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
-type DeviceRow = { key: string; device_type: string; problems: string[]; problem_other: string; quote_amount: string };
+type DeviceRow = { key: string; device_type: string; device_otro: boolean; problems: string[]; problem_other: string; quote_amount: string };
 
 const newRow = (): DeviceRow => ({
   key: Math.random().toString(36).slice(2),
   device_type: "",
+  device_otro: false,
   problems: [],
   problem_other: "",
   quote_amount: "",
@@ -42,6 +44,7 @@ export default function NewBatchOrderDialog({
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { presets: problemPresets } = useProblemPresets();
+  const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
   const [loading, setLoading] = useState(false);
 
   // Cada equipo del lote es una orden independiente creada en secuencia;
@@ -114,6 +117,13 @@ export default function NewBatchOrderDialog({
     setRows((prev) => prev.map((r) => (r.key === key
       ? { ...r, problems: r.problems.includes(p) ? r.problems.filter((x) => x !== p) : [...r.problems, p] }
       : r)));
+  };
+  const selectRowDeviceType = (key: string, label: string) => {
+    if (label === "Otro") {
+      updateRow(key, { device_otro: true, device_type: "" });
+    } else {
+      updateRow(key, { device_otro: false, device_type: label });
+    }
   };
   const addRow = () => setRows((prev) => [...prev, newRow()]);
   const removeRow = (key: string) => setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== key) : prev));
@@ -394,12 +404,45 @@ export default function NewBatchOrderDialog({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor={`batch_device_${row.key}`} className="text-xs">Equipo *</Label>
-                    <Input
-                      id={`batch_device_${row.key}`}
-                      placeholder="iPhone 13, Apple Watch S8…"
-                      value={row.device_type}
-                      onChange={(e) => updateRow(row.key, { device_type: e.target.value })}
-                    />
+                    {deviceTypeSelectionMode && deviceTypePresets.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap gap-1.5">
+                          {deviceTypePresets.map((p) => {
+                            const active = p.label === "Otro" ? row.device_otro : (!row.device_otro && row.device_type === p.label);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => selectRowDeviceType(row.key, p.label)}
+                                className={cn(
+                                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                  active
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                {p.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {row.device_otro && (
+                          <Input
+                            id={`batch_device_${row.key}`}
+                            placeholder="Especificá el equipo…"
+                            value={row.device_type}
+                            onChange={(e) => updateRow(row.key, { device_type: e.target.value })}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <Input
+                        id={`batch_device_${row.key}`}
+                        placeholder="iPhone 13, Apple Watch S8…"
+                        value={row.device_type}
+                        onChange={(e) => updateRow(row.key, { device_type: e.target.value })}
+                      />
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor={`batch_quote_${row.key}`} className="text-xs">Presupuesto (Gs.)</Label>

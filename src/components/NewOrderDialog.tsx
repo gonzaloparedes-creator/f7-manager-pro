@@ -7,6 +7,7 @@ import { usePlan } from "@/hooks/usePlan";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { supabase } from "@/integrations/supabase/client";
 import imageCompression from "browser-image-compression";
@@ -126,10 +127,12 @@ export default function NewOrderDialog({
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
   const { presets: problemPresets } = useProblemPresets();
+  const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode, loading: deviceTypePresetsLoading } = useDeviceTypePresets();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
+  const [deviceOtro, setDeviceOtro] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraTriggerRef = useRef<HTMLButtonElement>(null);
   // Radix monta el contenido del Dialog un tick después de que `open` pasa a
@@ -310,6 +313,7 @@ export default function NewOrderDialog({
     setClientSearch("");
     setLockInputMode("text");
     setShowSecondaryContact(false);
+    setDeviceOtro(false);
     if (clearDraft) {
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
     }
@@ -350,6 +354,28 @@ export default function NewOrderDialog({
     }));
   };
 
+  // Si había un borrador guardado con un equipo que no matchea ningún preset
+  // (texto libre tipeado antes de activar "modo selección", o un preset que
+  // se borró después), mostramos el campo de texto "Otro" ya con ese valor
+  // en vez de perderlo silenciosamente.
+  useEffect(() => {
+    if (deviceTypePresetsLoading) return;
+    if (form.device_type && !deviceTypePresets.some((p) => p.label === form.device_type)) {
+      setDeviceOtro(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceTypePresetsLoading]);
+
+  const selectDeviceType = (label: string) => {
+    if (label === "Otro") {
+      setDeviceOtro(true);
+      setForm({ ...form, device_type: "" });
+    } else {
+      setDeviceOtro(false);
+      setForm({ ...form, device_type: label });
+    }
+  };
+
   const parseAmount = (s: string) => {
     const digits = s.replace(/\D/g, "");
     return digits ? parseInt(digits, 10) : 0;
@@ -368,6 +394,10 @@ export default function NewOrderDialog({
     e.preventDefault();
     if (!user) return;
 
+    if (!form.device_type.trim()) {
+      toast({ title: "Faltan datos", description: "Indicá el equipo recibido.", variant: "destructive" });
+      return;
+    }
     if (form.problems.length === 0) {
       toast({ title: "Faltan datos", description: "Seleccioná al menos un problema.", variant: "destructive" });
       return;
@@ -830,8 +860,37 @@ export default function NewOrderDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="device_type">Equipo *</Label>
-                <Input id="device_type" required placeholder="iPhone 13, Apple Watch S8…" value={form.device_type}
-                  onChange={(e) => setForm({ ...form, device_type: e.target.value })} />
+                {deviceTypeSelectionMode && deviceTypePresets.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {deviceTypePresets.map((p) => {
+                        const active = p.label === "Otro" ? deviceOtro : (!deviceOtro && form.device_type === p.label);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => selectDeviceType(p.label)}
+                            className={cn(
+                              "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {deviceOtro && (
+                      <Input id="device_type" placeholder="Especificá el equipo…" value={form.device_type}
+                        onChange={(e) => setForm({ ...form, device_type: e.target.value })} />
+                    )}
+                  </div>
+                ) : (
+                  <Input id="device_type" required placeholder="iPhone 13, Apple Watch S8…" value={form.device_type}
+                    onChange={(e) => setForm({ ...form, device_type: e.target.value })} />
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="imei">IMEI / Nº de Serie</Label>
