@@ -21,6 +21,7 @@ import { useServiceTerms } from "@/hooks/useServiceTerms";
 type QuoteOrder = {
   id: string;
   order_number: string;
+  tracking_token: string;
   customer_name: string;
   customer_phone: string;
   secondary_phone?: string | null;
@@ -104,7 +105,7 @@ export default function ConvertQuoteDialog({
             customer_phone: notificationPhone,
             device_type: order.device_type,
             order_number: order.order_number,
-            order_code: order.order_number,
+            order_code: order.tracking_token,
             app_origin: window.location.origin,
           },
         });
