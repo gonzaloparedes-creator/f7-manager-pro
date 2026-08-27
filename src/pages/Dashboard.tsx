@@ -7,11 +7,12 @@ import { useCompany } from "@/hooks/useCompany";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
-import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers } from "lucide-react";
+import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
 import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
@@ -25,7 +26,9 @@ interface Order {
   id: string;
   order_number: string;
   customer_name: string;
+  customer_phone: string | null;
   device_type: string;
+  imei: string | null;
   status: string;
   created_at: string;
   problems: string[] | null;
@@ -77,6 +80,7 @@ export default function Dashboard() {
   const [collectingId, setCollectingId] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
   const [techMap, setTechMap] = useState<Record<string, string>>({});
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,7 +110,7 @@ export default function Dashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, customer_name, device_type, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
+      .select("id, order_number, customer_name, customer_phone, device_type, imei, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false });
     if (error) {
@@ -176,9 +180,23 @@ export default function Dashboard() {
     return { total, pending, ready };
   }, [branchScoped]);
 
-  const filtered = filter === "todos"
+  const filteredByStatus = filter === "todos"
     ? branchScoped.filter((o) => o.status !== "entregado" && o.status !== "presupuesto")
     : branchScoped.filter((o) => o.status === filter);
+
+  const searchQuery = search.trim().toLowerCase();
+  const filtered = searchQuery
+    ? filteredByStatus.filter((o) => {
+        const digits = searchQuery.replace(/\D/g, "");
+        return (
+          o.order_number.toLowerCase().includes(searchQuery) ||
+          o.customer_name.toLowerCase().includes(searchQuery) ||
+          o.device_type.toLowerCase().includes(searchQuery) ||
+          (o.imei ?? "").toLowerCase().includes(searchQuery) ||
+          (!!digits && (o.customer_phone ?? "").includes(digits))
+        );
+      })
+    : filteredByStatus;
 
   return (
     <div className="space-y-6">
@@ -225,6 +243,26 @@ export default function Dashboard() {
         <StatCard icon={CheckCircle2} label="Listas para retirar" value={stats.ready} accent="text-[hsl(var(--status-listo))]" />
       </div>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por cliente, N° de orden, equipo, IMEI o teléfono…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 pr-9"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            aria-label="Limpiar búsqueda"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {FILTERS.map((f) => (
           <button
@@ -252,9 +290,11 @@ export default function Dashboard() {
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <Smartphone className="h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground">
-              {filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${resolveStatusLabel(filter, statusPresets)}.`}
+              {searchQuery
+                ? `Ninguna orden coincide con "${search.trim()}".`
+                : filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${resolveStatusLabel(filter, statusPresets)}.`}
             </p>
-            {filter === "todos" && (
+            {filter === "todos" && !searchQuery && (
               <Button onClick={() => setOpen(true)} variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" /> Crear la primera
               </Button>

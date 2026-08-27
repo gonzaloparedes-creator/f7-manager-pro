@@ -4,6 +4,7 @@ export type OrderStatus =
   | "en_diagnostico"
   | "en_reparacion"
   | "listo"
+  | "enviado"
   | "entregado"
   | "garantia";
 
@@ -13,18 +14,10 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   en_diagnostico: "En diagnóstico",
   en_reparacion: "En reparación",
   listo: "Listo para retirar",
+  enviado: "Enviado",
   entregado: "Entregado",
   garantia: "Garantía",
 };
-
-export const STATUS_ORDER: OrderStatus[] = [
-  "recibido",
-  "en_diagnostico",
-  "en_reparacion",
-  "listo",
-  "entregado",
-  "garantia",
-];
 
 // Resuelve el label a mostrar para un status: el preset configurado por la
 // empresa (ver order_status_presets / useOrderStatusPresets) tiene
@@ -48,6 +41,8 @@ export function statusBadgeClasses(status: string) {
       return "bg-[hsl(var(--status-reparacion-bg))] text-[hsl(var(--status-reparacion))]";
     case "listo":
       return "bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))]";
+    case "enviado":
+      return "bg-[hsl(var(--status-enviado-bg))] text-[hsl(var(--status-enviado))]";
     case "entregado":
       return "bg-[hsl(var(--status-entregado-bg))] text-[hsl(var(--status-entregado))]";
     case "garantia":

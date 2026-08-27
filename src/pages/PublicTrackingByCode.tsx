@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2 } from "lucide-react";
+import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, Truck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2 } from "lucide-react";
 import { STATUS_LABELS, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
 import f7Logo from "@/assets/f7-logo.png";
 import { format } from "date-fns";
@@ -44,6 +44,7 @@ const ICONS: Record<string, any> = {
   en_diagnostico: Stethoscope,
   en_reparacion: Wrench,
   listo: PackageCheck,
+  enviado: Truck,
   entregado: CheckCircle2,
 };
 
@@ -207,7 +208,7 @@ export default function PublicTrackingByCode() {
               <div className="border-t border-border pt-4 space-y-4">
                 {order.problems && order.problems.length > 0 && (
                   <div className="space-y-1.5">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Problemas detectados</div>
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Detalles a la vista</div>
                     <div className="flex flex-wrap gap-1.5">
                       {order.problems.map((p) => (
                         <span key={p} className="rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium border border-primary/20">

@@ -224,12 +224,11 @@ export default function NewQuoteDialog({
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="quote_cedula">DNI / Cédula</Label>
+            <Label htmlFor="quote_cedula">DNI / Cédula / RUC</Label>
             <div className="flex gap-2">
               <Input
                 id="quote_cedula"
-                inputMode="numeric"
-                placeholder="Ingresá la cédula para buscar o crear"
+                placeholder="Ingresá la cédula o RUC para buscar o crear"
                 value={customerCedula}
                 onChange={(e) => setCustomerCedula(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchByCedula(); } }}

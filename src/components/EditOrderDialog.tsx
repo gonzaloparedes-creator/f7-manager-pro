@@ -202,7 +202,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
 
             {/* Equipo */}
             <section className="space-y-3 border-t border-border pt-4">
-              <h3 className="text-sm font-semibold text-foreground">Equipo y problemas</h3>
+              <h3 className="text-sm font-semibold text-foreground">Detalles del equipo</h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="e_device">Equipo *</Label>
@@ -217,7 +217,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
               </div>
 
               <div className="space-y-2">
-                <Label>Problemas detectados *</Label>
+                <Label>Detalles a la vista *</Label>
                 <div className="flex flex-wrap gap-2">
                   {problemPresets.map(({ label: p }) => {
                     const active = form.problems.includes(p);

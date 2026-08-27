@@ -54,6 +54,8 @@
     --status-reparacion-bg: 38 55% 19%;
     --status-listo: 142 70% 68%;
     --status-listo-bg: 142 45% 18%;
+    --status-enviado: 195 90% 72%;
+    --status-enviado-bg: 195 55% 20%;
     --status-entregado: 262 80% 78%;
     --status-entregado-bg: 262 50% 22%;
     --status-garantia: 280 90% 75%;

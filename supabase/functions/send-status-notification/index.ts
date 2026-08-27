@@ -1,12 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/cors.ts";
-import { sendWhatsAppText } from "../_shared/evolution.ts";
+import { sendWhatsAppText, sendWhatsAppMedia } from "../_shared/evolution.ts";
 
 const STATUS_LABELS: Record<string, string> = {
   recibido: "Recibido",
   en_diagnostico: "En diagnóstico",
   en_reparacion: "En reparación",
   listo: "Listo para retirar",
+  enviado: "Enviado",
   entregado: "Entregado",
 };
 
@@ -34,6 +35,7 @@ Deno.serve(async (req) => {
       order_code,
       new_status,
       app_origin,
+      image_urls,
     } = body ?? {};
 
     const code = order_code ?? order_number;
@@ -85,6 +87,10 @@ Deno.serve(async (req) => {
         ? `¡Hola ${customer_name}! 🎉 Tu ${device_type} ya está listo para retirar. ` +
           `Pasá cuando quieras por el local. Ante cualquier consulta no dudes en escribirnos. ` +
           `¡Gracias por confiar en nosotros! ✅`
+        : new_status === "enviado"
+        ? `¡Hola ${customer_name}! 📦 Tu ${device_type} ya fue enviado. ` +
+          `En breve lo vas a estar recibiendo. Ante cualquier consulta no dudes en escribirnos. ` +
+          `¡Gracias por confiar en nosotros! ✅`
         : `¡Hola ${customer_name}! El estado de tu ${device_type} ` +
           `(Orden *${order_number}*) fue actualizado a: *${statusLabel}*. ` +
           `Revisá los detalles aquí: ${tracking_url} 🔧`;
@@ -94,6 +100,19 @@ Deno.serve(async (req) => {
     await supabase.from("notification_send_log").insert({ user_id: user.id });
 
     if (!result.ok) return json({ error: result.error }, 502);
+
+    // "Enviado" es el único estado que además reenvía la evidencia
+    // fotográfica cargada en ese cambio de estado (si el técnico subió
+    // fotos) — best-effort: si alguna imagen falla no se reporta como
+    // error, el aviso de texto ya llegó al cliente.
+    if (new_status === "enviado" && Array.isArray(image_urls) && image_urls.length > 0) {
+      for (const url of image_urls) {
+        if (typeof url !== "string" || !url) continue;
+        const mediaResult = await sendWhatsAppMedia(profile?.evolution_instance_name, customer_phone, url);
+        if (!mediaResult.ok) console.warn("send-status-notification: no se pudo enviar foto", url, mediaResult.error);
+      }
+    }
+
     return json({ success: true });
   } catch (e) {
     console.error("send-status-notification error", e);

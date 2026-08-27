@@ -144,7 +144,7 @@ export default function Clients() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre, teléfono o cédula…"
+              placeholder="Buscar por nombre, teléfono, cédula o RUC…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -203,7 +203,7 @@ export default function Clients() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Teléfono</TableHead>
-                    <TableHead>Cédula</TableHead>
+                    <TableHead>Cédula / RUC</TableHead>
                     <TableHead className="text-center">Órdenes</TableHead>
                     <TableHead className="w-[110px]"></TableHead>
                   </TableRow>
@@ -269,11 +269,10 @@ export default function Clients() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-client-cedula">Cédula de Identidad (opcional)</Label>
+              <Label htmlFor="edit-client-cedula">Cédula de Identidad / RUC (opcional)</Label>
               <Input
                 id="edit-client-cedula"
-                inputMode="numeric"
-                placeholder="1.234.567"
+                placeholder="1.234.567 o RUC"
                 value={editCedula}
                 onChange={(e) => setEditCedula(e.target.value)}
               />
@@ -306,7 +305,7 @@ export default function Clients() {
               )}
               {selectedClient.cedula && (
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Cédula: </span>
+                  <span className="text-muted-foreground">Cédula / RUC: </span>
                   <span className="font-mono font-medium">{selectedClient.cedula}</span>
                 </div>
               )}

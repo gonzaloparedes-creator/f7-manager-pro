@@ -38,11 +38,12 @@ type NotifPrefs = {
   en_diagnostico: boolean;
   en_reparacion: boolean;
   listo: boolean;
+  enviado: boolean;
   entregado: boolean;
 };
 
 const DEFAULT_PREFS: NotifPrefs = {
-  recibido: true, en_diagnostico: false, en_reparacion: false, listo: true, entregado: false,
+  recibido: true, en_diagnostico: false, en_reparacion: false, listo: true, enviado: true, entregado: false,
 };
 
 const STATUS_LABELS: { key: keyof NotifPrefs; label: string }[] = [
@@ -50,6 +51,7 @@ const STATUS_LABELS: { key: keyof NotifPrefs; label: string }[] = [
   { key: "en_diagnostico", label: "En diagnóstico" },
   { key: "en_reparacion", label: "En reparación" },
   { key: "listo", label: "Listo para retirar" },
+  { key: "enviado", label: "Enviado" },
   { key: "entregado", label: "Entregado" },
 ];
 

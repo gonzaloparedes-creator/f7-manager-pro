@@ -64,7 +64,7 @@ export default function ProblemPresetsTab() {
         <div className="flex items-center gap-2">
           <Wrench className="h-5 w-5 text-primary" />
           <div>
-            <div className="font-semibold">Problemas detectados</div>
+            <div className="font-semibold">Detalles a la vista</div>
             <div className="text-xs text-muted-foreground">
               Los chips que el técnico puede marcar al recibir o cotizar un equipo.
             </div>

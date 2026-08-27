@@ -653,12 +653,11 @@ export default function NewOrderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="customer_cedula">DNI / Cédula</Label>
+              <Label htmlFor="customer_cedula">DNI / Cédula / RUC</Label>
               <div className="flex gap-2">
                 <Input
                   id="customer_cedula"
-                  inputMode="numeric"
-                  placeholder="Ingresá la cédula para buscar o crear"
+                  placeholder="Ingresá la cédula o RUC para buscar o crear"
                   value={form.customer_cedula}
                   onChange={(e) => setForm({ ...form, customer_cedula: e.target.value })}
                   onKeyDown={(e) => {
@@ -856,7 +855,7 @@ export default function NewOrderDialog({
             data-section="equipo"
             className="space-y-3 border-t border-border pt-4"
           >
-            <h3 className="text-sm font-semibold text-foreground">Equipo y problemas</h3>
+            <h3 className="text-sm font-semibold text-foreground">Detalles del equipo</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="device_type">Equipo *</Label>
@@ -900,7 +899,7 @@ export default function NewOrderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Problemas detectados *</Label>
+              <Label>Detalles a la vista *</Label>
               <div className="flex flex-wrap gap-2">
                 {problemPresets.map(({ label: p }) => {
                   const active = form.problems.includes(p);

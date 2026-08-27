@@ -389,7 +389,9 @@ export default function OrderDetail() {
     }
     setUpdating(true);
     try {
-      // Upload evidence images first (only relevant for en_reparacion, but support any status)
+      // Se pueden subir fotos de evidencia en cualquier estado (no solo
+      // en_reparacion) — si el estado nuevo es "enviado", además se
+      // reenvían por WhatsApp junto con el aviso (ver send-status-notification).
       let imageUrls: string[] = [];
       if (evidenceFiles.length > 0) {
         setCompressing(true);
@@ -453,6 +455,7 @@ export default function OrderDetail() {
               order_code: order.tracking_token,
               new_status: newStatus,
               app_origin: window.location.origin,
+              image_urls: imageUrls,
             },
           });
         } catch (e) { console.warn(e); }
@@ -764,7 +767,7 @@ export default function OrderDetail() {
           <Card>
             <CardContent className="space-y-4 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <FileText className="h-4 w-4 text-primary" /> Equipo y problemas
+                <FileText className="h-4 w-4 text-primary" /> Detalles del equipo
               </div>
 
               {order.imei && (
@@ -779,7 +782,7 @@ export default function OrderDetail() {
 
               {order.problems && order.problems.length > 0 && (
                 <div className="space-y-1.5">
-                  <div className="text-xs text-muted-foreground">Problemas detectados</div>
+                  <div className="text-xs text-muted-foreground">Detalles a la vista</div>
                   <div className="flex flex-wrap gap-1.5">
                     {order.problems.map((p) => (
                       <span key={p} className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
@@ -1136,64 +1139,62 @@ export default function OrderDetail() {
                 </div>
               )}
 
-              {(newStatus === "en_diagnostico" || newStatus === "en_reparacion" || newStatus === "listo") && (
-                <div className="space-y-3 rounded-md border border-dashed border-border p-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Camera className="h-4 w-4 text-primary" /> Evidencia fotográfica
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Adjuntá fotos del proceso de reparación. {noteVisible ? "Serán visibles para el cliente en el seguimiento." : "Solo serán visibles para el taller."}
-                  </p>
+              <div className="space-y-3 rounded-md border border-dashed border-border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Camera className="h-4 w-4 text-primary" /> Evidencia fotográfica
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Adjuntá fotos del proceso de reparación. {noteVisible ? "Serán visibles para el cliente en el seguimiento." : "Solo serán visibles para el taller."}
+                </p>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-foreground">
-                      Fotos: {evidencePreviews.length}/{photoLimit}
-                      {isStarter && <span className="ml-1 text-secondary">(Límite Starter)</span>}
-                    </span>
-                    {evidencePreviews.length >= photoLimit && (
-                      <span className="text-secondary">Límite alcanzado</span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition hover:bg-accent">
-                      <ImagePlus className="h-4 w-4" /> Galería
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,image/bmp,image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handleEvidenceSelect}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setCameraOpen(true)}
-                      className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition hover:bg-accent"
-                    >
-                      <Camera className="h-4 w-4" /> Cámara
-                    </button>
-                  </div>
-
-                  {evidencePreviews.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                      {evidencePreviews.map((src, i) => (
-                        <div key={i} className="relative aspect-square overflow-hidden rounded-md border border-border">
-                          <img src={src} alt={`Evidencia ${i + 1}`} className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removeEvidence(i)}
-                            className="absolute right-1 top-1 rounded-full bg-background/90 p-1 text-foreground shadow transition hover:bg-destructive hover:text-destructive-foreground"
-                            aria-label="Quitar foto"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-foreground">
+                    Fotos: {evidencePreviews.length}/{photoLimit}
+                    {isStarter && <span className="ml-1 text-secondary">(Límite Starter)</span>}
+                  </span>
+                  {evidencePreviews.length >= photoLimit && (
+                    <span className="text-secondary">Límite alcanzado</span>
                   )}
                 </div>
-              )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition hover:bg-accent">
+                    <ImagePlus className="h-4 w-4" /> Galería
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,image/bmp,image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleEvidenceSelect}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCameraOpen(true)}
+                    className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition hover:bg-accent"
+                  >
+                    <Camera className="h-4 w-4" /> Cámara
+                  </button>
+                </div>
+
+                {evidencePreviews.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {evidencePreviews.map((src, i) => (
+                      <div key={i} className="relative aspect-square overflow-hidden rounded-md border border-border">
+                        <img src={src} alt={`Evidencia ${i + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeEvidence(i)}
+                          className="absolute right-1 top-1 rounded-full bg-background/90 p-1 text-foreground shadow transition hover:bg-destructive hover:text-destructive-foreground"
+                          aria-label="Quitar foto"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <Button onClick={updateStatus} disabled={updating || compressing} className="w-full">
                 {compressing ? "Comprimiendo imágenes..." : updating ? "Actualizando..." : "Guardar cambios"}
