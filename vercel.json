@@ -12,6 +12,16 @@
       "destination": "/api/tracking-og?code=:code"
     },
     {
+      "source": "/tracking/:code",
+      "missing": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode"
+        }
+      ],
+      "destination": "/api/tracking-og?code=:code"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

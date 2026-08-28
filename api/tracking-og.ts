@@ -1,10 +1,19 @@
-// Solo lo ven crawlers de redes sociales (WhatsApp, Facebook, Twitter, etc.),
-// nunca un usuario real — ver el rewrite condicional por User-Agent en
-// vercel.json. Esos bots no ejecutan JavaScript, así que el <meta> estático
-// de index.html (con el título/descripción genéricos de F7 Manager Pro) es
-// lo único que ven cuando alguien comparte un link de seguimiento. Esta
-// función arma en su lugar un preview dinámico ("Seguimiento · {Taller}")
-// consultando datos mínimos y no sensibles vía la RPC get_tracking_og_info.
+// Solo lo ven crawlers, nunca un usuario real — ver el rewrite condicional en
+// vercel.json (dos reglas: lista de bots conocidos por User-Agent, y como red
+// de contención, cualquier request sin el header "sec-fetch-mode" — los
+// navegadores reales siempre lo mandan, los clientes HTTP server-side no).
+// Esa segunda regla existe porque Evolution API arma el preview del link ANTES
+// de mandar el WhatsApp automático: usa Baileys (link-preview-js), que hace un
+// fetch server-side sin User-Agent propio — no matcheaba ninguno de los bots
+// conocidos, así que caía al <meta> estático genérico de index.html y ESE
+// preview (con el logo de F7 Manager Pro, no el del taller) quedaba
+// incrustado para siempre en el mensaje ya enviado. Pegar el link a mano en
+// WhatsApp sí funcionaba porque ahí es la app real la que arma el preview.
+//
+// Esos bots no ejecutan JavaScript, así que el <meta> estático de index.html
+// (genérico) es lo único que verían sin esta función. Acá se arma en su lugar
+// un preview dinámico ("Seguimiento · {Taller}") consultando datos mínimos y
+// no sensibles vía la RPC get_tracking_og_info.
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
