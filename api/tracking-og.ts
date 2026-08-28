@@ -1,14 +1,18 @@
 // Solo lo ven crawlers, nunca un usuario real — ver el rewrite condicional en
-// vercel.json (dos reglas: lista de bots conocidos por User-Agent, y como red
-// de contención, cualquier request sin el header "sec-fetch-mode" — los
-// navegadores reales siempre lo mandan, los clientes HTTP server-side no).
-// Esa segunda regla existe porque Evolution API arma el preview del link ANTES
-// de mandar el WhatsApp automático: usa Baileys (link-preview-js), que hace un
-// fetch server-side sin User-Agent propio — no matcheaba ninguno de los bots
-// conocidos, así que caía al <meta> estático genérico de index.html y ESE
-// preview (con el logo de F7 Manager Pro, no el del taller) quedaba
+// vercel.json (tres reglas: lista de bots conocidos por User-Agent, falta el
+// header "sec-fetch-mode", o ese header viene presente pero con un valor
+// distinto de "navigate"). Esas dos últimas reglas existen porque Evolution
+// API arma el preview del link ANTES de mandar el WhatsApp automático: usa
+// Baileys (link-preview-js), que llama al fetch() nativo de Node — y fetch()
+// SÍ manda sec-fetch-mode, pero "cors", nunca "navigate" (eso lo manda un
+// navegador real recién en una navegación de página completa, no en un
+// fetch() programático). Confirmado inspeccionando en vivo qué le llega a
+// Evolution: sin esta regla, ese fetch no matcheaba ningún bot conocido NI
+// la ausencia del header, caía al <meta> estático genérico de index.html, y
+// ESE preview (con el logo de F7 Manager Pro, no el del taller) quedaba
 // incrustado para siempre en el mensaje ya enviado. Pegar el link a mano en
-// WhatsApp sí funcionaba porque ahí es la app real la que arma el preview.
+// WhatsApp sí funcionaba porque ahí es la app real (navegación real) la que
+// arma el preview.
 //
 // Esos bots no ejecutan JavaScript, así que el <meta> estático de index.html
 // (genérico) es lo único que verían sin esta función. Acá se arma en su lugar

@@ -22,6 +22,17 @@
       "destination": "/api/tracking-og?code=:code"
     },
     {
+      "source": "/tracking/:code",
+      "has": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode",
+          "value": "^(?!navigate$).+$"
+        }
+      ],
+      "destination": "/api/tracking-og?code=:code"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
