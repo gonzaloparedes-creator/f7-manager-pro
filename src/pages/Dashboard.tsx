@@ -30,6 +30,8 @@ interface Order {
   customer_phone: string | null;
   device_type: string;
   imei: string | null;
+  marca: string | null;
+  modelo: string | null;
   status: string;
   created_at: string;
   problems: string[] | null;
@@ -112,7 +114,7 @@ export default function Dashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, customer_name, customer_phone, device_type, imei, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
+      .select("id, order_number, customer_name, customer_phone, device_type, imei, marca, modelo, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false });
     if (error) {
@@ -195,6 +197,8 @@ export default function Dashboard() {
           o.customer_name.toLowerCase().includes(searchQuery) ||
           o.device_type.toLowerCase().includes(searchQuery) ||
           (o.imei ?? "").toLowerCase().includes(searchQuery) ||
+          (o.marca ?? "").toLowerCase().includes(searchQuery) ||
+          (o.modelo ?? "").toLowerCase().includes(searchQuery) ||
           (!!digits && (o.customer_phone ?? "").includes(digits))
         );
       })
@@ -326,7 +330,11 @@ export default function Dashboard() {
                       <div className="truncate text-sm font-semibold">{o.customer_name}</div>
                       <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                         <Smartphone className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{o.device_type} · {o.order_number}</span>
+                        <span className="truncate">
+                          {o.device_type}
+                          {(o.marca || o.modelo) && ` · ${[o.marca, o.modelo].filter(Boolean).join(" ")}`}
+                          {" · "}{o.order_number}
+                        </span>
                       </div>
                       {o.imei && (
                         <div className="truncate font-mono text-[11px] text-muted-foreground">{o.imei}</div>
@@ -391,6 +399,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Smartphone className="h-3.5 w-3.5" />
                       {o.device_type}
+                      {(o.marca || o.modelo) && ` · ${[o.marca, o.modelo].filter(Boolean).join(" ")}`}
                     </div>
                     {o.imei && (
                       <div className="font-mono text-xs text-muted-foreground">{o.imei}</div>

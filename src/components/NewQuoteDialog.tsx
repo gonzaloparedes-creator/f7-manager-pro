@@ -12,6 +12,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
+import { useMarcaPresets } from "@/hooks/useMarcaPresets";
 import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ export default function NewQuoteDialog({
   const { toast } = useToast();
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
+  const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
   const [loading, setLoading] = useState(false);
 
   const [customerName, setCustomerName] = useState("");
@@ -39,6 +41,9 @@ export default function NewQuoteDialog({
   const [customerCedula, setCustomerCedula] = useState("");
   const [deviceType, setDeviceType] = useState("");
   const [deviceOtro, setDeviceOtro] = useState(false);
+  const [marca, setMarca] = useState("");
+  const [marcaOtro, setMarcaOtro] = useState(false);
+  const [modelo, setModelo] = useState("");
   const [problems, setProblems] = useState<string[]>([]);
   const [problemOther, setProblemOther] = useState("");
   const [notes, setNotes] = useState("");
@@ -62,7 +67,8 @@ export default function NewQuoteDialog({
 
   const reset = () => {
     setCustomerName(""); setCustomerPhone(""); setCustomerCedula("");
-    setDeviceType(""); setDeviceOtro(false); setProblems([]); setProblemOther(""); setNotes(""); setQuoteAmount("");
+    setDeviceType(""); setDeviceOtro(false); setMarca(""); setMarcaOtro(false); setModelo("");
+    setProblems([]); setProblemOther(""); setNotes(""); setQuoteAmount("");
     setSelectedClientId(null); setClientSearch("");
   };
 
@@ -101,6 +107,16 @@ export default function NewQuoteDialog({
     } else {
       setDeviceOtro(false);
       setDeviceType(label);
+    }
+  };
+
+  const selectMarca = (label: string) => {
+    if (label === "Otro") {
+      setMarcaOtro(true);
+      setMarca("");
+    } else {
+      setMarcaOtro(false);
+      setMarca(label);
     }
   };
 
@@ -165,6 +181,8 @@ export default function NewQuoteDialog({
           customer_name: customerName,
           customer_phone: customerPhone || "",
           device_type: deviceType,
+          marca: marca || null,
+          modelo: modelo || null,
           problems,
           problem_other: problems.includes("Otro") ? problemOther : null,
           problem_description: notes || "",
@@ -371,6 +389,50 @@ export default function NewQuoteDialog({
                 onChange={(e) => setDeviceType(e.target.value)} />
             )}
           </div>
+
+          {useDeviceClassification && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="quote_marca">Marca</Label>
+                {marcaPresets.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {marcaPresets.map((p) => {
+                        const active = p.label === "Otro" ? marcaOtro : (!marcaOtro && marca === p.label);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => selectMarca(p.label)}
+                            className={cn(
+                              "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {marcaOtro && (
+                      <Input id="quote_marca" placeholder="Especificá la marca…" value={marca}
+                        onChange={(e) => setMarca(e.target.value)} />
+                    )}
+                  </div>
+                ) : (
+                  <Input id="quote_marca" placeholder="Apple, Samsung…" value={marca}
+                    onChange={(e) => setMarca(e.target.value)} />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quote_modelo">Modelo</Label>
+                <Input id="quote_modelo" placeholder="iPhone 13, Galaxy A54…" value={modelo}
+                  onChange={(e) => setModelo(e.target.value)} />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Problemas a cotizar</Label>

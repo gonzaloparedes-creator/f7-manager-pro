@@ -15,7 +15,7 @@ import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABEL
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
-import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks, Paperclip, Loader2 } from "lucide-react";
+import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks, Paperclip, Loader2, Tags } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
@@ -42,7 +42,7 @@ interface Order {
   secondary_contact_name?: string | null;
   device_type: string; problem_description: string; photos: string[]; status: string;
   technician_notes: string | null; tracking_token: string; created_at: string;
-  imei: string | null; problems: string[]; problem_other: string | null;
+  imei: string | null; marca?: string | null; modelo?: string | null; problems: string[]; problem_other: string | null;
   quote_amount: number; deposit_amount: number; estimated_delivery_date: string | null;
   device_pin: string | null; device_pattern: number[] | null; client_signature: string | null;
   cargos_adicionales: CargoAdicional[];
@@ -828,6 +828,16 @@ export default function OrderDetail() {
                   <div>
                     <div className="text-xs text-muted-foreground">IMEI / Nº de Serie</div>
                     <div className="font-mono">{order.imei}</div>
+                  </div>
+                </div>
+              )}
+
+              {(order.marca || order.modelo) && (
+                <div className="flex items-start gap-2 text-sm">
+                  <Tags className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-xs text-muted-foreground">Marca / Modelo</div>
+                    <div className="font-medium">{[order.marca, order.modelo].filter(Boolean).join(" · ")}</div>
                   </div>
                 </div>
               )}

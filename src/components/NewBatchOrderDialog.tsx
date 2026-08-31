@@ -11,6 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
+import { useMarcaPresets } from "@/hooks/useMarcaPresets";
 import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,12 +19,19 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
-type DeviceRow = { key: string; device_type: string; device_otro: boolean; problems: string[]; problem_other: string; quote_amount: string };
+type DeviceRow = {
+  key: string; device_type: string; device_otro: boolean;
+  marca: string; marca_otro: boolean; modelo: string;
+  problems: string[]; problem_other: string; quote_amount: string;
+};
 
 const newRow = (): DeviceRow => ({
   key: Math.random().toString(36).slice(2),
   device_type: "",
   device_otro: false,
+  marca: "",
+  marca_otro: false,
+  modelo: "",
   problems: [],
   problem_other: "",
   quote_amount: "",
@@ -45,6 +53,7 @@ export default function NewBatchOrderDialog({
   const { toast } = useToast();
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
+  const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
   const [loading, setLoading] = useState(false);
 
   // Cada equipo del lote es una orden independiente creada en secuencia;
@@ -125,6 +134,13 @@ export default function NewBatchOrderDialog({
       updateRow(key, { device_otro: false, device_type: label });
     }
   };
+  const selectRowMarca = (key: string, label: string) => {
+    if (label === "Otro") {
+      updateRow(key, { marca_otro: true, marca: "" });
+    } else {
+      updateRow(key, { marca_otro: false, marca: label });
+    }
+  };
   const addRow = () => setRows((prev) => [...prev, newRow()]);
   const removeRow = (key: string) => setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== key) : prev));
 
@@ -194,6 +210,8 @@ export default function NewBatchOrderDialog({
               customer_name: customerName,
               customer_phone: customerPhone || "",
               device_type: row.device_type,
+              marca: row.marca || null,
+              modelo: row.modelo || null,
               problems: row.problems,
               problem_other: row.problems.includes("Otro") ? row.problem_other : null,
               quote_amount: parseAmount(row.quote_amount),
@@ -454,6 +472,62 @@ export default function NewBatchOrderDialog({
                     />
                   </div>
                 </div>
+
+                {useDeviceClassification && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`batch_marca_${row.key}`} className="text-xs">Marca</Label>
+                      {marcaPresets.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {marcaPresets.map((p) => {
+                              const active = p.label === "Otro" ? row.marca_otro : (!row.marca_otro && row.marca === p.label);
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => selectRowMarca(row.key, p.label)}
+                                  className={cn(
+                                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                    active
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border bg-card text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  {p.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {row.marca_otro && (
+                            <Input
+                              id={`batch_marca_${row.key}`}
+                              placeholder="Especificá la marca…"
+                              value={row.marca}
+                              onChange={(e) => updateRow(row.key, { marca: e.target.value })}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <Input
+                          id={`batch_marca_${row.key}`}
+                          placeholder="Apple, Samsung…"
+                          value={row.marca}
+                          onChange={(e) => updateRow(row.key, { marca: e.target.value })}
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`batch_modelo_${row.key}`} className="text-xs">Modelo</Label>
+                      <Input
+                        id={`batch_modelo_${row.key}`}
+                        placeholder="iPhone 13, Galaxy A54…"
+                        value={row.modelo}
+                        onChange={(e) => updateRow(row.key, { modelo: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Problemas</Label>

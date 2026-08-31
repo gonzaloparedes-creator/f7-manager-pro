@@ -153,6 +153,7 @@ export type Database = {
           referral_partner_id: string | null
           service_terms_template: string | null
           updated_at: string
+          use_device_classification: boolean
           use_device_type_presets: boolean
           weekly_repairs_estimate: string | null
         }
@@ -176,6 +177,7 @@ export type Database = {
           referral_partner_id?: string | null
           service_terms_template?: string | null
           updated_at?: string
+          use_device_classification?: boolean
           use_device_type_presets?: boolean
           weekly_repairs_estimate?: string | null
         }
@@ -199,6 +201,7 @@ export type Database = {
           referral_partner_id?: string | null
           service_terms_template?: string | null
           updated_at?: string
+          use_device_classification?: boolean
           use_device_type_presets?: boolean
           weekly_repairs_estimate?: string | null
         }
@@ -379,6 +382,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      marca_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
       }
       notification_send_log: {
         Row: {
@@ -599,6 +623,8 @@ export type Database = {
           has_sim: boolean
           id: string
           imei: string | null
+          marca: string | null
+          modelo: string | null
           order_number: string
           photos: string[]
           problem_description: string | null
@@ -650,6 +676,8 @@ export type Database = {
           has_sim?: boolean
           id?: string
           imei?: string | null
+          marca?: string | null
+          modelo?: string | null
           order_number: string
           photos?: string[]
           problem_description?: string | null
@@ -701,6 +729,8 @@ export type Database = {
           has_sim?: boolean
           id?: string
           imei?: string | null
+          marca?: string | null
+          modelo?: string | null
           order_number?: string
           photos?: string[]
           problem_description?: string | null

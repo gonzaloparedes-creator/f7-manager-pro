@@ -8,6 +8,7 @@ import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
+import { useMarcaPresets } from "@/hooks/useMarcaPresets";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,6 +81,8 @@ type FormState = {
   customer_cedula: string;
   device_type: string;
   imei: string;
+  marca: string;
+  modelo: string;
   assigned_technician_id: string;
   problems: string[];
   problem_other: string;
@@ -105,6 +108,8 @@ const INITIAL_STATE: FormState = {
   customer_cedula: "",
   device_type: "",
   imei: "",
+  marca: "",
+  modelo: "",
   assigned_technician_id: "",
   problems: [],
   problem_other: "",
@@ -132,12 +137,14 @@ export default function NewOrderDialog({
   const { presets: checklistPresets } = useChecklistPresets();
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode, loading: deviceTypePresetsLoading } = useDeviceTypePresets();
+  const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
   const { technicians } = useAssignableTechnicians();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [deviceOtro, setDeviceOtro] = useState(false);
+  const [marcaOtro, setMarcaOtro] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraTriggerRef = useRef<HTMLButtonElement>(null);
   // Radix monta el contenido del Dialog un tick después de que `open` pasa a
@@ -319,6 +326,7 @@ export default function NewOrderDialog({
     setLockInputMode("text");
     setShowSecondaryContact(false);
     setDeviceOtro(false);
+    setMarcaOtro(false);
     if (clearDraft) {
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
     }
@@ -378,6 +386,16 @@ export default function NewOrderDialog({
     } else {
       setDeviceOtro(false);
       setForm({ ...form, device_type: label });
+    }
+  };
+
+  const selectMarca = (label: string) => {
+    if (label === "Otro") {
+      setMarcaOtro(true);
+      setForm({ ...form, marca: "" });
+    } else {
+      setMarcaOtro(false);
+      setForm({ ...form, marca: label });
     }
   };
 
@@ -506,6 +524,8 @@ export default function NewOrderDialog({
           alternative_phone: form.secondary_phone || null, // Guardamos también en alternative para compatibilidad
           device_type: form.device_type,
           imei: form.imei || null,
+          marca: form.marca || null,
+          modelo: form.modelo || null,
           problems: form.problems,
           problem_other: form.problems.includes("Otro") ? form.problem_other : null,
           problem_description: form.problem_description || "",
@@ -902,6 +922,50 @@ export default function NewOrderDialog({
                   onChange={(e) => setForm({ ...form, imei: e.target.value })} />
               </div>
             </div>
+
+            {useDeviceClassification && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="marca">Marca</Label>
+                  {marcaPresets.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {marcaPresets.map((p) => {
+                          const active = p.label === "Otro" ? marcaOtro : (!marcaOtro && form.marca === p.label);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => selectMarca(p.label)}
+                              className={cn(
+                                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                                active
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {marcaOtro && (
+                        <Input id="marca" placeholder="Especificá la marca…" value={form.marca}
+                          onChange={(e) => setForm({ ...form, marca: e.target.value })} />
+                      )}
+                    </div>
+                  ) : (
+                    <Input id="marca" placeholder="Apple, Samsung…" value={form.marca}
+                      onChange={(e) => setForm({ ...form, marca: e.target.value })} />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="modelo">Modelo</Label>
+                  <Input id="modelo" placeholder="iPhone 13, Galaxy A54…" value={form.modelo}
+                    onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="assigned_technician">Técnico asignado</Label>

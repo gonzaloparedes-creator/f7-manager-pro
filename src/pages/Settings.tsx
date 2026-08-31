@@ -28,6 +28,7 @@ import AccessoryPresetsTab from "@/components/AccessoryPresetsTab";
 import ChecklistPresetsTab from "@/components/ChecklistPresetsTab";
 import ProblemPresetsTab from "@/components/ProblemPresetsTab";
 import DeviceTypePresetsTab from "@/components/DeviceTypePresetsTab";
+import MarcaPresetsTab from "@/components/MarcaPresetsTab";
 import ServiceTermsTab from "@/components/ServiceTermsTab";
 import OrderStatusPresetsTab from "@/components/OrderStatusPresetsTab";
 import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
@@ -337,6 +338,7 @@ export default function Settings() {
 
         <TabsContent value="recepcion" className="space-y-6">
           <DeviceTypePresetsTab />
+          <MarcaPresetsTab />
           <ProblemPresetsTab />
           <AccessoryPresetsTab />
           <ChecklistPresetsTab />

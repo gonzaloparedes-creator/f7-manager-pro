@@ -10,7 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { formatPYG } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Wallet, TrendingUp, PackageMinus, TrendingDown, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound } from "lucide-react";
+import { Wallet, TrendingUp, PackageMinus, TrendingDown, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone } from "lucide-react";
 import { usePlan } from "@/hooks/usePlan";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
@@ -30,6 +30,9 @@ interface OrderRow {
   final_payment_date: string | null;
   current_branch_id: string | null;
   assigned_technician_id: string | null;
+  device_type: string | null;
+  marca: string | null;
+  modelo: string | null;
 }
 interface PartRow {
   order_id: string;
@@ -141,6 +144,39 @@ function partsCostInRange(orders: OrderRow[], parts: PartRow[], from: Date | nul
     }
   }
   return total;
+}
+
+/**
+ * Generaliza revenueInRange + partsCostInRange para agrupar por una clave
+ * arbitraria del pedido (device_type, marca o modelo) en vez de sumar todo
+ * junto — misma lógica de reconocimiento contable: la seña cuenta en el
+ * rango de deposit_date, el saldo (+ costo de repuestos de esa orden) en el
+ * de final_payment_date.
+ */
+function revenueByField(
+  orders: OrderRow[], parts: PartRow[], from: Date | null, to: Date | null,
+  getKey: (o: OrderRow) => string | null
+) {
+  const costByOrder = new Map<string, number>();
+  for (const p of parts) {
+    costByOrder.set(p.order_id, (costByOrder.get(p.order_id) ?? 0)
+      + Number(p.historical_cost ?? 0) * Number(p.quantity ?? 0));
+  }
+  const map = new Map<string, { revenue: number; cost: number }>();
+  const bump = (key: string, revenue: number, cost: number) => {
+    const cur = map.get(key) ?? { revenue: 0, cost: 0 };
+    cur.revenue += revenue; cur.cost += cost;
+    map.set(key, cur);
+  };
+  for (const o of orders) {
+    const key = getKey(o)?.trim() || "Sin especificar";
+    const senia = Number(o.senia_amount ?? 0);
+    if (inRange(o.deposit_date, from, to)) bump(key, senia, 0);
+    if (inRange(o.final_payment_date, from, to)) {
+      bump(key, Math.max(0, totalOf(o) - senia), costByOrder.get(o.id) ?? 0);
+    }
+  }
+  return map;
 }
 
 function salesRevenueInRange(sales: SaleRow[], from: Date | null, to: Date | null) {
@@ -285,6 +321,7 @@ export default function Reports() {
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [commissionEnabled, setCommissionEnabled] = useState(false);
+  const [useDeviceClassification, setUseDeviceClassification] = useState(false);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<Timeframe>("este_mes");
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
@@ -306,7 +343,7 @@ export default function Reports() {
       if (hasTaller) {
         const { data: o, error: oErr } = await supabase
           .from("orders")
-          .select("id, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, current_branch_id, assigned_technician_id")
+          .select("id, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, current_branch_id, assigned_technician_id, device_type, marca, modelo")
           .eq("company_id", companyId);
         if (oErr) hadError = true;
         const orderIds = (o ?? []).map((x: any) => x.id);
@@ -334,11 +371,12 @@ export default function Reports() {
 
       const [{ data: profs, error: profsErr }, { data: company, error: companyErr }] = await Promise.all([
         supabase.from("profiles").select("id, full_name, commission_rate").eq("company_id", companyId),
-        supabase.from("companies").select("commission_enabled").eq("id", companyId).maybeSingle(),
+        supabase.from("companies").select("commission_enabled, use_device_classification").eq("id", companyId).maybeSingle(),
       ]);
       if (profsErr || companyErr) hadError = true;
       setStaff((profs ?? []) as unknown as StaffRow[]);
       setCommissionEnabled(!!company?.commission_enabled);
+      setUseDeviceClassification(!!(company as any)?.use_device_classification);
 
       if (hadError) {
         toast({ title: "Error al cargar reportes", description: "Algunos datos no se pudieron cargar. Los números mostrados pueden estar incompletos.", variant: "destructive" });
@@ -368,6 +406,21 @@ export default function Reports() {
     () => hasTienda ? salesByCategory(sales, from, to) : new Map<string, { revenue: number; cost: number }>(),
     [hasTienda, sales, from, to]
   );
+
+  const gananciaPorEquipo = useMemo(
+    () => (hasTaller && useDeviceClassification) ? revenueByField(orders, parts, from, to, (o) => o.device_type) : new Map<string, { revenue: number; cost: number }>(),
+    [hasTaller, useDeviceClassification, orders, parts, from, to]
+  );
+  const gananciaPorMarca = useMemo(
+    () => (hasTaller && useDeviceClassification) ? revenueByField(orders, parts, from, to, (o) => o.marca) : new Map<string, { revenue: number; cost: number }>(),
+    [hasTaller, useDeviceClassification, orders, parts, from, to]
+  );
+  const gananciaPorModeloTop = useMemo(() => {
+    if (!hasTaller || !useDeviceClassification) return new Map<string, { revenue: number; cost: number }>();
+    const full = revenueByField(orders, parts, from, to, (o) => o.modelo);
+    const top = Array.from(full.entries()).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 8);
+    return new Map(top);
+  }, [hasTaller, useDeviceClassification, orders, parts, from, to]);
 
   const branchName = (id: string) => id ? (branches.find((b) => b.id === id)?.name ?? "Sucursal") : "Sin sucursal";
   const branchBreakdown = useMemo(() => {
@@ -576,13 +629,23 @@ export default function Reports() {
         )}
       </div>
 
-      {(categoriaTaller.size > 0 || categoriaTienda.size > 0 || (hasMultipleBranches && branchBreakdown.length > 0) || staffBreakdown.length > 1) && (
+      {(categoriaTaller.size > 0 || categoriaTienda.size > 0 || (hasMultipleBranches && branchBreakdown.length > 0) || staffBreakdown.length > 1
+        || gananciaPorEquipo.size > 0 || gananciaPorMarca.size > 0 || gananciaPorModeloTop.size > 0) && (
         <div className="grid gap-4 md:grid-cols-2">
           {categoriaTaller.size > 0 && (
             <CostByCategoryCard title="Costo de repuestos por categoría" rows={categoriaTaller} />
           )}
           {categoriaTienda.size > 0 && (
             <MarginByCategoryCard title="Ventas por categoría" rows={categoriaTienda} />
+          )}
+          {gananciaPorEquipo.size > 0 && (
+            <MarginByCategoryCard title="Ganancia por tipo de equipo" rows={gananciaPorEquipo} icon={Smartphone} />
+          )}
+          {gananciaPorMarca.size > 0 && (
+            <MarginByCategoryCard title="Ganancia por marca" rows={gananciaPorMarca} icon={Tags} />
+          )}
+          {gananciaPorModeloTop.size > 0 && (
+            <MarginByCategoryCard title="Ganancia por modelo (top 8)" rows={gananciaPorModeloTop} icon={Smartphone} />
           )}
           {hasMultipleBranches && branchBreakdown.length > 0 && (
             <RevenueListCard title="Por sucursal" icon={Building2} rows={branchBreakdown} />
@@ -732,10 +795,10 @@ function CostByCategoryCard({ title, rows }: { title: string; rows: Map<string, 
   );
 }
 
-function MarginByCategoryCard({ title, rows }: { title: string; rows: Map<string, { revenue: number; cost: number }> }) {
+function MarginByCategoryCard({ title, rows, icon = Tags }: { title: string; rows: Map<string, { revenue: number; cost: number }>; icon?: any }) {
   const sorted = Array.from(rows.entries()).sort((a, b) => b[1].revenue - a[1].revenue);
   return (
-    <BreakdownCardShell title={title} icon={Tags}>
+    <BreakdownCardShell title={title} icon={icon}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

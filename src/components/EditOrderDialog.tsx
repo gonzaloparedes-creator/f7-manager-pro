@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { useMarcaPresets } from "@/hooks/useMarcaPresets";
 
 interface CargoAdicional { motivo: string; monto: number }
 
@@ -33,6 +34,8 @@ type FormState = {
   customer_phone: string;
   device_type: string;
   imei: string;
+  marca: string;
+  modelo: string;
   problems: string[];
   problem_other: string;
   problem_description: string;
@@ -49,6 +52,8 @@ const EMPTY: FormState = {
   customer_phone: "",
   device_type: "",
   imei: "",
+  marca: "",
+  modelo: "",
   problems: [],
   problem_other: "",
   problem_description: "",
@@ -74,6 +79,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
   const { presets: problemPresets } = useProblemPresets();
+  const { useDeviceClassification } = useMarcaPresets();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [deliveryDateOpen, setDeliveryDateOpen] = useState(false);
@@ -85,7 +91,7 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
     setFetching(true);
     supabase
       .from("orders")
-      .select("customer_name, customer_phone, device_type, imei, problems, problem_other, problem_description, quote_amount, deposit_amount, estimated_delivery_date, accessories, checklist, cargos_adicionales, warranty_days")
+      .select("customer_name, customer_phone, device_type, imei, marca, modelo, problems, problem_other, problem_description, quote_amount, deposit_amount, estimated_delivery_date, accessories, checklist, cargos_adicionales, warranty_days")
       .eq("id", orderId)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -101,6 +107,8 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
           customer_phone: o.customer_phone ?? "",
           device_type: o.device_type ?? "",
           imei: o.imei ?? "",
+          marca: o.marca ?? "",
+          modelo: o.modelo ?? "",
           problems: o.problems ?? [],
           problem_other: o.problem_other ?? "",
           problem_description: o.problem_description ?? "",
@@ -148,6 +156,8 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
         customer_phone: form.customer_phone,
         device_type: form.device_type,
         imei: form.imei || null,
+        marca: form.marca || null,
+        modelo: form.modelo || null,
         problems: form.problems,
         problem_other: form.problems.includes("Otro") ? form.problem_other : null,
         problem_description: form.problem_description || "",
@@ -215,6 +225,21 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
                     onChange={(e) => setForm({ ...form, imei: e.target.value })} />
                 </div>
               </div>
+
+              {useDeviceClassification && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="e_marca">Marca</Label>
+                    <Input id="e_marca" placeholder="Apple, Samsung…" value={form.marca}
+                      onChange={(e) => setForm({ ...form, marca: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="e_modelo">Modelo</Label>
+                    <Input id="e_modelo" placeholder="iPhone 13, Galaxy A54…" value={form.modelo}
+                      onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Detalles a la vista *</Label>
