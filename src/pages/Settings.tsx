@@ -65,7 +65,7 @@ interface Profile {
 type Branch = { id: string; name: string; address: string | null };
 type UserRow = {
   id: string; full_name: string | null; phone: string | null; branch_id: string | null;
-  role: "admin" | "staff" | null;
+  role: "admin" | "staff" | "recepcion" | null;
   commission_rate: number;
 };
 
@@ -869,7 +869,7 @@ function UsersTab() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
     email: "", password: "", full_name: "", phone: "",
-    role: "staff" as "admin" | "staff",
+    role: "staff" as "admin" | "staff" | "recepcion",
     branch_id: "" as string,
   });
 
@@ -887,7 +887,7 @@ function UsersTab() {
       const { data } = await supabase.from("user_roles").select("user_id, role").in("user_id", userIds);
       roles = data ?? [];
     }
-    const roleMap = new Map<string, "admin" | "staff">();
+    const roleMap = new Map<string, "admin" | "staff" | "recepcion">();
     roles.forEach((r: any) => {
       const cur = roleMap.get(r.user_id);
       if (cur === "admin") return;
@@ -948,7 +948,7 @@ function UsersTab() {
     load();
   };
 
-  const updateUserRole = async (userId: string, newRole: "admin" | "staff") => {
+  const updateUserRole = async (userId: string, newRole: "admin" | "staff" | "recepcion") => {
     // Replace all existing roles with the chosen one
     await supabase.from("user_roles").delete().eq("user_id", userId);
     const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole });
@@ -1020,6 +1020,7 @@ function UsersTab() {
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="staff">Staff</SelectItem>
+                          <SelectItem value="recepcion">Recepción</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1081,6 +1082,7 @@ function UsersTab() {
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="staff">Staff</SelectItem>
+                            <SelectItem value="recepcion">Recepción</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>
@@ -1153,6 +1155,7 @@ function UsersTab() {
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="recepcion">Recepción</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

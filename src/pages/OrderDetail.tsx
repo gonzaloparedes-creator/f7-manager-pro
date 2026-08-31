@@ -14,7 +14,8 @@ import { WarrantyBadge } from "@/components/WarrantyBadge";
 import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
-import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks } from "lucide-react";
+import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
+import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks, Paperclip, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
@@ -45,6 +46,7 @@ interface Order {
   quote_amount: number; deposit_amount: number; estimated_delivery_date: string | null;
   device_pin: string | null; device_pattern: number[] | null; client_signature: string | null;
   cargos_adicionales: CargoAdicional[];
+  financial_documents: FinancialDocument[];
   client_id: string | null;
   customer_cedula?: string | null;
   assigned_technician_id?: string | null;
@@ -60,9 +62,9 @@ interface Order {
   quote_responded_at?: string | null;
 }
 interface CargoAdicional { motivo: string; monto: number; }
+interface FinancialDocument { name: string; url: string; uploaded_at: string; }
 interface History { id: string; status: string; status_label?: string | null; note: string | null; created_at: string; is_internal?: boolean; image_urls?: string[] | null; }
 interface TechNote { id: string; note: string; created_at: string; technician_id: string; }
-interface StaffUser { id: string; full_name: string | null }
 interface Branch { id: string; name: string }
 
 export default function OrderDetail() {
@@ -89,6 +91,9 @@ export default function OrderDetail() {
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
   const [pendingDeleteNote, setPendingDeleteNote] = useState<TechNote | null>(null);
   const [pendingRemoveChargeIdx, setPendingRemoveChargeIdx] = useState<number | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [removingDocIdx, setRemovingDocIdx] = useState<number | null>(null);
+  const [pendingRemoveDocIdx, setPendingRemoveDocIdx] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<"not_found" | "error" | null>(null);
   const STATUS_DRAFT_KEY = `f7_status_update_draft_${id ?? "new"}`;
   const loadStatusDraft = () => {
@@ -114,7 +119,7 @@ export default function OrderDetail() {
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const { technicians } = useAssignableTechnicians();
   const [assigning, setAssigning] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -214,6 +219,9 @@ export default function OrderDetail() {
         cargos_adicionales: Array.isArray((o as any).cargos_adicionales)
           ? ((o as any).cargos_adicionales as CargoAdicional[])
           : [],
+        financial_documents: Array.isArray((o as any).financial_documents)
+          ? ((o as any).financial_documents as FinancialDocument[])
+          : [],
         customer_cedula: cedula,
         received_by_name: receivedByName,
       };
@@ -243,27 +251,6 @@ export default function OrderDetail() {
     if (!companyId) return;
     supabase.from("companies").select("name").eq("id", companyId).maybeSingle()
       .then(({ data }) => setBusinessName(data?.name ?? null));
-  }, [companyId]);
-
-  // Load staff users (for "Técnico Asignado" dropdown) — scoped to company
-  useEffect(() => {
-    if (!companyId) return;
-    const loadStaff = async () => {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .eq("company_id", companyId);
-      const ids = (profs ?? []).map((p: any) => p.id);
-      if (ids.length === 0) { setStaffUsers([]); return; }
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "staff")
-        .in("user_id", ids);
-      const staffIds = new Set((roles ?? []).map((r: any) => r.user_id));
-      setStaffUsers(((profs ?? []) as any[]).filter((p) => staffIds.has(p.id)) as StaffUser[]);
-    };
-    loadStaff();
   }, [companyId]);
 
   // Load all branches (for transfer modal)
@@ -301,7 +288,7 @@ export default function OrderDetail() {
         .eq("id", order.id);
       if (error) throw error;
       const techName = newId
-        ? (staffUsers.find((s) => s.id === newId)?.full_name || "Técnico")
+        ? (technicians.find((s) => s.id === newId)?.full_name || "Técnico")
         : null;
       const noteText = techName
         ? `Asignado a ${techName}`
@@ -525,6 +512,70 @@ export default function OrderDetail() {
     }
   };
 
+  const MAX_FINANCIAL_DOCS = 3;
+  const MAX_FINANCIAL_DOC_MB = 10;
+
+  const uploadFinancialDocuments = async (fileList: FileList | null) => {
+    if (!order || !companyId || !fileList || fileList.length === 0) return;
+    const existing = order.financial_documents ?? [];
+    const incoming = Array.from(fileList);
+    const remaining = MAX_FINANCIAL_DOCS - existing.length;
+    if (remaining <= 0) {
+      toast({ title: `Límite de ${MAX_FINANCIAL_DOCS} documentos alcanzado`, variant: "destructive" });
+      return;
+    }
+    const accepted = incoming.slice(0, remaining);
+    const tooBig = accepted.filter((f) => f.size > MAX_FINANCIAL_DOC_MB * 1024 * 1024);
+    if (tooBig.length > 0) {
+      toast({ title: "Archivo demasiado pesado", description: `Máximo ${MAX_FINANCIAL_DOC_MB}MB por documento.`, variant: "destructive" });
+      return;
+    }
+    setUploadingDoc(true);
+    try {
+      const uploaded: FinancialDocument[] = [];
+      for (const file of accepted) {
+        const path = `${companyId}/${order.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+        const { error: upErr } = await supabase.storage
+          .from("order-documents")
+          .upload(path, file, { contentType: file.type });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("order-documents").getPublicUrl(path);
+        uploaded.push({ name: file.name, url: pub.publicUrl, uploaded_at: new Date().toISOString() });
+      }
+      const updatedDocs = [...existing, ...uploaded];
+      const { error } = await supabase
+        .from("orders")
+        .update({ financial_documents: updatedDocs as any })
+        .eq("id", order.id);
+      if (error) throw error;
+      toast({ title: "Documento adjuntado" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const removeFinancialDocument = async (idx: number) => {
+    if (!order) return;
+    const updated = (order.financial_documents ?? []).filter((_, i) => i !== idx);
+    setRemovingDocIdx(idx);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ financial_documents: updated as any })
+        .eq("id", order.id);
+      if (error) throw error;
+      setPendingRemoveDocIdx(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setRemovingDocIdx(null);
+    }
+  };
+
   const copyTracking = () => {
     if (!order) return;
     const url = `${window.location.origin}/tracking/${order.tracking_token || order.order_number}`;
@@ -676,6 +727,7 @@ export default function OrderDetail() {
             secondary_phone: order.secondary_phone,
             device_type: order.device_type,
             quote_amount: order.quote_amount,
+            assigned_technician_id: order.assigned_technician_id,
           }}
           open={convertOpen}
           onOpenChange={setConvertOpen}
@@ -715,7 +767,7 @@ export default function OrderDetail() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Sin asignar</SelectItem>
-                  {staffUsers.map((s) => (
+                  {technicians.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.full_name || "Técnico sin nombre"}
                     </SelectItem>
@@ -877,7 +929,7 @@ export default function OrderDetail() {
 
           <OrderPartsSection orderId={order.id} branchId={order.current_branch_id ?? null} />
 
-          {(isAdmin || order.quote_amount > 0 || order.deposit_amount > 0 || order.estimated_delivery_date || (order.cargos_adicionales?.length ?? 0) > 0) && (() => {
+          {(isAdmin || order.quote_amount > 0 || order.deposit_amount > 0 || order.estimated_delivery_date || (order.cargos_adicionales?.length ?? 0) > 0 || (order.financial_documents?.length ?? 0) > 0) && (() => {
             const cargos = order.cargos_adicionales ?? [];
             const cargosTotal = cargos.reduce((s, c) => s + Number(c.monto || 0), 0);
             const totalAjustado = Number(order.quote_amount ?? 0) + cargosTotal;
@@ -1019,6 +1071,54 @@ export default function OrderDetail() {
                         </span>
                       </div>
                     )}
+
+                    <div className="space-y-1.5 border-t border-border pt-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Documentos (PDF)</span>
+                        {order.financial_documents.length < MAX_FINANCIAL_DOCS && (
+                          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                            {uploadingDoc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                            Adjuntar PDF
+                            <input
+                              type="file"
+                              accept="application/pdf"
+                              multiple
+                              className="hidden"
+                              disabled={uploadingDoc}
+                              onChange={(e) => { uploadFinancialDocuments(e.target.files); e.target.value = ""; }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                      {order.financial_documents.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">Sin documentos adjuntos.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {order.financial_documents.map((doc, i) => (
+                            <div key={i} className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border p-2 text-sm">
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex min-w-0 items-center gap-1.5 truncate text-primary hover:underline"
+                              >
+                                <FileText className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{doc.name}</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => setPendingRemoveDocIdx(i)}
+                                disabled={removingDocIdx === i}
+                                className="shrink-0 rounded-sm text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40"
+                                aria-label="Eliminar documento"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </CardContent>
@@ -1380,6 +1480,19 @@ export default function OrderDetail() {
         }
         loading={pendingRemoveChargeIdx !== null && removingChargeIdx === pendingRemoveChargeIdx}
         onConfirm={() => pendingRemoveChargeIdx !== null && removeCharge(pendingRemoveChargeIdx)}
+      />
+
+      <ConfirmDialog
+        open={pendingRemoveDocIdx !== null}
+        onOpenChange={(o) => !o && setPendingRemoveDocIdx(null)}
+        title="¿Eliminar documento?"
+        description={
+          pendingRemoveDocIdx !== null && order.financial_documents?.[pendingRemoveDocIdx]
+            ? `Se eliminará "${order.financial_documents[pendingRemoveDocIdx].name}".`
+            : ""
+        }
+        loading={pendingRemoveDocIdx !== null && removingDocIdx === pendingRemoveDocIdx}
+        onConfirm={() => pendingRemoveDocIdx !== null && removeFinancialDocument(pendingRemoveDocIdx)}
       />
 
       <ConfirmDialog

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatPYG, renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
 import { Type, Grid3x3, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
@@ -17,6 +19,7 @@ import WarrantySelector from "@/components/WarrantySelector";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
+import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
 
 type QuoteOrder = {
   id: string;
@@ -27,6 +30,7 @@ type QuoteOrder = {
   secondary_phone?: string | null;
   device_type: string;
   quote_amount: number;
+  assigned_technician_id?: string | null;
 };
 
 // El resto de los datos que Nueva Orden pide (fotos, PIN/patrón, accesorios,
@@ -38,11 +42,14 @@ export default function ConvertQuoteDialog({
   order, open, onOpenChange, onConverted,
 }: { order: QuoteOrder; open: boolean; onOpenChange: (o: boolean) => void; onConverted: () => void }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
   const { template: serviceTermsTemplate } = useServiceTerms();
+  const { technicians } = useAssignableTechnicians();
   const [loading, setLoading] = useState(false);
 
+  const [assignedTechnicianId, setAssignedTechnicianId] = useState(order.assigned_technician_id ?? "");
   const [lockInputMode, setLockInputMode] = useState<"text" | "pattern">("text");
   const [devicePin, setDevicePin] = useState("");
   const [devicePattern, setDevicePattern] = useState<number[]>([]);
@@ -80,6 +87,7 @@ export default function ConvertQuoteDialog({
         .from("orders")
         .update({
           status: "recibido",
+          assigned_technician_id: assignedTechnicianId || user?.id || null,
           device_pin: devicePin || null,
           device_pattern: devicePattern,
           accessories,
@@ -242,6 +250,21 @@ export default function ConvertQuoteDialog({
           <div className="space-y-2">
             <Label>Tiempo de garantía</Label>
             <WarrantySelector value={warrantyDays} onChange={setWarrantyDays} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="convert_technician">Técnico asignado</Label>
+            <Select
+              value={assignedTechnicianId || user?.id || ""}
+              onValueChange={setAssignedTechnicianId}
+            >
+              <SelectTrigger id="convert_technician"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+              <SelectContent>
+                {technicians.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.full_name || "Técnico sin nombre"}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

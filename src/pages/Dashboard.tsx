@@ -12,10 +12,11 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
-import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X } from "lucide-react";
+import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
 import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
+import DeliveryCalendarDialog from "@/components/DeliveryCalendarDialog";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,7 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [collectingId, setCollectingId] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>("all");
@@ -205,7 +207,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Órdenes de reparación</h1>
           <p className="text-sm text-muted-foreground">Gestioná todas tus reparaciones desde un solo lugar.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <Select value={branchFilter} onValueChange={setBranchFilter}>
               <SelectTrigger className="w-[160px] sm:w-[200px]">
@@ -219,10 +221,14 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
           )}
+          <Button variant="outline" onClick={() => setCalendarOpen(true)} className="gap-2">
+            <CalendarDays className="h-4 w-4" /> Calendario
+          </Button>
           {/* En mobile el FAB (nav inferior) ya cubre Nueva Orden/Presupuesto/
               Lote — mostrar estos botones también acá desbordaba el header
               en pantallas chicas. Se muestran recién desde md, que es
-              donde el FAB deja de estar disponible (ver AppLayout). */}
+              donde el FAB deja de estar disponible (ver AppLayout). El
+              calendario no tiene equivalente en el FAB, así que se ve siempre. */}
           <div className="hidden items-center gap-2 md:flex">
             <Button variant="outline" onClick={() => setBatchOpen(true)} className="gap-2">
               <Layers className="h-4 w-4" /> Modo Lote
@@ -322,6 +328,9 @@ export default function Dashboard() {
                         <Smartphone className="h-3 w-3 shrink-0" />
                         <span className="truncate">{o.device_type} · {o.order_number}</span>
                       </div>
+                      {o.imei && (
+                        <div className="truncate font-mono text-[11px] text-muted-foreground">{o.imei}</div>
+                      )}
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
@@ -383,6 +392,9 @@ export default function Dashboard() {
                       <Smartphone className="h-3.5 w-3.5" />
                       {o.device_type}
                     </div>
+                    {o.imei && (
+                      <div className="font-mono text-xs text-muted-foreground">{o.imei}</div>
+                    )}
                   </div>
                   <WarrantyBadge deliveredAt={o.delivered_at} warrantyDays={o.warranty_days} />
                   {o.assigned_technician_id && techMap[o.assigned_technician_id] && (
@@ -445,6 +457,12 @@ export default function Dashboard() {
       <NewOrderDialog open={open} onOpenChange={setOpen} onCreated={load} />
       <NewQuoteDialog open={quoteOpen} onOpenChange={setQuoteOpen} onCreated={load} />
       <NewBatchOrderDialog open={batchOpen} onOpenChange={setBatchOpen} onCreated={load} />
+      <DeliveryCalendarDialog
+        open={calendarOpen}
+        onOpenChange={setCalendarOpen}
+        orders={branchScoped}
+        statusPresets={statusPresets}
+      />
     </div>
   );
 }

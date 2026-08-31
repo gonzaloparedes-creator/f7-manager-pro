@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     const { email, password, full_name, phone, role, branch_id } = body ?? {};
 
     if (!email || !password) return json({ error: "Email y contraseña son obligatorios" }, 400);
-    if (!["admin", "staff"].includes(role)) return json({ error: "Rol inválido" }, 400);
+    if (!["admin", "staff", "recepcion"].includes(role)) return json({ error: "Rol inválido" }, 400);
     if (String(password).length < 6) return json({ error: "La contraseña debe tener al menos 6 caracteres" }, 400);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);

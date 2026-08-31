@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       accessory_presets: {
@@ -170,12 +145,15 @@ export type Database = {
           id: string
           is_active: boolean
           is_paying: boolean
+          logo_url: string | null
           name: string
           order_seq: number
           plan_type: string
           previous_system: string | null
           referral_partner_id: string | null
+          service_terms_template: string | null
           updated_at: string
+          use_device_type_presets: boolean
           weekly_repairs_estimate: string | null
         }
         Insert: {
@@ -190,12 +168,15 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_paying?: boolean
+          logo_url?: string | null
           name: string
           order_seq?: number
           plan_type?: string
           previous_system?: string | null
           referral_partner_id?: string | null
+          service_terms_template?: string | null
           updated_at?: string
+          use_device_type_presets?: boolean
           weekly_repairs_estimate?: string | null
         }
         Update: {
@@ -210,12 +191,15 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_paying?: boolean
+          logo_url?: string | null
           name?: string
           order_seq?: number
           plan_type?: string
           previous_system?: string | null
           referral_partner_id?: string | null
+          service_terms_template?: string | null
           updated_at?: string
+          use_device_type_presets?: boolean
           weekly_repairs_estimate?: string | null
         }
         Relationships: [
@@ -227,6 +211,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      device_type_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
       }
       inventory_categories: {
         Row: {
@@ -470,6 +475,7 @@ export type Database = {
           note: string | null
           order_id: string
           status: string
+          status_label: string | null
         }
         Insert: {
           created_at?: string
@@ -479,6 +485,7 @@ export type Database = {
           note?: string | null
           order_id: string
           status: string
+          status_label?: string | null
         }
         Update: {
           created_at?: string
@@ -488,6 +495,7 @@ export type Database = {
           note?: string | null
           order_id?: string
           status?: string
+          status_label?: string | null
         }
         Relationships: [
           {
@@ -498,6 +506,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      order_status_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_locked: boolean
+          key: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_locked?: boolean
+          key: string
+          label: string
+          sort_order: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_locked?: boolean
+          key?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
       }
       order_technical_notes: {
         Row: {
@@ -554,6 +592,7 @@ export type Database = {
           device_type: string
           estimated_delivery_date: string | null
           final_payment_date: string | null
+          financial_documents: Json
           has_case: boolean
           has_esim: boolean
           has_sd: boolean
@@ -566,6 +605,9 @@ export type Database = {
           problem_other: string | null
           problems: string[]
           quote_amount: number
+          quote_responded_at: string | null
+          quote_response: string | null
+          quote_response_note: string | null
           received_branch_id: string | null
           received_by_id: string | null
           secondary_contact_name: string | null
@@ -601,6 +643,7 @@ export type Database = {
           device_type: string
           estimated_delivery_date?: string | null
           final_payment_date?: string | null
+          financial_documents?: Json
           has_case?: boolean
           has_esim?: boolean
           has_sd?: boolean
@@ -613,6 +656,9 @@ export type Database = {
           problem_other?: string | null
           problems?: string[]
           quote_amount?: number
+          quote_responded_at?: string | null
+          quote_response?: string | null
+          quote_response_note?: string | null
           received_branch_id?: string | null
           received_by_id?: string | null
           secondary_contact_name?: string | null
@@ -648,6 +694,7 @@ export type Database = {
           device_type?: string
           estimated_delivery_date?: string | null
           final_payment_date?: string | null
+          financial_documents?: Json
           has_case?: boolean
           has_esim?: boolean
           has_sd?: boolean
@@ -660,6 +707,9 @@ export type Database = {
           problem_other?: string | null
           problems?: string[]
           quote_amount?: number
+          quote_responded_at?: string | null
+          quote_response?: string | null
+          quote_response_note?: string | null
           received_branch_id?: string | null
           received_by_id?: string | null
           secondary_contact_name?: string | null
@@ -717,6 +767,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      problem_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
       }
       product_sales: {
         Row: {
@@ -944,6 +1015,7 @@ export type Database = {
           image_urls: string[]
           note: string
           status: string
+          status_label: string
         }[]
       }
       get_order_by_code: {
@@ -952,6 +1024,8 @@ export type Database = {
           accessories: string[]
           cargos_adicionales: Json
           checklist: Json
+          company_logo_url: string
+          company_name: string
           created_at: string
           deposit_amount: number
           device_type: string
@@ -962,7 +1036,11 @@ export type Database = {
           problem_other: string
           problems: string[]
           quote_amount: number
+          quote_responded_at: string
+          quote_response: string
+          quote_response_note: string
           status: string
+          status_label: string
           technician_notes: string
           updated_at: string
         }[]
@@ -973,6 +1051,8 @@ export type Database = {
           accessories: string[]
           cargos_adicionales: Json
           checklist: Json
+          company_logo_url: string
+          company_name: string
           created_at: string
           deposit_amount: number
           device_type: string
@@ -983,7 +1063,11 @@ export type Database = {
           problem_other: string
           problems: string[]
           quote_amount: number
+          quote_responded_at: string
+          quote_response: string
+          quote_response_note: string
           status: string
+          status_label: string
           technician_notes: string
           updated_at: string
         }[]
@@ -996,6 +1080,7 @@ export type Database = {
           image_urls: string[]
           note: string
           status: string
+          status_label: string
         }[]
       }
       get_technical_notes_by_code: {
@@ -1017,6 +1102,7 @@ export type Database = {
       get_tracking_og_info: {
         Args: { _code: string }
         Returns: {
+          company_logo_url: string
           company_name: string
           device_type: string
           order_number: string
@@ -1036,7 +1122,7 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "staff" | "superadmin"
+      app_role: "admin" | "staff" | "superadmin" | "recepcion"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1162,12 +1248,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
-      app_role: ["admin", "staff", "superadmin"],
+      app_role: ["admin", "staff", "superadmin", "recepcion"],
     },
   },
 } as const

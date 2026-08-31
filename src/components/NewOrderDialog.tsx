@@ -8,6 +8,7 @@ import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
+import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { supabase } from "@/integrations/supabase/client";
 import imageCompression from "browser-image-compression";
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -78,6 +80,7 @@ type FormState = {
   customer_cedula: string;
   device_type: string;
   imei: string;
+  assigned_technician_id: string;
   problems: string[];
   problem_other: string;
   problem_description: string; // observaciones iniciales
@@ -102,6 +105,7 @@ const INITIAL_STATE: FormState = {
   customer_cedula: "",
   device_type: "",
   imei: "",
+  assigned_technician_id: "",
   problems: [],
   problem_other: "",
   problem_description: "",
@@ -128,6 +132,7 @@ export default function NewOrderDialog({
   const { presets: checklistPresets } = useChecklistPresets();
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode, loading: deviceTypePresetsLoading } = useDeviceTypePresets();
+  const { technicians } = useAssignableTechnicians();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -489,7 +494,7 @@ export default function NewOrderDialog({
         .insert({
           company_id: companyId,
           technician_id: user.id,
-          assigned_technician_id: user.id,
+          assigned_technician_id: form.assigned_technician_id || user.id,
           received_branch_id: branchId,
           current_branch_id: branchId,
           order_number,
@@ -896,6 +901,21 @@ export default function NewOrderDialog({
                 <Input id="imei" placeholder="356938035643809" value={form.imei}
                   onChange={(e) => setForm({ ...form, imei: e.target.value })} />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assigned_technician">Técnico asignado</Label>
+              <Select
+                value={form.assigned_technician_id || user?.id || ""}
+                onValueChange={(v) => setForm({ ...form, assigned_technician_id: v })}
+              >
+                <SelectTrigger id="assigned_technician"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                <SelectContent>
+                  {technicians.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.full_name || "Técnico sin nombre"}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

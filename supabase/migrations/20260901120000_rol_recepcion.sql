@@ -1,0 +1,11 @@
+-- Nuevo rol "recepcion" (además de admin/staff) para empleados que solo
+-- recepcionan equipos y no deben aparecer en los selectores de "Técnico
+-- Asignado". Ninguna policy de RLS depende de has_role(..., 'staff')
+-- específicamente (se confirmó revisando todas las migraciones), así que
+-- recepcion se comporta exactamente igual que staff en todos lados salvo en
+-- la lógica nueva de técnicos asignables (ver useAssignableTechnicians).
+--
+-- Un solo statement en este archivo a propósito: Postgres no permite usar un
+-- valor de enum recién agregado en la misma transacción que lo crea. Mismo
+-- patrón ya usado en este repo para agregar 'superadmin'.
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'recepcion';
