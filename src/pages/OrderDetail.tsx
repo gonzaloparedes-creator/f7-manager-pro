@@ -16,7 +16,7 @@ import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
 import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks, Paperclip, Loader2, Tags } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
 import { format, formatDistanceToNow } from "date-fns";
@@ -534,7 +534,7 @@ export default function OrderDetail() {
     try {
       const uploaded: FinancialDocument[] = [];
       for (const file of accepted) {
-        const path = `${companyId}/${order.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+        const path = `${companyId}/${order.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${sanitizeFilenameForStorage(file.name)}`;
         const { error: upErr } = await supabase.storage
           .from("order-documents")
           .upload(path, file, { contentType: file.type });

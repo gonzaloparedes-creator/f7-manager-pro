@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
 import { Loader2, FolderPlus, Camera, Upload, X } from "lucide-react";
 import { CameraCapture } from "@/components/CameraCapture";
+import { sanitizeFilenameForStorage } from "@/lib/utils";
 
 const CREATE_CATEGORY = "__create_category__";
 const CREATE_SUBCATEGORY = "__create_subcategory__";
@@ -117,7 +118,7 @@ export default function NewProductDialog({
           useWebWorker: true,
         });
         setCompressing(false);
-        const path = `${companyId}/${crypto.randomUUID()}-${compressed.name}`;
+        const path = `${companyId}/${crypto.randomUUID()}-${sanitizeFilenameForStorage(compressed.name)}`;
         const { error: upErr } = await supabase.storage
           .from("inventory-images")
           .upload(path, compressed, { contentType: compressed.type });

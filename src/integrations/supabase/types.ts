@@ -1081,6 +1081,7 @@ export type Database = {
           deposit_amount: number
           device_type: string
           estimated_delivery_date: string
+          financial_documents: Json
           id: string
           imei: string
           marca: string
@@ -1111,6 +1112,7 @@ export type Database = {
           deposit_amount: number
           device_type: string
           estimated_delivery_date: string
+          financial_documents: Json
           id: string
           imei: string
           marca: string

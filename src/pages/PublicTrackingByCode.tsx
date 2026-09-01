@@ -5,13 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, Truck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2, Hash } from "lucide-react";
+import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, Truck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2, Hash, FileText } from "lucide-react";
 import { STATUS_LABELS, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
 import f7Logo from "@/assets/f7-logo.png";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 interface CargoAdicional { motivo: string; monto: number; }
+interface PublicFinancialDocument { name: string; url: string; uploaded_at: string; }
 interface PublicOrder {
   id: string;
   order_number: string;
@@ -38,6 +39,7 @@ interface PublicOrder {
   marca?: string | null;
   modelo?: string | null;
   imei?: string | null;
+  financial_documents?: PublicFinancialDocument[] | null;
 }
 interface PublicHistory { id: string; status: string; status_label?: string | null; note: string | null; created_at: string; image_urls?: string[] | null; }
 interface PublicTechNote { id: string; note: string; created_at: string; }
@@ -117,7 +119,11 @@ export default function PublicTrackingByCode() {
           ]);
       const found: any = Array.isArray(o) ? o[0] : null;
       if (found?.company_name) document.title = `Seguimiento ${found.order_number} | ${found.company_name}`;
-      setOrder(found ? { ...found, cargos_adicionales: Array.isArray(found.cargos_adicionales) ? found.cargos_adicionales : [] } : null);
+      setOrder(found ? {
+        ...found,
+        cargos_adicionales: Array.isArray(found.cargos_adicionales) ? found.cargos_adicionales : [],
+        financial_documents: Array.isArray(found.financial_documents) ? found.financial_documents : [],
+      } : null);
       setHistory((h ?? []) as PublicHistory[]);
       setTechNotes((tn ?? []) as PublicTechNote[]);
       setLoading(false);
@@ -285,47 +291,70 @@ export default function PublicTrackingByCode() {
 
         {(() => {
           const cargos = order.cargos_adicionales ?? [];
+          const documents = order.financial_documents ?? [];
           const quote = Number(order.quote_amount ?? 0);
           const deposit = Number(order.deposit_amount ?? 0);
           const cargosTotal = cargos.reduce((s, c) => s + Number(c.monto || 0), 0);
           const totalAjustado = quote + cargosTotal;
           const saldo = Math.max(0, totalAjustado - deposit);
-          if (quote <= 0 && deposit <= 0 && cargos.length === 0) return null;
+          if (quote <= 0 && deposit <= 0 && cargos.length === 0 && documents.length === 0) return null;
           return (
             <Card>
               <CardContent className="space-y-3 p-6">
                 <h2 className="flex items-center gap-2 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" /> Información financiera
                 </h2>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Presupuesto inicial</span>
-                    <span className="font-medium">{formatPYG(quote)}</span>
+                {(quote > 0 || deposit > 0 || cargos.length > 0) && (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Presupuesto inicial</span>
+                      <span className="font-medium">{formatPYG(quote)}</span>
+                    </div>
+                    {cargos.length > 0 && (
+                      <div className="space-y-1.5 rounded-md border border-dashed border-border p-2">
+                        <div className="text-xs font-medium text-muted-foreground">Cargos adicionales</div>
+                        {cargos.map((c, i) => (
+                          <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">{c.motivo}</span>
+                            <span className="font-medium">{formatPYG(c.monto)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between border-t border-border pt-2">
+                      <span className="text-muted-foreground">Total ajustado</span>
+                      <span className="font-semibold">{formatPYG(totalAjustado)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Seña</span>
+                      <span className="font-medium">- {formatPYG(deposit)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border pt-2">
+                      <span className="text-sm font-semibold">Saldo</span>
+                      <span className="text-base font-bold text-primary">{formatPYG(saldo)}</span>
+                    </div>
                   </div>
-                  {cargos.length > 0 && (
-                    <div className="space-y-1.5 rounded-md border border-dashed border-border p-2">
-                      <div className="text-xs font-medium text-muted-foreground">Cargos adicionales</div>
-                      {cargos.map((c, i) => (
-                        <div key={i} className="flex items-center justify-between gap-2 text-sm">
-                          <span className="truncate">{c.motivo}</span>
-                          <span className="font-medium">{formatPYG(c.monto)}</span>
-                        </div>
+                )}
+
+                {documents.length > 0 && (
+                  <div className="space-y-1.5 border-t border-border pt-3">
+                    <div className="text-xs font-medium text-muted-foreground">Documentos</div>
+                    <div className="space-y-1">
+                      {documents.map((doc, i) => (
+                        <a
+                          key={i}
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 truncate rounded-md border border-dashed border-border p-2 text-sm text-primary hover:underline"
+                        >
+                          <FileText className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{doc.name}</span>
+                        </a>
                       ))}
                     </div>
-                  )}
-                  <div className="flex items-center justify-between border-t border-border pt-2">
-                    <span className="text-muted-foreground">Total ajustado</span>
-                    <span className="font-semibold">{formatPYG(totalAjustado)}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Seña</span>
-                    <span className="font-medium">- {formatPYG(deposit)}</span>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-border pt-2">
-                    <span className="text-sm font-semibold">Saldo</span>
-                    <span className="text-base font-bold text-primary">{formatPYG(saldo)}</span>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           );

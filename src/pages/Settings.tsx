@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompany } from "@/hooks/useCompany";
+import { sanitizeFilenameForStorage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -399,7 +400,7 @@ function BusinessIdentityCard() {
     setUploading(true);
     try {
       const compressed = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true });
-      const path = `${companyId}/${crypto.randomUUID()}-${compressed.name}`;
+      const path = `${companyId}/${crypto.randomUUID()}-${sanitizeFilenameForStorage(compressed.name)}`;
       const { error: upErr } = await supabase.storage.from("company-logos").upload(path, compressed, { contentType: compressed.type });
       if (upErr) throw upErr;
       const { data } = supabase.storage.from("company-logos").getPublicUrl(path);
