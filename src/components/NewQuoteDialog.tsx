@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { useMarcaPresets } from "@/hooks/useMarcaPresets";
+import { useModeloPresets } from "@/hooks/useModeloPresets";
 import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ export default function NewQuoteDialog({
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
   const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
+  const { presets: modeloPresets } = useModeloPresets();
   const [loading, setLoading] = useState(false);
 
   const [customerName, setCustomerName] = useState("");
@@ -44,6 +46,7 @@ export default function NewQuoteDialog({
   const [marca, setMarca] = useState("");
   const [marcaOtro, setMarcaOtro] = useState(false);
   const [modelo, setModelo] = useState("");
+  const [modeloOtro, setModeloOtro] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [problemOther, setProblemOther] = useState("");
   const [notes, setNotes] = useState("");
@@ -67,7 +70,7 @@ export default function NewQuoteDialog({
 
   const reset = () => {
     setCustomerName(""); setCustomerPhone(""); setCustomerCedula("");
-    setDeviceType(""); setDeviceOtro(false); setMarca(""); setMarcaOtro(false); setModelo("");
+    setDeviceType(""); setDeviceOtro(false); setMarca(""); setMarcaOtro(false); setModelo(""); setModeloOtro(false);
     setProblems([]); setProblemOther(""); setNotes(""); setQuoteAmount("");
     setSelectedClientId(null); setClientSearch("");
   };
@@ -117,6 +120,16 @@ export default function NewQuoteDialog({
     } else {
       setMarcaOtro(false);
       setMarca(label);
+    }
+  };
+
+  const selectModelo = (label: string) => {
+    if (label === "Otro") {
+      setModeloOtro(true);
+      setModelo("");
+    } else {
+      setModeloOtro(false);
+      setModelo(label);
     }
   };
 
@@ -428,8 +441,37 @@ export default function NewQuoteDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="quote_modelo">Modelo</Label>
-                <Input id="quote_modelo" placeholder="iPhone 13, Galaxy A54…" value={modelo}
-                  onChange={(e) => setModelo(e.target.value)} />
+                {modeloPresets.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {modeloPresets.map((p) => {
+                        const active = p.label === "Otro" ? modeloOtro : (!modeloOtro && modelo === p.label);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => selectModelo(p.label)}
+                            className={cn(
+                              "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                              active
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {modeloOtro && (
+                      <Input id="quote_modelo" placeholder="Especificá el modelo…" value={modelo}
+                        onChange={(e) => setModelo(e.target.value)} />
+                    )}
+                  </div>
+                ) : (
+                  <Input id="quote_modelo" placeholder="iPhone 13, Galaxy A54…" value={modelo}
+                    onChange={(e) => setModelo(e.target.value)} />
+                )}
               </div>
             </div>
           )}

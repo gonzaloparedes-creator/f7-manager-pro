@@ -404,6 +404,27 @@ export type Database = {
         }
         Relationships: []
       }
+      modelo_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       notification_send_log: {
         Row: {
           created_at: string

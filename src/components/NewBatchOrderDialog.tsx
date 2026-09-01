@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { useMarcaPresets } from "@/hooks/useMarcaPresets";
+import { useModeloPresets } from "@/hooks/useModeloPresets";
 import { STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,7 @@ import "react-phone-input-2/lib/style.css";
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
 type DeviceRow = {
   key: string; device_type: string; device_otro: boolean;
-  marca: string; marca_otro: boolean; modelo: string;
+  marca: string; marca_otro: boolean; modelo: string; modelo_otro: boolean;
   problems: string[]; problem_other: string; quote_amount: string;
 };
 
@@ -32,6 +33,7 @@ const newRow = (): DeviceRow => ({
   marca: "",
   marca_otro: false,
   modelo: "",
+  modelo_otro: false,
   problems: [],
   problem_other: "",
   quote_amount: "",
@@ -54,6 +56,7 @@ export default function NewBatchOrderDialog({
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
   const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
+  const { presets: modeloPresets } = useModeloPresets();
   const [loading, setLoading] = useState(false);
 
   // Cada equipo del lote es una orden independiente creada en secuencia;
@@ -139,6 +142,13 @@ export default function NewBatchOrderDialog({
       updateRow(key, { marca_otro: true, marca: "" });
     } else {
       updateRow(key, { marca_otro: false, marca: label });
+    }
+  };
+  const selectRowModelo = (key: string, label: string) => {
+    if (label === "Otro") {
+      updateRow(key, { modelo_otro: true, modelo: "" });
+    } else {
+      updateRow(key, { modelo_otro: false, modelo: label });
     }
   };
   const addRow = () => setRows((prev) => [...prev, newRow()]);
@@ -519,12 +529,45 @@ export default function NewBatchOrderDialog({
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor={`batch_modelo_${row.key}`} className="text-xs">Modelo</Label>
-                      <Input
-                        id={`batch_modelo_${row.key}`}
-                        placeholder="iPhone 13, Galaxy A54…"
-                        value={row.modelo}
-                        onChange={(e) => updateRow(row.key, { modelo: e.target.value })}
-                      />
+                      {modeloPresets.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {modeloPresets.map((p) => {
+                              const active = p.label === "Otro" ? row.modelo_otro : (!row.modelo_otro && row.modelo === p.label);
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => selectRowModelo(row.key, p.label)}
+                                  className={cn(
+                                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                    active
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border bg-card text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  {p.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {row.modelo_otro && (
+                            <Input
+                              id={`batch_modelo_${row.key}`}
+                              placeholder="Especificá el modelo…"
+                              value={row.modelo}
+                              onChange={(e) => updateRow(row.key, { modelo: e.target.value })}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <Input
+                          id={`batch_modelo_${row.key}`}
+                          placeholder="iPhone 13, Galaxy A54…"
+                          value={row.modelo}
+                          onChange={(e) => updateRow(row.key, { modelo: e.target.value })}
+                        />
+                      )}
                     </div>
                   </div>
                 )}

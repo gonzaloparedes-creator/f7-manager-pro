@@ -9,6 +9,7 @@ import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { useMarcaPresets } from "@/hooks/useMarcaPresets";
+import { useModeloPresets } from "@/hooks/useModeloPresets";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,6 +139,7 @@ export default function NewOrderDialog({
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode, loading: deviceTypePresetsLoading } = useDeviceTypePresets();
   const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
+  const { presets: modeloPresets } = useModeloPresets();
   const { technicians } = useAssignableTechnicians();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
@@ -145,6 +147,7 @@ export default function NewOrderDialog({
   const [compressing, setCompressing] = useState(false);
   const [deviceOtro, setDeviceOtro] = useState(false);
   const [marcaOtro, setMarcaOtro] = useState(false);
+  const [modeloOtro, setModeloOtro] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraTriggerRef = useRef<HTMLButtonElement>(null);
   // Radix monta el contenido del Dialog un tick después de que `open` pasa a
@@ -327,6 +330,7 @@ export default function NewOrderDialog({
     setShowSecondaryContact(false);
     setDeviceOtro(false);
     setMarcaOtro(false);
+    setModeloOtro(false);
     if (clearDraft) {
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
     }
@@ -396,6 +400,16 @@ export default function NewOrderDialog({
     } else {
       setMarcaOtro(false);
       setForm({ ...form, marca: label });
+    }
+  };
+
+  const selectModelo = (label: string) => {
+    if (label === "Otro") {
+      setModeloOtro(true);
+      setForm({ ...form, modelo: "" });
+    } else {
+      setModeloOtro(false);
+      setForm({ ...form, modelo: label });
     }
   };
 
@@ -961,8 +975,37 @@ export default function NewOrderDialog({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="modelo">Modelo</Label>
-                  <Input id="modelo" placeholder="iPhone 13, Galaxy A54…" value={form.modelo}
-                    onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
+                  {modeloPresets.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {modeloPresets.map((p) => {
+                          const active = p.label === "Otro" ? modeloOtro : (!modeloOtro && form.modelo === p.label);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => selectModelo(p.label)}
+                              className={cn(
+                                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                                active
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {modeloOtro && (
+                        <Input id="modelo" placeholder="Especificá el modelo…" value={form.modelo}
+                          onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
+                      )}
+                    </div>
+                  ) : (
+                    <Input id="modelo" placeholder="iPhone 13, Galaxy A54…" value={form.modelo}
+                      onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
+                  )}
                 </div>
               </div>
             )}
