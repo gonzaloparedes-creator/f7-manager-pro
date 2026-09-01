@@ -5,11 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ListChecks, Plus, Trash2, Loader2, Lock, ChevronUp, ChevronDown, Pencil, Check, X } from "lucide-react";
+import { ListChecks, Plus, Trash2, Loader2, Lock, ChevronUp, ChevronDown, Pencil, Check, X, MessageCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { getDefaultStatusMessage, renderStatusMessage } from "@/lib/orders";
 
-type Preset = { id: string; key: string; label: string; sort_order: number; is_locked: boolean };
+type Preset = { id: string; key: string; label: string; sort_order: number; is_locked: boolean; message_template: string | null };
 
 function slugify(label: string, taken: Set<string>) {
   const base = label
@@ -40,13 +43,16 @@ export default function OrderStatusPresetsTab() {
   const [editingLabel, setEditingLabel] = useState("");
   const [pendingDelete, setPendingDelete] = useState<Preset | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [messageEditing, setMessageEditing] = useState<Preset | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [savingMessage, setSavingMessage] = useState(false);
 
   const load = async () => {
     if (!companyId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("order_status_presets")
-      .select("id, key, label, sort_order, is_locked")
+      .select("id, key, label, sort_order, is_locked, message_template")
       .eq("company_id", companyId)
       .order("sort_order", { ascending: true });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -107,6 +113,27 @@ export default function OrderStatusPresetsTab() {
     load();
   };
 
+  const openMessageEditor = (p: Preset) => {
+    setMessageEditing(p);
+    setMessageText(p.message_template ?? getDefaultStatusMessage(p.key));
+  };
+
+  const saveMessage = async () => {
+    if (!messageEditing) return;
+    const trimmed = messageText.trim();
+    if (!trimmed) return toast({ title: "El mensaje no puede quedar vacío", variant: "destructive" });
+    setSavingMessage(true);
+    const { error } = await supabase
+      .from("order_status_presets")
+      .update({ message_template: trimmed })
+      .eq("id", messageEditing.id);
+    setSavingMessage(false);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    toast({ title: "Mensaje guardado" });
+    setMessageEditing(null);
+    load();
+  };
+
   return (
     <Card>
       <CardContent className="space-y-4 p-6">
@@ -116,6 +143,7 @@ export default function OrderStatusPresetsTab() {
             <div className="font-semibold">Estados de la orden</div>
             <div className="text-xs text-muted-foreground">
               Los pasos del selector "Actualizar estado". "Recibido" y "Entregado" (con candado) no se pueden borrar.
+              Con el ícono de WhatsApp de cada fila podés personalizar el mensaje que recibe el cliente en ese estado.
             </div>
           </div>
         </div>
@@ -174,6 +202,9 @@ export default function OrderStatusPresetsTab() {
                 ) : (
                   <>
                     <span className="flex-1 truncate font-medium">{p.label}</span>
+                    <Button variant="ghost" size="icon" onClick={() => openMessageEditor(p)} aria-label={`Mensaje de WhatsApp de ${p.label}`}>
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => startEdit(p)} aria-label={`Renombrar ${p.label}`}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -197,6 +228,64 @@ export default function OrderStatusPresetsTab() {
         loading={deleting}
         onConfirm={() => pendingDelete && remove(pendingDelete)}
       />
+
+      <Dialog open={!!messageEditing} onOpenChange={(o) => !o && setMessageEditing(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Mensaje de WhatsApp — {messageEditing?.label}</DialogTitle>
+            <DialogDescription>
+              El texto que recibe el cliente cuando una orden pasa a este estado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
+            Usá estos placeholders, se reemplazan automáticamente:{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{cliente}}"}</code>{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{equipo}}"}</code>{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{orden}}"}</code>{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{estado}}"}</code>{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{link}}"}</code>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="status_message_text">Mensaje</Label>
+            <Textarea
+              id="status_message_text"
+              rows={6}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              className="resize-none text-sm"
+            />
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => messageEditing && setMessageText(getDefaultStatusMessage(messageEditing.key))}
+              disabled={savingMessage}
+            >
+              Restaurar predeterminado
+            </Button>
+            <Button type="button" onClick={saveMessage} disabled={savingMessage}>
+              {savingMessage ? "Guardando..." : "Guardar cambios"}
+            </Button>
+          </div>
+
+          <div className="space-y-2 border-t border-border pt-4">
+            <Label className="text-xs text-muted-foreground">Vista previa (con datos de ejemplo)</Label>
+            <div className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm leading-relaxed">
+              {renderStatusMessage(messageText, {
+                cliente: "Juan Pérez",
+                equipo: "Celular",
+                orden: "ORD-0001",
+                estado: messageEditing?.label ?? "",
+                link: "https://f7manager.com/tracking/ORD-0001",
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

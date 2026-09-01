@@ -560,6 +560,7 @@ export type Database = {
           is_locked: boolean
           key: string
           label: string
+          message_template: string | null
           sort_order: number
         }
         Insert: {
@@ -569,6 +570,7 @@ export type Database = {
           is_locked?: boolean
           key: string
           label: string
+          message_template?: string | null
           sort_order: number
         }
         Update: {
@@ -578,6 +580,7 @@ export type Database = {
           is_locked?: boolean
           key?: string
           label?: string
+          message_template?: string | null
           sort_order?: number
         }
         Relationships: []

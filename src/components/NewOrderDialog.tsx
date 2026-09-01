@@ -4,37 +4,25 @@ import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
-import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
-import { useChecklistPresets } from "@/hooks/useChecklistPresets";
-import { useProblemPresets } from "@/hooks/useProblemPresets";
-import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
-import { useMarcaPresets } from "@/hooks/useMarcaPresets";
-import { useModeloPresets } from "@/hooks/useModeloPresets";
-import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { supabase } from "@/integrations/supabase/client";
-import imageCompression from "browser-image-compression";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
-import WarrantySelector from "@/components/WarrantySelector";
-import { Upload, X, CalendarIcon, Search, UserPlus, Check, Camera, Type, Grid3x3, Loader2, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
+import { renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
+import { X, Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
-import { PatternLock } from "@/components/PatternLock";
 import { SignaturePad } from "@/components/SignaturePad";
-import { CameraCapture } from "@/components/CameraCapture";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
+import DeviceIntakeFields, { type DeviceIntakeValue } from "@/components/DeviceIntakeFields";
+import type { PhotoEntry } from "@/lib/photos";
 
 const SECTIONS = [
   { key: "cliente", label: "Cliente" },
@@ -47,58 +35,15 @@ const SECTIONS = [
 ] as const;
 
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
-type PhotoEntry = { file: File; previewUrl: string };
 
-// Comprimir apenas se agrega la foto (no recién al enviar el formulario): una
-// foto de cámara sin comprimir puede pesar varios MB, y mientras el usuario
-// completa el resto del formulario esos File quedan enteros en memoria. En
-// Android, justo después de volver de la app de Cámara (que ya usó memoria
-// por su cuenta), esa presión extra hace que el sistema mate la pestaña y
-// vuelva al dashboard — no pasa con la galería porque el picker del sistema
-// es mucho más liviano que la app de Cámara.
-const PHOTO_COMPRESS_OPTIONS = {
-  maxSizeMB: 0.3,
-  maxWidthOrHeight: 1024,
-  useWebWorker: true,
-  initialQuality: 0.8,
-};
-
-async function compressPhoto(file: File): Promise<File> {
-  if (!file.type.startsWith("image/")) return file;
-  try {
-    const compressed = await imageCompression(file, PHOTO_COMPRESS_OPTIONS);
-    return new File([compressed], file.name, { type: compressed.type || file.type });
-  } catch {
-    return file;
-  }
-}
-
-
-type FormState = {
+type FormState = DeviceIntakeValue & {
   customer_name: string;
   customer_phone: string;
   secondary_phone: string;
   secondary_contact_name: string;
   customer_cedula: string;
-  device_type: string;
-  imei: string;
-  marca: string;
-  modelo: string;
-  assigned_technician_id: string;
-  problems: string[];
-  problem_other: string;
-  problem_description: string; // observaciones iniciales
-  quote_amount: string;
-  deposit_amount: string;
-  deposit_payment_method: string;
-  estimated_delivery_date: Date | undefined;
-  device_pin: string;
-  device_pattern: number[];
   terms_accepted: boolean;
   client_signature: string;
-  accessories: string[];
-  checklist: Record<string, "ok" | "fail">;
-  warranty_days: number;
 };
 
 const INITIAL_STATE: FormState = {
@@ -134,22 +79,16 @@ export default function NewOrderDialog({
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { limits, isStarter } = usePlan();
-  const { presets: accessoryPresets } = useAccessoryPresets();
-  const { presets: checklistPresets } = useChecklistPresets();
-  const { presets: problemPresets } = useProblemPresets();
-  const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode, loading: deviceTypePresetsLoading } = useDeviceTypePresets();
-  const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
-  const { presets: modeloPresets } = useModeloPresets();
-  const { technicians } = useAssignableTechnicians();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
-  const [deviceOtro, setDeviceOtro] = useState(false);
-  const [marcaOtro, setMarcaOtro] = useState(false);
-  const [modeloOtro, setModeloOtro] = useState(false);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const cameraTriggerRef = useRef<HTMLButtonElement>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  // DeviceIntakeFields maneja internamente su propio estado de UI (chips
+  // "Otro" activos, modo PIN/patrón) — cambiar esta key fuerza un remount
+  // limpio de esa parte cuando se resetea el formulario o se recarga un
+  // borrador, sin tener que levantar ese estado hasta acá.
+  const [formKey, setFormKey] = useState(0);
   // Radix monta el contenido del Dialog un tick después de que `open` pasa a
   // true (para permitir la animación de entrada) — un useRef normal quedaría
   // en null en el momento en que corre el efecto de abajo, y como no es
@@ -193,19 +132,6 @@ export default function NewOrderDialog({
     const top = section.getBoundingClientRect().top - contentEl.getBoundingClientRect().top + contentEl.scrollTop;
     contentEl.scrollTo({ top, behavior: "smooth" });
   };
-  // El botón "Listo"/"Cerrar" de la cámara vive en un portal aparte y tiene
-  // el foco al desmontarse. Devolver el foco al botón "Cámara" evita el
-  // primer intento de cierre, pero en touch real de Android Radix dispara
-  // un SEGUNDO onOpenChange(false) unos instantes después (confirmado con
-  // pruebas), ya con cameraOpen=false en el closure — un ref, que no
-  // depende de un re-render, mantiene el bloqueo durante ese margen.
-  const suppressCloseRef = useRef(false);
-  const closeCamera = () => {
-    suppressCloseRef.current = true;
-    cameraTriggerRef.current?.focus();
-    setCameraOpen(false);
-    window.setTimeout(() => { suppressCloseRef.current = false; }, 600);
-  };
   const DRAFT_KEY = "f7_order_draft";
   const loadDraft = (): { form: FormState; selectedClientId: string | null } | null => {
     try {
@@ -227,18 +153,10 @@ export default function NewOrderDialog({
   const [clients, setClients] = useState<ClientLite[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(initialDraft?.selectedClientId ?? null);
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
-  const [deliveryDateOpen, setDeliveryDateOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [showSecondaryContact, setShowSecondaryContact] = useState(() => {
     const d = loadDraft();
     return !!(d?.form?.secondary_phone || d?.form?.secondary_contact_name);
-  });
-  // Un equipo tiene un solo método de desbloqueo — mostrar PIN y patrón a la
-  // vez siempre desperdicia espacio en mobile. Se alterna cuál se ve, sin
-  // borrar el dato del que queda oculto.
-  const [lockInputMode, setLockInputMode] = useState<"text" | "pattern">(() => {
-    const d = loadDraft();
-    return d?.form?.device_pattern && d.form.device_pattern.length > 0 ? "pattern" : "text";
   });
   const [searchingCedula, setSearchingCedula] = useState(false);
 
@@ -292,7 +210,7 @@ export default function NewOrderDialog({
       setForm(d.form);
       setSelectedClientId(d.selectedClientId);
       setShowSecondaryContact(!!(d.form.secondary_phone || d.form.secondary_contact_name));
-      setLockInputMode(d.form.device_pattern && d.form.device_pattern.length > 0 ? "pattern" : "text");
+      setFormKey((k) => k + 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -326,90 +244,10 @@ export default function NewOrderDialog({
     setFiles((prev) => { prev.forEach((p) => URL.revokeObjectURL(p.previewUrl)); return []; });
     setSelectedClientId(null);
     setClientSearch("");
-    setLockInputMode("text");
     setShowSecondaryContact(false);
-    setDeviceOtro(false);
-    setMarcaOtro(false);
-    setModeloOtro(false);
+    setFormKey((k) => k + 1);
     if (clearDraft) {
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
-    }
-  };
-
-
-  const addFiles = async (incoming: File[]) => {
-    if (incoming.length === 0) return;
-    const remaining = limits.photos - files.length;
-    if (remaining <= 0) {
-      toast({
-        title: `Límite de ${limits.photos} fotos alcanzado${isStarter ? " (plan Starter)" : ""}`,
-        variant: "destructive",
-      });
-      return;
-    }
-    const accepted = incoming.slice(0, remaining);
-    if (incoming.length > remaining) {
-      toast({ title: `Solo se agregaron ${accepted.length} de ${incoming.length} fotos (máximo ${limits.photos}).` });
-    }
-    setCompressing(true);
-    try {
-      const entries: PhotoEntry[] = [];
-      for (const file of accepted) {
-        const compressed = await compressPhoto(file);
-        entries.push({ file: compressed, previewUrl: URL.createObjectURL(compressed) });
-      }
-      setFiles((prev) => [...prev, ...entries]);
-    } finally {
-      setCompressing(false);
-    }
-  };
-
-  const toggleProblem = (p: string) => {
-    setForm((f) => ({
-      ...f,
-      problems: f.problems.includes(p) ? f.problems.filter((x) => x !== p) : [...f.problems, p],
-    }));
-  };
-
-  // Si había un borrador guardado con un equipo que no matchea ningún preset
-  // (texto libre tipeado antes de activar "modo selección", o un preset que
-  // se borró después), mostramos el campo de texto "Otro" ya con ese valor
-  // en vez de perderlo silenciosamente.
-  useEffect(() => {
-    if (deviceTypePresetsLoading) return;
-    if (form.device_type && !deviceTypePresets.some((p) => p.label === form.device_type)) {
-      setDeviceOtro(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deviceTypePresetsLoading]);
-
-  const selectDeviceType = (label: string) => {
-    if (label === "Otro") {
-      setDeviceOtro(true);
-      setForm({ ...form, device_type: "" });
-    } else {
-      setDeviceOtro(false);
-      setForm({ ...form, device_type: label });
-    }
-  };
-
-  const selectMarca = (label: string) => {
-    if (label === "Otro") {
-      setMarcaOtro(true);
-      setForm({ ...form, marca: "" });
-    } else {
-      setMarcaOtro(false);
-      setForm({ ...form, marca: label });
-    }
-  };
-
-  const selectModelo = (label: string) => {
-    if (label === "Otro") {
-      setModeloOtro(true);
-      setForm({ ...form, modelo: "" });
-    } else {
-      setModeloOtro(false);
-      setForm({ ...form, modelo: label });
     }
   };
 
@@ -420,12 +258,6 @@ export default function NewOrderDialog({
 
   const quote = useMemo(() => parseAmount(form.quote_amount), [form.quote_amount]);
   const deposit = useMemo(() => parseAmount(form.deposit_amount), [form.deposit_amount]);
-  const balance = Math.max(0, quote - deposit);
-
-  const formatThousands = (s: string) => {
-    const n = parseAmount(s);
-    return n ? n.toLocaleString("es-PY") : "";
-  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -602,7 +434,7 @@ export default function NewOrderDialog({
         // Dialog; Radix lo trata como "click afuera" y pide cerrar el
         // Dialog. Mientras la cámara esté abierta (o recién se cerró), ese
         // pedido se ignora por completo.
-        if (cameraOpen || suppressCloseRef.current) return;
+        if (cameraActive) return;
         if (!loading) { onOpenChange(o); if (!o) reset(); }
       }}
     >
@@ -888,529 +720,19 @@ export default function NewOrderDialog({
             )}
           </section>
 
-          {/* Sección: Equipo y problemas */}
-          <section
-            ref={(el) => { sectionRefs.current.equipo = el; }}
-            data-section="equipo"
-            className="space-y-3 border-t border-border pt-4"
-          >
-            <h3 className="text-sm font-semibold text-foreground">Detalles del equipo</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="device_type">Equipo *</Label>
-                {deviceTypeSelectionMode && deviceTypePresets.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      {deviceTypePresets.map((p) => {
-                        const active = p.label === "Otro" ? deviceOtro : (!deviceOtro && form.device_type === p.label);
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => selectDeviceType(p.label)}
-                            className={cn(
-                              "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                              active
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border bg-card text-muted-foreground hover:text-foreground"
-                            )}
-                          >
-                            {p.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {deviceOtro && (
-                      <Input id="device_type" placeholder="Especificá el equipo…" value={form.device_type}
-                        onChange={(e) => setForm({ ...form, device_type: e.target.value })} />
-                    )}
-                  </div>
-                ) : (
-                  <Input id="device_type" required placeholder="iPhone 13, Apple Watch S8…" value={form.device_type}
-                    onChange={(e) => setForm({ ...form, device_type: e.target.value })} />
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="imei">IMEI / Nº de Serie</Label>
-                <Input id="imei" placeholder="356938035643809" value={form.imei}
-                  onChange={(e) => setForm({ ...form, imei: e.target.value })} />
-              </div>
-            </div>
-
-            {useDeviceClassification && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="marca">Marca</Label>
-                  {marcaPresets.length > 0 ? (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {marcaPresets.map((p) => {
-                          const active = p.label === "Otro" ? marcaOtro : (!marcaOtro && form.marca === p.label);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => selectMarca(p.label)}
-                              className={cn(
-                                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                                active
-                                  ? "border-primary bg-primary text-primary-foreground"
-                                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              {p.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {marcaOtro && (
-                        <Input id="marca" placeholder="Especificá la marca…" value={form.marca}
-                          onChange={(e) => setForm({ ...form, marca: e.target.value })} />
-                      )}
-                    </div>
-                  ) : (
-                    <Input id="marca" placeholder="Apple, Samsung…" value={form.marca}
-                      onChange={(e) => setForm({ ...form, marca: e.target.value })} />
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="modelo">Modelo</Label>
-                  {modeloPresets.length > 0 ? (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {modeloPresets.map((p) => {
-                          const active = p.label === "Otro" ? modeloOtro : (!modeloOtro && form.modelo === p.label);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => selectModelo(p.label)}
-                              className={cn(
-                                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                                active
-                                  ? "border-primary bg-primary text-primary-foreground"
-                                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              {p.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {modeloOtro && (
-                        <Input id="modelo" placeholder="Especificá el modelo…" value={form.modelo}
-                          onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
-                      )}
-                    </div>
-                  ) : (
-                    <Input id="modelo" placeholder="iPhone 13, Galaxy A54…" value={form.modelo}
-                      onChange={(e) => setForm({ ...form, modelo: e.target.value })} />
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="assigned_technician">Técnico asignado</Label>
-              <Select
-                value={form.assigned_technician_id || user?.id || ""}
-                onValueChange={(v) => setForm({ ...form, assigned_technician_id: v })}
-              >
-                <SelectTrigger id="assigned_technician"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-                <SelectContent>
-                  {technicians.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.full_name || "Técnico sin nombre"}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Detalles a la vista *</Label>
-              <div className="flex flex-wrap gap-2">
-                {problemPresets.map(({ label: p }) => {
-                  const active = form.problems.includes(p);
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => toggleProblem(p)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                        active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-card text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {form.problems.includes("Otro") && (
-              <div className="space-y-2">
-                <Label htmlFor="problem_other">Especificá "Otro" *</Label>
-                <Input id="problem_other" placeholder="Describí el problema..." value={form.problem_other}
-                  onChange={(e) => setForm({ ...form, problem_other: e.target.value })} />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="problem">Observaciones iniciales</Label>
-              <Textarea id="problem" rows={3}
-                placeholder="Estado estético, accesorios entregados, contraseña, etc."
-                value={form.problem_description}
-                onChange={(e) => setForm({ ...form, problem_description: e.target.value })} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Fotos</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted">
-                  <Upload className="h-4 w-4" />
-                  Galería
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,image/gif,image/bmp,image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      addFiles(Array.from(e.target.files ?? []));
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                <button
-                  ref={cameraTriggerRef}
-                  type="button"
-                  onClick={() => setCameraOpen(true)}
-                  className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted"
-                >
-                  <Camera className="h-4 w-4" />
-                  Cámara
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {files.length} / {limits.photos} fotos{isStarter ? " (plan Starter)" : ""}
-              </p>
-              {files.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {files.map((f, i) => (
-                    <div key={f.previewUrl} className="relative">
-                      <img src={f.previewUrl} alt={f.file.name} className="h-16 w-16 rounded-md object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          URL.revokeObjectURL(f.previewUrl);
-                          setFiles(files.filter((_, j) => j !== i));
-                        }}
-                        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Sección: Accesorios y Componentes */}
-          <section
-            ref={(el) => { sectionRefs.current.accesorios = el; }}
-            data-section="accesorios"
-            className="space-y-3 border-t border-border pt-4"
-          >
-            <h3 className="text-sm font-semibold text-foreground">Accesorios y Componentes</h3>
-            <p className="text-xs text-muted-foreground">
-              Marcá lo que el cliente entrega junto al equipo.
-            </p>
-            {accessoryPresets.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No hay accesorios configurados. Agregalos en Configuración → Accesorios.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {accessoryPresets.map((acc) => {
-                  const checked = form.accessories.includes(acc.label);
-                  return (
-                    <div
-                      key={acc.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2"
-                    >
-                      <Label htmlFor={`acc_${acc.id}`} className="text-sm font-normal cursor-pointer">
-                        {acc.label}
-                      </Label>
-                      <Switch
-                        id={`acc_${acc.id}`}
-                        checked={checked}
-                        onCheckedChange={(c) => setForm({
-                          ...form,
-                          accessories: c
-                            ? [...form.accessories, acc.label]
-                            : form.accessories.filter((x) => x !== acc.label),
-                        })}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Sección: Checklist de recepción */}
-          <section
-            ref={(el) => { sectionRefs.current.checklist = el; }}
-            data-section="checklist"
-            className="space-y-3 border-t border-border pt-4"
-          >
-            <h3 className="text-sm font-semibold text-foreground">Checklist de Recepción</h3>
-            <p className="text-xs text-muted-foreground">
-              Dejá constancia del estado del equipo al recibirlo (opcional, item por item).
-            </p>
-            {checklistPresets.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No hay ítems configurados. Agregalos en Configuración → Accesorios.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {checklistPresets.map((c) => {
-                  const status = form.checklist[c.label];
-                  return (
-                    <div
-                      key={c.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2"
-                    >
-                      <span className="text-sm">{c.label}</span>
-                      <div className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = { ...form.checklist };
-                            if (next[c.label] === "ok") delete next[c.label]; else next[c.label] = "ok";
-                            setForm({ ...form, checklist: next });
-                          }}
-                          className={cn(
-                            "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                            status === "ok"
-                              ? "border-transparent bg-[hsl(var(--status-listo-bg))] text-[hsl(var(--status-listo))]"
-                              : "border-input text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          OK
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = { ...form.checklist };
-                            if (next[c.label] === "fail") delete next[c.label]; else next[c.label] = "fail";
-                            setForm({ ...form, checklist: next });
-                          }}
-                          className={cn(
-                            "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                            status === "fail"
-                              ? "border-transparent bg-destructive/10 text-destructive"
-                              : "border-input text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          Falla
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Sección: Financiero */}
-          <section
-            ref={(el) => { sectionRefs.current.financiero = el; }}
-            data-section="financiero"
-            className="space-y-3 border-t border-border pt-4"
-          >
-            <h3 className="text-sm font-semibold text-foreground">Información financiera</h3>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="quote_amount">Presupuesto (Gs.)</Label>
-                <Input
-                  id="quote_amount"
-                  inputMode="numeric"
-                  placeholder="0"
-                  value={formatThousands(form.quote_amount)}
-                  onChange={(e) => setForm({ ...form, quote_amount: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="deposit_amount">Seña (Gs.)</Label>
-                <Input
-                  id="deposit_amount"
-                  inputMode="numeric"
-                  placeholder="0"
-                  value={formatThousands(form.deposit_amount)}
-                  onChange={(e) => setForm({ ...form, deposit_amount: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Saldo</Label>
-                <div className={cn(
-                  "flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-semibold",
-                  balance > 0 ? "text-foreground" : "text-muted-foreground"
-                )}>
-                  {formatPYG(balance)}
-                </div>
-              </div>
-            </div>
-
-            {deposit > 0 && (
-              <div className="space-y-2">
-                <Label>Método de pago de la seña</Label>
-                <div className="flex flex-wrap gap-2">
-                  {([
-                    { value: "Efectivo", label: "Efectivo", icon: Banknote },
-                    { value: "Transferencia", label: "Transferencia", icon: ArrowLeftRight },
-                    { value: "Otro", label: "Otro", icon: MoreHorizontal },
-                  ] as const).map((m) => {
-                    const active = form.deposit_payment_method === m.value;
-                    return (
-                      <button
-                        key={m.value}
-                        type="button"
-                        onClick={() => setForm({ ...form, deposit_payment_method: m.value })}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-card text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        <m.icon className="h-3.5 w-3.5" />
-                        {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Fecha estimada de entrega</Label>
-              <Popover open={deliveryDateOpen} onOpenChange={setDeliveryDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal sm:w-[280px]",
-                      !form.estimated_delivery_date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.estimated_delivery_date
-                      ? format(form.estimated_delivery_date, "PPP", { locale: es })
-                      : <span>Elegí una fecha</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={form.estimated_delivery_date}
-                    onSelect={(d) => { setForm({ ...form, estimated_delivery_date: d }); setDeliveryDateOpen(false); }}
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                    initialFocus
-                    locale={es}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tiempo de garantía</Label>
-              <WarrantySelector
-                value={form.warranty_days}
-                onChange={(d) => setForm({ ...form, warranty_days: d })}
-              />
-            </div>
-          </section>
-
-          <section
-            ref={(el) => { sectionRefs.current.seguridad = el; }}
-            data-section="seguridad"
-            className="space-y-3 border-t border-border pt-4"
-          >
-            <h3 className="text-sm font-semibold text-foreground">Seguridad del equipo</h3>
-            <p className="text-xs text-muted-foreground">
-              Datos opcionales para que el técnico pueda acceder al equipo durante la reparación.
-            </p>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor={lockInputMode === "text" ? "device_pin" : undefined}>
-                  {lockInputMode === "text" ? "PIN / Contraseña" : "Patrón de desbloqueo (Android)"}
-                </Label>
-                <div className="flex rounded-md border border-input p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setLockInputMode("text")}
-                    aria-label="Usar PIN o contraseña"
-                    aria-pressed={lockInputMode === "text"}
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-sm transition-colors",
-                      lockInputMode === "text" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                    )}
-                  >
-                    <Type className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLockInputMode("pattern")}
-                    aria-label="Usar patrón de desbloqueo"
-                    aria-pressed={lockInputMode === "pattern"}
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-sm transition-colors",
-                      lockInputMode === "pattern" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                    )}
-                  >
-                    <Grid3x3 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {lockInputMode === "text" ? (
-                <>
-                  <Input
-                    id="device_pin"
-                    type="text"
-                    autoComplete="off"
-                    placeholder="Ej: 1234 o contraseña"
-                    value={form.device_pin}
-                    onChange={(e) => setForm({ ...form, device_pin: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Se guarda asociado a la orden y solo es visible para el técnico.
-                  </p>
-                </>
-              ) : (
-                <div className="flex flex-col items-start gap-2">
-                  <PatternLock
-                    value={form.device_pattern}
-                    onChange={(p) => setForm({ ...form, device_pattern: p })}
-                    size={200}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setForm({ ...form, device_pattern: [] })}
-                    disabled={form.device_pattern.length === 0}
-                  >
-                    Borrar patrón
-                  </Button>
-                </div>
-              )}
-            </div>
-          </section>
+          <DeviceIntakeFields
+            key={formKey}
+            idPrefix="order"
+            value={form}
+            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            files={files}
+            onFilesChange={setFiles}
+            photoLimit={limits.photos}
+            isStarterPlan={isStarter}
+            registerSectionRef={(key, el) => { sectionRefs.current[key] = el; }}
+            onCameraActiveChange={setCameraActive}
+            onCompressingChange={setCompressing}
+          />
 
           {/* Sección: Términos y firma */}
           <section
@@ -1457,9 +779,6 @@ export default function NewOrderDialog({
         </form>
         </div>
       </DialogContent>
-      {cameraOpen && (
-        <CameraCapture onClose={closeCamera} onCapture={(fs) => addFiles(fs)} />
-      )}
     </Dialog>
   );
 }

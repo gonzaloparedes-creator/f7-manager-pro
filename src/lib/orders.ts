@@ -132,3 +132,35 @@ export function renderServiceTerms(template: string, warrantyDays: number | null
   const phrase = `${days} ${days === 1 ? "día" : "días"}`;
   return template.replaceAll("{{garantia_dias}}", phrase);
 }
+
+// Mensaje de WhatsApp por defecto para cada estado cuando la empresa nunca
+// personalizó order_status_presets.message_template — textos idénticos
+// (mismos emojis, misma puntuación) a los que manda hoy
+// send-status-notification/index.ts, para que abrir el editor por primera
+// vez muestre exactamente lo que ya se está mandando, sin sorpresas.
+export const DEFAULT_STATUS_MESSAGES: Partial<Record<string, string>> = {
+  listo: "¡Hola {{cliente}}! 🎉 Tu {{equipo}} ya está listo para retirar. Pasá cuando quieras por el local. Ante cualquier consulta no dudes en escribirnos. ¡Gracias por confiar en nosotros! ✅",
+  enviado: "¡Hola {{cliente}}! 📦 Tu {{equipo}} ya fue enviado. En breve lo vas a estar recibiendo. Ante cualquier consulta no dudes en escribirnos. ¡Gracias por confiar en nosotros! ✅",
+};
+
+const GENERIC_STATUS_MESSAGE =
+  "¡Hola {{cliente}}! El estado de tu {{equipo}} (Orden *{{orden}}*) fue actualizado a: *{{estado}}*. Revisá los detalles aquí: {{link}} 🔧";
+
+export function getDefaultStatusMessage(statusKey: string): string {
+  return DEFAULT_STATUS_MESSAGES[statusKey] ?? GENERIC_STATUS_MESSAGE;
+}
+
+export interface StatusMessageVars {
+  cliente: string;
+  equipo: string;
+  orden: string;
+  estado: string;
+  link: string;
+}
+
+export function renderStatusMessage(template: string, vars: StatusMessageVars) {
+  return (Object.keys(vars) as (keyof StatusMessageVars)[]).reduce(
+    (acc, key) => acc.replaceAll(`{{${key}}}`, vars[key]),
+    template
+  );
+}

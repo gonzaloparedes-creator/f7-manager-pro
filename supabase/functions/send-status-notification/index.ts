@@ -75,25 +75,33 @@ Deno.serve(async (req) => {
     // entraron a ese tab, o una key que ya no tiene preset).
     const { data: statusPreset } = await supabase
       .from("order_status_presets")
-      .select("label")
+      .select("label, message_template")
       .eq("company_id", ownedOrder.company_id)
       .eq("key", new_status)
       .maybeSingle();
 
     const tracking_url = `${app_origin ?? ""}/tracking/${code}`;
     const statusLabel = statusPreset?.label ?? STATUS_LABELS[new_status] ?? new_status;
-    const message_template =
-      new_status === "listo"
-        ? `¡Hola ${customer_name}! 🎉 Tu ${device_type} ya está listo para retirar. ` +
-          `Pasá cuando quieras por el local. Ante cualquier consulta no dudes en escribirnos. ` +
-          `¡Gracias por confiar en nosotros! ✅`
-        : new_status === "enviado"
-        ? `¡Hola ${customer_name}! 📦 Tu ${device_type} ya fue enviado. ` +
-          `En breve lo vas a estar recibiendo. Ante cualquier consulta no dudes en escribirnos. ` +
-          `¡Gracias por confiar en nosotros! ✅`
-        : `¡Hola ${customer_name}! El estado de tu ${device_type} ` +
-          `(Orden *${order_number}*) fue actualizado a: *${statusLabel}*. ` +
-          `Revisá los detalles aquí: ${tracking_url} 🔧`;
+    const customTemplate = statusPreset?.message_template?.trim();
+    const message_template = customTemplate
+      ? renderTemplate(customTemplate, {
+          cliente: customer_name,
+          equipo: device_type,
+          orden: order_number,
+          estado: statusLabel,
+          link: tracking_url,
+        })
+      : new_status === "listo"
+      ? `¡Hola ${customer_name}! 🎉 Tu ${device_type} ya está listo para retirar. ` +
+        `Pasá cuando quieras por el local. Ante cualquier consulta no dudes en escribirnos. ` +
+        `¡Gracias por confiar en nosotros! ✅`
+      : new_status === "enviado"
+      ? `¡Hola ${customer_name}! 📦 Tu ${device_type} ya fue enviado. ` +
+        `En breve lo vas a estar recibiendo. Ante cualquier consulta no dudes en escribirnos. ` +
+        `¡Gracias por confiar en nosotros! ✅`
+      : `¡Hola ${customer_name}! El estado de tu ${device_type} ` +
+        `(Orden *${order_number}*) fue actualizado a: *${statusLabel}*. ` +
+        `Revisá los detalles aquí: ${tracking_url} 🔧`;
 
     const result = await sendWhatsAppText(profile?.evolution_instance_name, customer_phone, message_template);
 
@@ -130,6 +138,14 @@ async function isRateLimited(supabase: ReturnType<typeof createClient>, userId: 
     .eq("user_id", userId)
     .gte("created_at", since);
   return (count ?? 0) >= RATE_LIMIT_PER_HOUR;
+}
+
+function renderTemplate(template: string, vars: Record<string, string>) {
+  let out = template;
+  for (const [key, value] of Object.entries(vars)) {
+    out = out.replaceAll(`{{${key}}}`, value);
+  }
+  return out;
 }
 
 function json(body: unknown, status = 200) {

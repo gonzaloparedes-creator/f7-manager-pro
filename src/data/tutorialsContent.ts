@@ -129,9 +129,10 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "modo-lote",
         title: "Modo Lote",
         body: [
-          "Pensado para cuando un mismo cliente deja varios equipos juntos. Se cargan los datos del cliente una sola vez, y después se agrega una fila por cada equipo (tipo, marca/modelo, problema y presupuesto estimado).",
-          "Al confirmar, cada fila se convierte en una orden real e independiente, cada una con su propio número de orden y su propio link de seguimiento para el cliente.",
-          "Por velocidad, este modo no pide accesorios, checklist, garantía, seña ni firma por equipo — la idea es una carga rápida, no reemplazar a Nueva Orden. Si alguno de esos datos hace falta, se completa después entrando al detalle de esa orden puntual.",
+          "Pensado para cuando un mismo cliente deja varios equipos juntos. Se cargan los datos del cliente una sola vez, y después se agrega un equipo por fila — cada fila es un acordeón que se puede expandir o colapsar sin perder lo ya cargado.",
+          "Cada equipo tiene exactamente los mismos datos que se cargan en Nueva Orden: tipo/IMEI/marca/modelo, técnico asignado, problemas y observaciones, fotos, accesorios, checklist de recepción, presupuesto/seña/garantía, y PIN o patrón de desbloqueo. Las filas nuevas arrancan expandidas para cargar rápido; se pueden colapsar a mano una vez completadas para ver de un vistazo el progreso del lote.",
+          "La firma del cliente y la aceptación de los términos se completan una sola vez para todo el lote, no por equipo — un cliente que deja varios equipos firma una sola vez por todos.",
+          "Al confirmar, cada fila se convierte en una orden real e independiente, cada una con su propio número de orden, su propio link de seguimiento para el cliente y la misma firma/términos.",
         ],
         images: [{ file: "crear-ordenes-modo-lote-01.png", alt: "Modo Lote con varios equipos del mismo cliente" }],
       },
@@ -464,6 +465,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Estados",
         body: [
           "Permite personalizar los nombres de los estados por los que pasa una orden (por ejemplo, cambiar \"En reparación\" por el texto que uses en tu taller), reordenarlos y definir cuáles quedan fijos.",
+          "Cada estado tiene además su propio mensaje de WhatsApp editable: con el ícono de mensaje se abre un editor con placeholders (cliente, equipo, número de orden, estado y link de seguimiento) que se reemplazan automáticamente al enviar, más una vista previa en vivo. Si no se edita, se sigue usando el mensaje predeterminado de siempre.",
         ],
         images: [{ file: "configuracion-estados-01.png", alt: "Configuración de estados de orden" }],
       },

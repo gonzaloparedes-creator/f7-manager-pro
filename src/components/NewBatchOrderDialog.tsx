@@ -1,62 +1,90 @@
 import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { usePlan } from "@/hooks/usePlan";
+import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
-import { useProblemPresets } from "@/hooks/useProblemPresets";
-import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
-import { useMarcaPresets } from "@/hooks/useMarcaPresets";
-import { useModeloPresets } from "@/hooks/useModeloPresets";
-import { STATUS_LABELS } from "@/lib/orders";
+import { renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
+import { SignaturePad } from "@/components/SignaturePad";
+import DeviceIntakeFields, { type DeviceIntakeValue } from "@/components/DeviceIntakeFields";
+import type { PhotoEntry } from "@/lib/photos";
 
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
-type DeviceRow = {
-  key: string; device_type: string; device_otro: boolean;
-  marca: string; marca_otro: boolean; modelo: string; modelo_otro: boolean;
-  problems: string[]; problem_other: string; quote_amount: string;
-};
+type DeviceRow = DeviceIntakeValue & { key: string; files: PhotoEntry[] };
 
 const newRow = (): DeviceRow => ({
   key: Math.random().toString(36).slice(2),
   device_type: "",
-  device_otro: false,
+  imei: "",
   marca: "",
-  marca_otro: false,
   modelo: "",
-  modelo_otro: false,
+  assigned_technician_id: "",
   problems: [],
   problem_other: "",
+  problem_description: "",
+  accessories: [],
+  checklist: {},
   quote_amount: "",
+  deposit_amount: "",
+  deposit_payment_method: "Efectivo",
+  estimated_delivery_date: undefined,
+  warranty_days: 30,
+  device_pin: "",
+  device_pattern: [],
+  files: [],
 });
 
+function parseAmount(s: string) {
+  const digits = s.replace(/\D/g, "");
+  return digits ? parseInt(digits, 10) : 0;
+}
+
+function summarizeRow(row: DeviceRow): string {
+  if (!row.device_type.trim()) return "Sin completar";
+  const parts = [row.device_type, [row.marca, row.modelo].filter(Boolean).join(" ")].filter(Boolean);
+  const amount = parseAmount(row.quote_amount);
+  const base = parts.join(" · ");
+  return amount > 0 ? `${base} · Gs. ${amount.toLocaleString("es-PY")}` : base;
+}
+
+function toggleInSet<T>(set: Set<T>, item: T, active: boolean): Set<T> {
+  const next = new Set(set);
+  if (active) next.add(item); else next.delete(item);
+  return next;
+}
+
 // Modo Lote: un mismo cliente deja varios equipos a la vez (caso típico:
-// trae 3 celus de la familia el mismo día). Se completa el cliente una
-// sola vez y se genera una orden real e independiente por cada equipo
-// (cada una con su propio número, su propio link de seguimiento). A
-// propósito no pide accesorios/checklist/garantía/seña/firma por equipo
-// acá — eso se completa después desde el detalle de cada orden si hace
-// falta; el objetivo de este modo es entrada rápida, no reemplazar Nueva
-// Orden.
+// trae 3 celus de la familia el mismo día). Se completa el cliente una sola
+// vez y se genera una orden real e independiente por cada equipo (cada una
+// con su propio número, su propio link de seguimiento) — pero cada equipo
+// tiene los mismos datos completos que Nueva Orden (accesorios, checklist,
+// seña, garantía, PIN/patrón, fotos, técnico), vía el mismo
+// DeviceIntakeFields que usa Nueva Orden. Firma y términos se completan una
+// sola vez para todo el lote (un cliente que deja 3 equipos firma una vez,
+// no tres) y se graban idénticos en cada orden creada.
 export default function NewBatchOrderDialog({
   open, onOpenChange, onCreated,
 }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const { limits, isStarter } = usePlan();
+  const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
-  const { presets: problemPresets } = useProblemPresets();
-  const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
-  const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
-  const { presets: modeloPresets } = useModeloPresets();
   const [loading, setLoading] = useState(false);
 
   // Cada equipo del lote es una orden independiente creada en secuencia;
@@ -74,7 +102,16 @@ export default function NewBatchOrderDialog({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerCedula, setCustomerCedula] = useState("");
-  const [rows, setRows] = useState<DeviceRow[]>([newRow(), newRow()]);
+  const [rows, setRows] = useState<DeviceRow[]>(() => [newRow(), newRow()]);
+  const [openRows, setOpenRows] = useState<string[]>(() => rows.map((r) => r.key));
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [clientSignature, setClientSignature] = useState("");
+  // Cuántas filas tienen su cámara abierta / están comprimiendo fotos ahora
+  // mismo — con más de un equipo puede haber, en teoría, más de una a la
+  // vez. Mientras el set no esté vacío, el diálogo no debe cerrarse (cámara)
+  // ni permitir enviar el formulario (compresión en curso).
+  const [activeCameraRows, setActiveCameraRows] = useState<Set<string>>(new Set());
+  const [compressingRows, setCompressingRows] = useState<Set<string>>(new Set());
 
   const [clients, setClients] = useState<ClientLite[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -95,7 +132,14 @@ export default function NewBatchOrderDialog({
   const reset = () => {
     setCustomerName(""); setCustomerPhone(""); setCustomerCedula("");
     setSelectedClientId(null); setClientSearch("");
-    setRows([newRow(), newRow()]);
+    rows.forEach((r) => r.files.forEach((f) => URL.revokeObjectURL(f.previewUrl)));
+    const fresh = [newRow(), newRow()];
+    setRows(fresh);
+    setOpenRows(fresh.map((r) => r.key));
+    setTermsAccepted(false);
+    setClientSignature("");
+    setActiveCameraRows(new Set());
+    setCompressingRows(new Set());
   };
 
   const searchByCedula = async () => {
@@ -125,43 +169,25 @@ export default function NewBatchOrderDialog({
   const updateRow = (key: string, patch: Partial<DeviceRow>) => {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
-  const toggleRowProblem = (key: string, p: string) => {
-    setRows((prev) => prev.map((r) => (r.key === key
-      ? { ...r, problems: r.problems.includes(p) ? r.problems.filter((x) => x !== p) : [...r.problems, p] }
-      : r)));
+  const addRow = () => {
+    const row = newRow();
+    setRows((prev) => [...prev, row]);
+    setOpenRows((prev) => [...prev, row.key]);
   };
-  const selectRowDeviceType = (key: string, label: string) => {
-    if (label === "Otro") {
-      updateRow(key, { device_otro: true, device_type: "" });
-    } else {
-      updateRow(key, { device_otro: false, device_type: label });
-    }
+  const removeRow = (key: string) => {
+    setRows((prev) => {
+      if (prev.length === 1) return prev;
+      const row = prev.find((r) => r.key === key);
+      row?.files.forEach((f) => URL.revokeObjectURL(f.previewUrl));
+      return prev.filter((r) => r.key !== key);
+    });
+    setOpenRows((prev) => prev.filter((k) => k !== key));
+    setActiveCameraRows((prev) => toggleInSet(prev, key, false));
+    setCompressingRows((prev) => toggleInSet(prev, key, false));
   };
-  const selectRowMarca = (key: string, label: string) => {
-    if (label === "Otro") {
-      updateRow(key, { marca_otro: true, marca: "" });
-    } else {
-      updateRow(key, { marca_otro: false, marca: label });
-    }
-  };
-  const selectRowModelo = (key: string, label: string) => {
-    if (label === "Otro") {
-      updateRow(key, { modelo_otro: true, modelo: "" });
-    } else {
-      updateRow(key, { modelo_otro: false, modelo: label });
-    }
-  };
-  const addRow = () => setRows((prev) => [...prev, newRow()]);
-  const removeRow = (key: string) => setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== key) : prev));
 
-  const parseAmount = (s: string) => {
-    const digits = s.replace(/\D/g, "");
-    return digits ? parseInt(digits, 10) : 0;
-  };
-  const formatThousands = (s: string) => {
-    const n = parseAmount(s);
-    return n ? n.toLocaleString("es-PY") : "";
-  };
+  const anyCameraActive = activeCameraRows.size > 0;
+  const anyCompressing = compressingRows.size > 0;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,6 +201,26 @@ export default function NewBatchOrderDialog({
       toast({ title: "Faltan datos", description: "Agregá al menos un equipo con su tipo.", variant: "destructive" });
       return;
     }
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
+      if (row.problems.length === 0) {
+        toast({ title: "Faltan datos", description: `Equipo ${i + 1}: seleccioná al menos un problema.`, variant: "destructive" });
+        return;
+      }
+      if (row.problems.includes("Otro") && !row.problem_other.trim()) {
+        toast({ title: "Faltan datos", description: `Equipo ${i + 1}: describí el problema "Otro".`, variant: "destructive" });
+        return;
+      }
+      if (parseAmount(row.deposit_amount) > parseAmount(row.quote_amount)) {
+        toast({ title: "Importes inválidos", description: `Equipo ${i + 1}: la seña no puede superar al presupuesto.`, variant: "destructive" });
+        return;
+      }
+    }
+    if (!termsAccepted) {
+      toast({ title: "Faltan datos", description: "El cliente debe aceptar los términos del servicio.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: meProfile } = await supabase
@@ -203,16 +249,31 @@ export default function NewBatchOrderDialog({
 
       for (const row of validRows) {
         try {
+          // Las fotos ya se comprimen apenas se agregan (ver DeviceIntakeFields),
+          // acá solo queda subir lo que ya está en memoria en tamaño reducido.
+          const photoUrls: string[] = [];
+          for (const { file } of row.files) {
+            const ext = file.name.split(".").pop() || "jpg";
+            const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+            const { error: upErr } = await supabase.storage.from("order-photos").upload(path, file);
+            if (upErr) throw upErr;
+            const { data: pub } = supabase.storage.from("order-photos").getPublicUrl(path);
+            photoUrls.push(pub.publicUrl);
+          }
+
           const { data: numData, error: numErr } = await supabase.rpc("generate_order_number", { _company_id: resolvedCompanyId });
           if (numErr) throw numErr;
           const order_number = numData as string;
+
+          const quote = parseAmount(row.quote_amount);
+          const deposit = parseAmount(row.deposit_amount);
 
           const { data: order, error } = await supabase
             .from("orders")
             .insert({
               company_id: resolvedCompanyId,
               technician_id: user.id,
-              assigned_technician_id: user.id,
+              assigned_technician_id: row.assigned_technician_id || user.id,
               received_branch_id: branchId,
               current_branch_id: branchId,
               order_number,
@@ -220,15 +281,27 @@ export default function NewBatchOrderDialog({
               customer_name: customerName,
               customer_phone: customerPhone || "",
               device_type: row.device_type,
+              imei: row.imei || null,
               marca: row.marca || null,
               modelo: row.modelo || null,
               problems: row.problems,
               problem_other: row.problems.includes("Otro") ? row.problem_other : null,
-              quote_amount: parseAmount(row.quote_amount),
-              deposit_amount: 0,
-              photos: [],
+              problem_description: row.problem_description || "",
+              quote_amount: quote,
+              deposit_amount: deposit,
+              deposit_payment_method: deposit > 0 ? row.deposit_payment_method : null,
+              estimated_delivery_date: row.estimated_delivery_date
+                ? format(row.estimated_delivery_date, "yyyy-MM-dd")
+                : null,
+              photos: photoUrls,
               status: "recibido",
-              terms_accepted: false,
+              device_pin: row.device_pin || null,
+              device_pattern: row.device_pattern,
+              terms_accepted: termsAccepted,
+              client_signature: clientSignature || null,
+              accessories: row.accessories,
+              checklist: Object.entries(row.checklist).map(([label, status]) => ({ label, status })),
+              warranty_days: row.warranty_days,
               received_by_id: user.id,
             })
             .select()
@@ -283,12 +356,18 @@ export default function NewBatchOrderDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!loading) { onOpenChange(o); if (!o) reset(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (anyCameraActive) return;
+        if (!loading) { onOpenChange(o); if (!o) reset(); }
+      }}
+    >
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
         <DialogHeader className="shrink-0">
           <DialogTitle>Modo Lote</DialogTitle>
           <DialogDescription>
-            Recibí varios equipos del mismo cliente de una sola vez. Cada equipo genera su propia orden.
+            Recibí varios equipos del mismo cliente de una sola vez. Cada equipo genera su propia orden, con los mismos datos que Nueva Orden.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex-1 space-y-4 overflow-y-auto">
@@ -414,211 +493,85 @@ export default function NewBatchOrderDialog({
               </Button>
             </div>
 
-            {rows.map((row, idx) => (
-              <div key={row.key} className="space-y-3 rounded-lg border border-border p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">Equipo {idx + 1}</span>
-                  <Button
-                    type="button" variant="ghost" size="icon" className="h-9 w-9"
-                    onClick={() => removeRow(row.key)}
-                    disabled={rows.length === 1}
-                    aria-label={`Quitar equipo ${idx + 1}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`batch_device_${row.key}`} className="text-xs">Equipo *</Label>
-                    {deviceTypeSelectionMode && deviceTypePresets.length > 0 ? (
-                      <div className="space-y-1.5">
-                        <div className="flex flex-wrap gap-1.5">
-                          {deviceTypePresets.map((p) => {
-                            const active = p.label === "Otro" ? row.device_otro : (!row.device_otro && row.device_type === p.label);
-                            return (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => selectRowDeviceType(row.key, p.label)}
-                                className={cn(
-                                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                                  active
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border bg-card text-muted-foreground hover:text-foreground"
-                                )}
-                              >
-                                {p.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {row.device_otro && (
-                          <Input
-                            id={`batch_device_${row.key}`}
-                            placeholder="Especificá el equipo…"
-                            value={row.device_type}
-                            onChange={(e) => updateRow(row.key, { device_type: e.target.value })}
-                          />
-                        )}
+            <Accordion type="multiple" value={openRows} onValueChange={setOpenRows} className="space-y-2">
+              {rows.map((row, idx) => (
+                <AccordionItem key={row.key} value={row.key} className="rounded-lg border border-border px-3">
+                  <div className="flex items-center gap-1">
+                    <AccordionTrigger className="flex-1 py-3 text-left hover:no-underline">
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-sm font-medium">Equipo {idx + 1}</span>
+                        <span className="text-xs font-normal text-muted-foreground">{summarizeRow(row)}</span>
                       </div>
-                    ) : (
-                      <Input
-                        id={`batch_device_${row.key}`}
-                        placeholder="iPhone 13, Apple Watch S8…"
-                        value={row.device_type}
-                        onChange={(e) => updateRow(row.key, { device_type: e.target.value })}
-                      />
-                    )}
+                    </AccordionTrigger>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={(e) => { e.stopPropagation(); removeRow(row.key); }}
+                      disabled={rows.length === 1}
+                      aria-label={`Quitar equipo ${idx + 1}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`batch_quote_${row.key}`} className="text-xs">Presupuesto (Gs.)</Label>
-                    <Input
-                      id={`batch_quote_${row.key}`}
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={formatThousands(row.quote_amount)}
-                      onChange={(e) => updateRow(row.key, { quote_amount: e.target.value })}
+                  <AccordionContent className="pb-4 pt-1">
+                    <DeviceIntakeFields
+                      idPrefix={`batch_${row.key}`}
+                      compact
+                      value={row}
+                      onChange={(patch) => updateRow(row.key, patch)}
+                      files={row.files}
+                      onFilesChange={(files) => updateRow(row.key, { files })}
+                      photoLimit={limits.photos}
+                      isStarterPlan={isStarter}
+                      onCameraActiveChange={(active) => setActiveCameraRows((prev) => toggleInSet(prev, row.key, active))}
+                      onCompressingChange={(c) => setCompressingRows((prev) => toggleInSet(prev, row.key, c))}
                     />
-                  </div>
-                </div>
-
-                {useDeviceClassification && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`batch_marca_${row.key}`} className="text-xs">Marca</Label>
-                      {marcaPresets.length > 0 ? (
-                        <div className="space-y-1.5">
-                          <div className="flex flex-wrap gap-1.5">
-                            {marcaPresets.map((p) => {
-                              const active = p.label === "Otro" ? row.marca_otro : (!row.marca_otro && row.marca === p.label);
-                              return (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  onClick={() => selectRowMarca(row.key, p.label)}
-                                  className={cn(
-                                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                                    active
-                                      ? "border-primary bg-primary text-primary-foreground"
-                                      : "border-border bg-card text-muted-foreground hover:text-foreground"
-                                  )}
-                                >
-                                  {p.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {row.marca_otro && (
-                            <Input
-                              id={`batch_marca_${row.key}`}
-                              placeholder="Especificá la marca…"
-                              value={row.marca}
-                              onChange={(e) => updateRow(row.key, { marca: e.target.value })}
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <Input
-                          id={`batch_marca_${row.key}`}
-                          placeholder="Apple, Samsung…"
-                          value={row.marca}
-                          onChange={(e) => updateRow(row.key, { marca: e.target.value })}
-                        />
-                      )}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`batch_modelo_${row.key}`} className="text-xs">Modelo</Label>
-                      {modeloPresets.length > 0 ? (
-                        <div className="space-y-1.5">
-                          <div className="flex flex-wrap gap-1.5">
-                            {modeloPresets.map((p) => {
-                              const active = p.label === "Otro" ? row.modelo_otro : (!row.modelo_otro && row.modelo === p.label);
-                              return (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  onClick={() => selectRowModelo(row.key, p.label)}
-                                  className={cn(
-                                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                                    active
-                                      ? "border-primary bg-primary text-primary-foreground"
-                                      : "border-border bg-card text-muted-foreground hover:text-foreground"
-                                  )}
-                                >
-                                  {p.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {row.modelo_otro && (
-                            <Input
-                              id={`batch_modelo_${row.key}`}
-                              placeholder="Especificá el modelo…"
-                              value={row.modelo}
-                              onChange={(e) => updateRow(row.key, { modelo: e.target.value })}
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <Input
-                          id={`batch_modelo_${row.key}`}
-                          placeholder="iPhone 13, Galaxy A54…"
-                          value={row.modelo}
-                          onChange={(e) => updateRow(row.key, { modelo: e.target.value })}
-                        />
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Problemas</Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {problemPresets.map(({ label: p }) => {
-                      const active = row.problems.includes(p);
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => toggleRowProblem(row.key, p)}
-                          className={cn(
-                            "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                            active
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-card text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {p}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {row.problems.includes("Otro") && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`batch_other_${row.key}`} className="text-xs">Especificá "Otro"</Label>
-                    <Input
-                      id={`batch_other_${row.key}`}
-                      value={row.problem_other}
-                      onChange={(e) => updateRow(row.key, { problem_other: e.target.value })}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            Accesorios, checklist, garantía, seña y firma se completan después, individualmente, desde el detalle de cada orden.
-          </p>
+          <div className="space-y-3 border-t border-border pt-4">
+            <Label className="text-sm font-semibold text-foreground">Firma y términos</Label>
+            <p className="text-xs text-muted-foreground">
+              Se completa una sola vez para todos los equipos de este lote.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="batch_terms">Términos del servicio</Label>
+              <Textarea
+                id="batch_terms"
+                readOnly
+                rows={6}
+                value={renderServiceTerms(serviceTermsTemplate, rows[0]?.warranty_days ?? 30)}
+                className="resize-none bg-muted/30 font-mono text-xs leading-relaxed"
+              />
+            </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="batch_terms_accepted"
+                checked={termsAccepted}
+                onCheckedChange={(c) => setTermsAccepted(c === true)}
+              />
+              <Label htmlFor="batch_terms_accepted" className="text-sm font-normal leading-snug">
+                El cliente leyó y acepta los términos y condiciones del servicio.
+              </Label>
+            </div>
+            <div className="space-y-2">
+              <Label>Firma del cliente (opcional)</Label>
+              <SignaturePad value={clientSignature} onChange={setClientSignature} />
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || anyCompressing}>
               {loading
                 ? "Creando..."
+                : anyCompressing
+                ? "Optimizando fotos..."
                 : (() => {
                     const n = rows.filter((r) => r.device_type.trim()).length;
                     if (n === 0) return "Crear orden";
