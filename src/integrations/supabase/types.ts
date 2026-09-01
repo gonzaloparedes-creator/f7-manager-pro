@@ -1082,6 +1082,9 @@ export type Database = {
           device_type: string
           estimated_delivery_date: string
           id: string
+          imei: string
+          marca: string
+          modelo: string
           order_number: string
           problem_description: string
           problem_other: string
@@ -1109,6 +1112,9 @@ export type Database = {
           device_type: string
           estimated_delivery_date: string
           id: string
+          imei: string
+          marca: string
+          modelo: string
           order_number: string
           problem_description: string
           problem_other: string

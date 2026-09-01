@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, Truck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2 } from "lucide-react";
+import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, Truck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2, Hash } from "lucide-react";
 import { STATUS_LABELS, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
 import f7Logo from "@/assets/f7-logo.png";
 import { format } from "date-fns";
@@ -35,6 +35,9 @@ interface PublicOrder {
   quote_responded_at?: string | null;
   company_name?: string | null;
   company_logo_url?: string | null;
+  marca?: string | null;
+  modelo?: string | null;
+  imei?: string | null;
 }
 interface PublicHistory { id: string; status: string; status_label?: string | null; note: string | null; created_at: string; image_urls?: string[] | null; }
 interface PublicTechNote { id: string; note: string; created_at: string; }
@@ -173,8 +176,23 @@ export default function PublicTrackingByCode() {
               <Smartphone className="h-6 w-6" />
               {order.device_type}
             </div>
+            {(order.marca || order.modelo) && (
+              <div className="mt-1 text-sm font-medium opacity-90">
+                {[order.marca, order.modelo].filter(Boolean).join(" · ")}
+              </div>
+            )}
           </div>
           <CardContent className="space-y-4 p-6">
+            {order.imei && (
+              <div className="flex items-center gap-3 rounded-lg border border-border p-4">
+                <Hash className="h-5 w-5 text-primary" />
+                <div>
+                  <div className="text-xs text-muted-foreground">IMEI / Nº de serie</div>
+                  <div className="font-mono font-medium">{order.imei}</div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-3 rounded-lg bg-accent p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <Icon className="h-5 w-5" />
