@@ -15,6 +15,7 @@ import Clients from "./pages/Clients.tsx";
 import Reports from "./pages/Reports.tsx";
 import Inventory from "./pages/Inventory.tsx";
 import Products from "./pages/Products.tsx";
+import HowToUse from "./pages/HowToUse.tsx";
 import PublicTrackingByCode from "./pages/PublicTrackingByCode.tsx";
 import MasterAdmin from "./pages/MasterAdmin.tsx";
 import SuperAdminHome from "./pages/SuperAdminHome.tsx";
@@ -63,6 +64,7 @@ const App = () => (
             <Route path="/inventario" element={<Inventory />} />
             <Route path="/productos" element={<Products />} />
             <Route path="/reportes" element={<Reports />} />
+            <Route path="/como-usar" element={<HowToUse />} />
             <Route path="/configuracion" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />

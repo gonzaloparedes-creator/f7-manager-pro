@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -21,6 +21,7 @@ const baseNav = [
   { to: "/inventario", label: "Inventario", icon: Package, proOnly: true, businessOnly: false, adminOnly: false },
   { to: "/productos", label: "Productos", icon: ShoppingBag, proOnly: false, businessOnly: true, adminOnly: false },
   { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true },
+  { to: "/como-usar", label: "Cómo usar", icon: BookOpen, proOnly: false, businessOnly: false, adminOnly: false },
 ];
 const adminNav = [
   { to: "/configuracion", label: "Configuración", icon: Settings, proOnly: false, businessOnly: false, adminOnly: true },
@@ -50,7 +51,7 @@ export default function AppLayout() {
   // así que en mobile viven como íconos en el header en vez de competir por
   // espacio en la barra inferior. En desktop el sidebar tiene lugar de sobra.
   const mobileNav = useMemo(
-    () => nav.filter((i) => i.to !== "/configuracion" && i.to !== "/superadmin"),
+    () => nav.filter((i) => i.to !== "/configuracion" && i.to !== "/superadmin" && i.to !== "/como-usar"),
     [nav]
   );
   useEffect(() => {
@@ -193,6 +194,13 @@ export default function AppLayout() {
               <Settings className="h-5 w-5" />
             </Link>
           )}
+          <Link
+            to="/como-usar"
+            aria-label="Cómo usar"
+            className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <BookOpen className="h-5 w-5" />
+          </Link>
           <button
             onClick={signOut}
             aria-label="Cerrar sesión"
