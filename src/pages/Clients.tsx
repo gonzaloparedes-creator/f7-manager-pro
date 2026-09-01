@@ -13,8 +13,11 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Pencil, Search, Users as UsersIcon, MessageCircle } from "lucide-react";
 import { openWhatsApp } from "@/lib/whatsapp";
+import { resolveStatusLabel } from "@/lib/orders";
+import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 
 type Client = {
   id: string;
@@ -37,6 +40,7 @@ export default function Clients() {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const { presets: statusPresets } = useOrderStatusPresets();
   const [clients, setClients] = useState<Client[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -325,7 +329,7 @@ export default function Clients() {
                           <div className="font-medium">{o.order_number}</div>
                           <div className="text-xs text-muted-foreground">{o.device_type}</div>
                         </div>
-                        <Badge variant="outline">{o.status}</Badge>
+                        <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
                       </Link>
                     </li>
                   ))}
