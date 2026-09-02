@@ -82,6 +82,7 @@ export default function OrderDetail() {
   const [editQuote, setEditQuote] = useState<string>("");
   const [editDeposit, setEditDeposit] = useState<string>("");
   const [savingFinance, setSavingFinance] = useState(false);
+  const [collectingBalance, setCollectingBalance] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
   const [history, setHistory] = useState<History[]>([]);
@@ -590,6 +591,24 @@ export default function OrderDetail() {
     setEditingFinance(true);
   };
 
+  const collectBalance = async (totalAjustado: number) => {
+    if (!order) return;
+    setCollectingBalance(true);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ deposit_amount: totalAjustado, final_payment_date: new Date().toISOString() })
+        .eq("id", order.id);
+      if (error) throw error;
+      toast({ title: "Saldo cobrado", description: `${order.order_number} quedó totalmente pagada.` });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error al cobrar saldo", description: e.message, variant: "destructive" });
+    } finally {
+      setCollectingBalance(false);
+    }
+  };
+
   const saveFinance = async () => {
     if (!order) return;
     const q = Number(editQuote);
@@ -1078,6 +1097,18 @@ export default function OrderDetail() {
                         <span className="text-base font-bold text-primary">{formatPYG(saldo)}</span>
                       </div>
                     </div>
+
+                    {saldo > 0 && (
+                      <Button
+                        type="button"
+                        className="w-full gap-2 bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                        disabled={collectingBalance}
+                        onClick={() => collectBalance(totalAjustado)}
+                      >
+                        <Wallet className="h-4 w-4" />
+                        {collectingBalance ? "Cobrando..." : "Cobrar Saldo"}
+                      </Button>
+                    )}
 
                     {order.estimated_delivery_date && (
                       <div className="flex items-center gap-2 border-t border-border pt-3 text-sm">

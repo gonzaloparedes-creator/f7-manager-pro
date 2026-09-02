@@ -316,7 +316,7 @@ export default function Dashboard() {
           {/* Mobile: filas compactas, una línea de info por orden */}
           <div className="flex flex-col gap-2 sm:hidden">
             {filtered.map((o) => {
-              const { saldo, isFullyPaid, hasQuoteOnly, total } = orderMoney(o);
+              const { saldo, isFullyPaid, hasQuoteOnly, hasPartial, total } = orderMoney(o);
               return (
                 <Link key={o.id} to={`/ordenes/${o.id}`}>
                   <div className={cn(
@@ -347,8 +347,19 @@ export default function Dashboard() {
                           {QUOTE_RESPONSE_LABELS[o.quote_response]}
                         </span>
                       )}
-                      {saldo > 0 ? (
-                        <span className="text-[11px] font-semibold text-secondary">{formatPYG(saldo)}</span>
+                      {hasPartial || (total > 0 && saldo > 0) ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[11px] font-semibold text-secondary">Saldo: {formatPYG(saldo)}</span>
+                          <Button
+                            size="sm"
+                            disabled={collectingId === o.id}
+                            onClick={(e) => collectBalance(e, o, total)}
+                            className="h-7 gap-1 bg-secondary px-2 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/90"
+                          >
+                            <Wallet className="h-3 w-3" />
+                            {collectingId === o.id ? "..." : "Cobrar Saldo"}
+                          </Button>
+                        </div>
                       ) : hasQuoteOnly ? (
                         <span className="text-[11px] font-medium text-muted-foreground">{formatPYG(total)}</span>
                       ) : null}
