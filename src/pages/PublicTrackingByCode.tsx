@@ -40,6 +40,7 @@ interface PublicOrder {
   modelo?: string | null;
   imei?: string | null;
   financial_documents?: PublicFinancialDocument[] | null;
+  photos?: string[] | null;
 }
 interface PublicHistory { id: string; status: string; status_label?: string | null; note: string | null; created_at: string; image_urls?: string[] | null; }
 interface PublicTechNote { id: string; note: string; created_at: string; }
@@ -282,6 +283,25 @@ export default function PublicTrackingByCode() {
                     >
                       {c.status === "ok" ? "✓" : "✗"} {c.label}
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {order.photos && order.photos.length > 0 && (
+              <div className="space-y-1.5 border-t border-border pt-4">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fotos de recepción</div>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {order.photos.map((src, idx) => (
+                    <a
+                      key={idx}
+                      href={src}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block aspect-square overflow-hidden rounded-md border border-border"
+                    >
+                      <img src={src} alt={`Foto de recepción ${idx + 1}`} className="h-full w-full object-cover transition hover:opacity-80" />
+                    </a>
                   ))}
                 </div>
               </div>
