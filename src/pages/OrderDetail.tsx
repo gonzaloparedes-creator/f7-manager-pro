@@ -119,7 +119,7 @@ export default function OrderDetail() {
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const { technicians } = useAssignableTechnicians();
+  const { technicians, loading: techniciansLoading } = useAssignableTechnicians();
   const [assigning, setAssigning] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -722,6 +722,7 @@ export default function OrderDetail() {
           order={{
             id: order.id,
             order_number: order.order_number,
+            tracking_token: order.tracking_token,
             customer_name: order.customer_name,
             customer_phone: order.customer_phone,
             secondary_phone: order.secondary_phone,
@@ -757,23 +758,29 @@ export default function OrderDetail() {
                   Derivar a otra sucursal
                 </Button>
               </div>
-              <Select
-                value={order.assigned_technician_id ?? "__none__"}
-                onValueChange={assignTechnician}
-                disabled={assigning}
-              >
-                <SelectTrigger id="assigned-tech">
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin asignar</SelectItem>
-                  {technicians.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.full_name || "Técnico sin nombre"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {techniciansLoading ? (
+                <div className="flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                  Cargando técnicos...
+                </div>
+              ) : (
+                <Select
+                  value={order.assigned_technician_id ?? "__none__"}
+                  onValueChange={assignTechnician}
+                  disabled={assigning}
+                >
+                  <SelectTrigger id="assigned-tech">
+                    <SelectValue placeholder="Sin asignar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin asignar</SelectItem>
+                    {technicians.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.full_name || "Técnico sin nombre"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {order.current_branch_id && (
                 <p className="text-xs text-muted-foreground">
                   Sucursal actual:{" "}
