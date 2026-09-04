@@ -7,8 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Rocket, Search, Users2 } from "lucide-react";
+import { Rocket, Search, Users2, Copy, MessageCircle } from "lucide-react";
+import { openWhatsApp } from "@/lib/whatsapp";
 
 interface CompanyRow {
   id: string;
@@ -25,6 +28,7 @@ interface CompanyRow {
 interface Partner {
   id: string;
   name: string;
+  slug: string;
   commission_rate: number;
 }
 
@@ -37,6 +41,12 @@ interface Metrics {
   daysSinceActivation: number | null;
   trialDaysLeft: number | null;
   trialExpired: boolean;
+  lastActivityAt: string | null;
+}
+
+interface Contact {
+  fullName: string | null;
+  phone: string | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -60,7 +70,15 @@ function computeMetrics(clientDates: string[], actionDates: string[]): Metrics {
     daysSinceActivation,
     trialDaysLeft,
     trialExpired,
+    lastActivityAt: activeDays.length > 0 ? activeDays[activeDays.length - 1] : null,
   };
+}
+
+function relativeDays(iso: string): string {
+  const d = daysSince(iso);
+  if (d <= 0) return "hoy";
+  if (d === 1) return "ayer";
+  return `hace ${d} días`;
 }
 
 export default function SuperAdminFundadores() {
@@ -68,9 +86,11 @@ export default function SuperAdminFundadores() {
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [metrics, setMetrics] = useState<Record<string, Metrics>>({});
+  const [contacts, setContacts] = useState<Record<string, Contact>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [partnerFilter, setPartnerFilter] = useState<string>("all");
 
   useEffect(() => { document.title = "Panel de Fundadores — F7 Manager Pro"; }, []);
 
@@ -87,7 +107,7 @@ export default function SuperAdminFundadores() {
         .select("id, name, created_at, plan_type, is_active, founder_cohort, founder_cohort_at, is_paying, referral_partner_id")
         .or("founder_cohort.eq.true,referral_partner_id.not.is.null")
         .order("created_at", { ascending: false }),
-      supabase.from("referral_partners").select("id, name, commission_rate").order("name"),
+      supabase.from("referral_partners").select("id, name, slug, commission_rate").order("name"),
     ]);
     if (error) {
       toast.error("No se pudieron cargar los Fundadores");
@@ -101,15 +121,32 @@ export default function SuperAdminFundadores() {
     const ids = rows.map((c) => c.id);
     if (ids.length === 0) {
       setMetrics({});
+      setContacts({});
       setLoading(false);
       return;
     }
 
-    const [{ data: clients }, { data: orders }, { data: sales }] = await Promise.all([
+    const [{ data: clients }, { data: orders }, { data: sales }, { data: profiles }] = await Promise.all([
       supabase.from("clients").select("company_id, created_at").in("company_id", ids),
       supabase.from("orders").select("company_id, created_at").in("company_id", ids),
       (supabase as any).from("product_sales").select("company_id, created_at").in("company_id", ids),
+      supabase.from("profiles").select("company_id, full_name, phone, created_at").in("company_id", ids),
     ]);
+
+    // El primer perfil (por fecha) de cada empresa es quien la creó al
+    // registrarse — no es 100% "el admin" en todos los casos (podría haber
+    // cambiado de admin después), pero es la mejor aproximación sin sumar
+    // un join contra user_roles solo para un dato de contacto.
+    const contactByCompany = new Map<string, Contact>();
+    (profiles ?? [])
+      .slice()
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .forEach((p) => {
+        if (!contactByCompany.has(p.company_id)) {
+          contactByCompany.set(p.company_id, { fullName: p.full_name, phone: p.phone });
+        }
+      });
+    setContacts(Object.fromEntries(contactByCompany));
 
     const clientDatesByCompany = new Map<string, string[]>();
     (clients ?? []).forEach((r: any) => {
@@ -162,9 +199,10 @@ export default function SuperAdminFundadores() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return companies;
-    return companies.filter((c) => c.name.toLowerCase().includes(q));
-  }, [companies, search]);
+    return companies
+      .filter((c) => (partnerFilter === "all" ? true : partnerFilter === "none" ? !c.referral_partner_id : c.referral_partner_id === partnerFilter))
+      .filter((c) => (q ? c.name.toLowerCase().includes(q) : true));
+  }, [companies, search, partnerFilter]);
 
   const summary = useMemo(() => {
     const total = companies.length;
@@ -174,14 +212,19 @@ export default function SuperAdminFundadores() {
   }, [companies, metrics]);
 
   const byPartner = useMemo(() => {
-    return partners
-      .map((p) => {
-        const referred = companies.filter((c) => c.referral_partner_id === p.id);
-        const paying = referred.filter((c) => c.is_paying).length;
-        return { ...p, referred: referred.length, paying };
-      })
-      .filter((p) => p.referred > 0);
-  }, [partners, companies]);
+    return partners.map((p) => {
+      const referred = companies.filter((c) => c.referral_partner_id === p.id);
+      const activated = referred.filter((c) => metrics[c.id]?.activated).length;
+      const paying = referred.filter((c) => c.is_paying).length;
+      return { ...p, referred: referred.length, activated, paying };
+    });
+  }, [partners, companies, metrics]);
+
+  const copyRegisterLink = (slug: string) => {
+    const url = `${window.location.origin}/register?ref=${slug}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Link copiado", { description: url });
+  };
 
   if (roleLoading) {
     return (
@@ -237,20 +280,29 @@ export default function SuperAdminFundadores() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Users2 className="h-4 w-4 text-muted-foreground" /> Por aliado
+                <Users2 className="h-4 w-4 text-muted-foreground" /> Por aliado / cohorte
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {byPartner.map((p) => (
-                  <div key={p.id} className="rounded-md border border-border bg-muted/30 p-3">
+                  <div key={p.id} className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
                     <div className="font-medium text-foreground">{p.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {p.referred} referidos · {p.paying} pagando · {p.commission_rate}% de comisión
+                      {p.referred} registrados · {p.activated} activados · {p.paying} pagando
+                      {p.commission_rate > 0 && ` · ${p.commission_rate}% de comisión`}
                     </div>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      El monto exacto se calcula contra lo efectivamente cobrado — esto es atribución, no facturación.
-                    </p>
+                    <div className="flex items-center gap-1.5 rounded border border-dashed border-border bg-background px-2 py-1.5">
+                      <code className="flex-1 truncate text-[11px] text-muted-foreground">/register?ref={p.slug}</code>
+                      <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => copyRegisterLink(p.slug)} aria-label={`Copiar link de registro de ${p.name}`}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {p.commission_rate > 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        El monto exacto se calcula contra lo efectivamente cobrado — esto es atribución, no facturación.
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -259,11 +311,23 @@ export default function SuperAdminFundadores() {
         )}
 
         <Card>
-          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+          <CardHeader className="flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-lg">Empresas ({filtered.length})</CardTitle>
-            <div className="relative w-full max-w-xs">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Buscar empresa..." aria-label="Buscar empresa" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Select value={partnerFilter} onValueChange={setPartnerFilter}>
+                <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Todos los aliados" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los aliados</SelectItem>
+                  <SelectItem value="none">Sin aliado (marcados a mano)</SelectItem>
+                  {partners.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Buscar empresa..." aria-label="Buscar empresa" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -272,7 +336,10 @@ export default function SuperAdminFundadores() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Empresa</TableHead>
+                    <TableHead>Contacto</TableHead>
                     <TableHead>Aliado</TableHead>
+                    <TableHead className="text-center">Día del programa</TableHead>
+                    <TableHead>Última actividad</TableHead>
                     <TableHead className="text-center">Cliente</TableHead>
                     <TableHead className="text-center">Acción real</TableHead>
                     <TableHead className="text-center">Días activos</TableHead>
@@ -285,17 +352,37 @@ export default function SuperAdminFundadores() {
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Cargando...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">Cargando...</TableCell></TableRow>
                   ) : filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Sin Fundadores ni referidos todavía.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">Sin Fundadores ni referidos todavía.</TableCell></TableRow>
                   ) : filtered.map((c) => {
                     const m = metrics[c.id];
                     const partner = partnerName(c.referral_partner_id);
+                    const contact = contacts[c.id];
+                    const programStart = c.founder_cohort_at ?? c.created_at;
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
                         <TableCell>
+                          {contact?.fullName || contact?.phone ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate">{contact?.fullName || "Sin nombre"}</span>
+                              {contact?.phone && (
+                                <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0 text-success" onClick={() => openWhatsApp(contact.phone!)} aria-label={`WhatsApp a ${contact.fullName ?? c.name}`}>
+                                  <MessageCircle className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           {partner ? <Badge variant="outline">{partner}</Badge> : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-center text-muted-foreground">Día {daysSince(programStart) + 1}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {m?.lastActivityAt ? relativeDays(m.lastActivityAt) : "Sin actividad"}
                         </TableCell>
                         <TableCell className="text-center">
                           {m?.clientCount ? <Badge variant="outline">{m.clientCount}</Badge> : <span className="text-muted-foreground">—</span>}
