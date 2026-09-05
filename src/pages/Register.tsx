@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Wrench, Sparkles, Search, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COUNTRIES, PY_DEPARTMENTS, citiesForDepartment } from "@/lib/locations";
-import PhoneInput from "react-phone-input-2";
+import PhoneInput, { type CountryData } from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
 const REPAIRS_BUCKETS = ["1 a 5", "6 a 15", "16 a 30", "Más de 30"];
@@ -101,11 +101,35 @@ export default function Register() {
   const [department, setDepartment] = useState("");
   const [city, setCity] = useState("");
   const isParaguay = country === "PY";
-  // react-phone-input-2 espera un código ISO2 en minúscula; "OTHER" no es un
-  // país real así que cae a Paraguay (mercado principal) como default.
-  const phoneCountry = (country === "OTHER" ? "PY" : country).toLowerCase();
-  const dialCode = DIAL_CODES[country] ?? DIAL_CODES.PY;
+  // El teléfono tiene su propio país (phoneIso2/dialCode), separado de
+  // `country`: react-phone-input-2 conoce ~200 países (con buscador propio
+  // en su dropdown de bandera), mientras que el selector "País" de arriba
+  // solo cubre los 6 mercados principales + "Otro". Cambiar cualquiera de
+  // los dos mantiene al otro sincronizado cuando el país coincide; si eligen
+  // la bandera de un país fuera de esos 6, "País" pasa a "Otro" pero el
+  // teléfono conserva el país/prefijo real que tocaron (no lo fuerza a PY).
+  const [phoneIso2, setPhoneIso2] = useState("py");
+  const [dialCode, setDialCode] = useState(DIAL_CODES.PY);
   const phone = `${dialCode}${phoneLocal}`;
+
+  const selectCountry = (v: string) => {
+    setCountry(v);
+    setDepartment("");
+    setCity("");
+    if (v !== "OTHER") {
+      setPhoneIso2(v.toLowerCase());
+      setDialCode(DIAL_CODES[v] ?? DIAL_CODES.PY);
+    }
+  };
+
+  const selectPhoneCountry = (iso2: string, dial: string) => {
+    setPhoneIso2(iso2);
+    setDialCode(dial);
+    const matched = COUNTRIES.find((c) => c.code !== "OTHER" && c.code.toLowerCase() === iso2);
+    setCountry(matched ? matched.code : "OTHER");
+    setDepartment("");
+    setCity("");
+  };
 
   useEffect(() => { document.title = "Registro | F7 Manager Pro"; }, []);
 
@@ -114,7 +138,7 @@ export default function Register() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         const detected = data?.country as string | undefined;
-        if (detected && COUNTRIES.some((c) => c.code === detected)) setCountry(detected);
+        if (detected && COUNTRIES.some((c) => c.code === detected)) selectCountry(detected);
       })
       .catch(() => { /* sin geo, se queda en Paraguay por defecto */ });
   }, []);
@@ -235,15 +259,21 @@ export default function Register() {
               <Label htmlFor="phone">Teléfono</Label>
               <div className="flex gap-2">
                 <PhoneInput
-                  country={phoneCountry}
+                  country={phoneIso2}
                   value={dialCode}
-                  onChange={() => {}}
-                  disableDropdown
+                  onChange={(_value, data) => {
+                    const d = data as CountryData;
+                    if (d.countryCode && d.dialCode) selectPhoneCountry(d.countryCode, d.dialCode);
+                  }}
                   countryCodeEditable={false}
+                  enableSearch
+                  searchPlaceholder="Buscar país..."
                   specialLabel=""
                   inputProps={{ readOnly: true, tabIndex: -1, "aria-hidden": true }}
-                  inputClass="!h-10 !w-20 !cursor-default !rounded-md !border-input !bg-background !pl-12 !text-sm !text-foreground"
+                  inputClass="!h-10 !w-24 !cursor-default !rounded-md !border-input !bg-background !pl-14 !text-sm !text-foreground"
                   buttonClass="!rounded-l-md !border-input !bg-background"
+                  dropdownClass="!bg-popover !text-popover-foreground"
+                  searchClass="!bg-background !text-foreground"
                   containerClass="!w-auto"
                 />
                 <Input
@@ -267,7 +297,7 @@ export default function Register() {
 
             <div className="space-y-2">
               <Label>País</Label>
-              <Select value={country} onValueChange={(v) => { setCountry(v); setDepartment(""); setCity(""); }}>
+              <Select value={country} onValueChange={selectCountry}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {COUNTRIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>)}
