@@ -6,11 +6,69 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Wrench, Sparkles } from "lucide-react";
-import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
+import { Wrench, Sparkles, Search, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { COUNTRIES, PY_DEPARTMENTS, citiesForDepartment } from "@/lib/locations";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/style.css";
 
 const REPAIRS_BUCKETS = ["1 a 5", "6 a 15", "16 a 30", "Más de 30"];
+
+// Combobox con buscador para listas largas (departamentos/ciudades) — mismo
+// patrón Popover+Command que ya usa el buscador de clientes en Modo Lote,
+// pero genérico porque acá hace falta dos veces con listas distintas.
+function SearchableSelect({
+  value, onChange, options, placeholder, searchPlaceholder, emptyText, disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyText: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled}
+          className="w-full justify-start font-normal"
+        >
+          <Search className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          {value ? <span className="truncate">{value}</span> : <span className="truncate text-muted-foreground">{placeholder}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command filter={(itemValue, s) => (itemValue.toLowerCase().includes(s.toLowerCase()) ? 1 : 0)}>
+          <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
+          <CommandList>
+            <CommandEmpty>{emptyText}</CommandEmpty>
+            <CommandGroup>
+              {options.map((opt) => (
+                <CommandItem
+                  key={opt}
+                  value={opt}
+                  onSelect={() => { onChange(opt); setOpen(false); setSearch(""); }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === opt ? "opacity-100" : "opacity-0")} />
+                  {opt}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -39,6 +97,9 @@ export default function Register() {
   const [department, setDepartment] = useState("");
   const [city, setCity] = useState("");
   const isParaguay = country === "PY";
+  // react-phone-input-2 espera un código ISO2 en minúscula; "OTHER" no es un
+  // país real así que cae a Paraguay (mercado principal) como default.
+  const phoneCountry = (country === "OTHER" ? "PY" : country).toLowerCase();
 
   useEffect(() => { document.title = "Registro | F7 Manager Pro"; }, []);
 
@@ -166,7 +227,19 @@ export default function Register() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Teléfono</Label>
-              <Input id="phone" placeholder="595XXXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <PhoneInput
+                country={phoneCountry}
+                value={phone}
+                onChange={(value) => setPhone(value)}
+                disableDropdown
+                countryCodeEditable={false}
+                specialLabel=""
+                inputProps={{ id: "phone", name: "phone" }}
+                inputClass="!h-10 !w-full !rounded-md !border-input !bg-background !text-sm !text-foreground"
+                buttonClass="!rounded-l-md !border-input !bg-background"
+                dropdownClass="!bg-popover !text-popover-foreground"
+                containerClass="!w-full"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -191,16 +264,26 @@ export default function Register() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Departamento</Label>
-                  <Select value={department} onValueChange={setDepartment}>
-                    <SelectTrigger><SelectValue placeholder="Elegí uno" /></SelectTrigger>
-                    <SelectContent>
-                      {PY_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={department}
+                    onChange={(v) => { setDepartment(v); setCity(""); }}
+                    options={PY_DEPARTMENTS}
+                    placeholder="Elegí uno"
+                    searchPlaceholder="Buscar departamento..."
+                    emptyText="Ningún departamento coincide."
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="city">Ciudad</Label>
-                  <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+                  <Label>Ciudad</Label>
+                  <SearchableSelect
+                    value={city}
+                    onChange={setCity}
+                    options={citiesForDepartment(department)}
+                    placeholder={department ? "Elegí una ciudad" : "Elegí primero el departamento"}
+                    searchPlaceholder="Buscar ciudad..."
+                    emptyText="Ninguna ciudad coincide."
+                    disabled={!department}
+                  />
                 </div>
               </div>
             )}
