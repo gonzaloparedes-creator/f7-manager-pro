@@ -17,6 +17,10 @@ import "react-phone-input-2/lib/style.css";
 
 const REPAIRS_BUCKETS = ["1 a 5", "6 a 15", "16 a 30", "Más de 30"];
 
+const DIAL_CODES: Record<string, string> = {
+  PY: "595", AR: "54", BR: "55", BO: "591", UY: "598", CL: "56",
+};
+
 // Combobox con buscador para listas largas (departamentos/ciudades) — mismo
 // patrón Popover+Command que ya usa el buscador de clientes en Modo Lote,
 // pero genérico porque acá hace falta dos veces con listas distintas.
@@ -76,7 +80,7 @@ export default function Register() {
 
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phoneLocal, setPhoneLocal] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -100,6 +104,8 @@ export default function Register() {
   // react-phone-input-2 espera un código ISO2 en minúscula; "OTHER" no es un
   // país real así que cae a Paraguay (mercado principal) como default.
   const phoneCountry = (country === "OTHER" ? "PY" : country).toLowerCase();
+  const dialCode = DIAL_CODES[country] ?? DIAL_CODES.PY;
+  const phone = `${dialCode}${phoneLocal}`;
 
   useEffect(() => { document.title = "Registro | F7 Manager Pro"; }, []);
 
@@ -227,19 +233,28 @@ export default function Register() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Teléfono</Label>
-              <PhoneInput
-                country={phoneCountry}
-                value={phone}
-                onChange={(value) => setPhone(value)}
-                disableDropdown
-                countryCodeEditable={false}
-                specialLabel=""
-                inputProps={{ id: "phone", name: "phone" }}
-                inputClass="!h-10 !w-full !rounded-md !border-input !bg-background !text-sm !text-foreground"
-                buttonClass="!rounded-l-md !border-input !bg-background"
-                dropdownClass="!bg-popover !text-popover-foreground"
-                containerClass="!w-full"
-              />
+              <div className="flex gap-2">
+                <PhoneInput
+                  country={phoneCountry}
+                  value={dialCode}
+                  onChange={() => {}}
+                  disableDropdown
+                  countryCodeEditable={false}
+                  specialLabel=""
+                  inputProps={{ readOnly: true, tabIndex: -1, "aria-hidden": true }}
+                  inputClass="!h-10 !w-20 !cursor-default !rounded-md !border-input !bg-background !pl-12 !text-sm !text-foreground"
+                  buttonClass="!rounded-l-md !border-input !bg-background"
+                  containerClass="!w-auto"
+                />
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="981 123 456"
+                  value={phoneLocal}
+                  onChange={(e) => setPhoneLocal(e.target.value.replace(/\D/g, ""))}
+                  className="flex-1"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
