@@ -190,7 +190,7 @@ function InfoGrid({ order, statusLabel }: { order: PrintOrder; statusLabel?: str
           <div className="font-semibold">{formatPYG(order.quote_amount)}</div>
         </div>
         <div>
-          <div className="text-black/60">Seña</div>
+          <div className="text-black/60">Seña / Pagado</div>
           <div className="font-semibold">{formatPYG(order.deposit_amount)}</div>
         </div>
         <div>

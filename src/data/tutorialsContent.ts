@@ -197,6 +197,7 @@ export const tutorialCategories: TutorialCategory[] = [
         badge: { label: "Edición: solo Admin" },
         body: [
           "Acá se ve y edita el presupuesto, la seña, el saldo pendiente y los cargos adicionales que se le sumen al trabajo sobre la marcha (por ejemplo, si aparece un problema extra durante la reparación). También se define la fecha estimada de entrega.",
+          "Con saldo pendiente aparece el botón \"Registrar pago\": abre un monto ya cargado con el total que falta (por si el cliente paga todo de una vez) y un método de pago para elegir de la lista configurable. Si el cliente va completando de a poco, se cambia el monto por lo que efectivamente paga esa vez — el sistema descuenta eso del saldo y deja el resto pendiente para la próxima visita. Cada pago registrado queda anotado en el Historial de la orden, con fecha y método.",
           "En \"Documentos (PDF)\" se pueden adjuntar hasta 3 archivos de hasta 10 MB cada uno — útil para guardar una factura, una garantía del fabricante, o cualquier comprobante relacionado con el trabajo.",
         ],
         images: [{ file: "detalle-orden-financiero-01.png", alt: "Información financiera y documentos adjuntos" }],

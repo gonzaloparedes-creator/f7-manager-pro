@@ -346,7 +346,7 @@ export default function PublicTrackingByCode() {
                       <span className="font-semibold">{formatPYG(totalAjustado)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Seña</span>
+                      <span className="text-muted-foreground">Seña / Pagado</span>
                       <span className="font-medium">- {formatPYG(deposit)}</span>
                     </div>
                     <div className="flex items-center justify-between border-t border-border pt-2">
