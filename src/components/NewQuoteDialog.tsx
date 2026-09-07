@@ -168,13 +168,33 @@ export default function NewQuoteDialog({
       const cedulaNorm = customerCedula.trim() || null;
       if (!clientId) {
         const phoneNorm = customerPhone || null;
-        const { data: created, error: cErr } = await supabase
-          .from("clients")
-          .insert({ company_id: resolvedCompanyId, technician_id: user.id, name: customerName, phone: phoneNorm, cedula: cedulaNorm })
-          .select("id")
-          .single();
-        if (cErr) throw cErr;
-        clientId = created.id;
+        // Evita el error de unique constraint (technician_id, phone): si ya
+        // existe un cliente con este mismo teléfono para este técnico
+        // (cliente recurrente que no se buscó/seleccionó arriba), se
+        // reutiliza en vez de intentar crear un duplicado.
+        if (phoneNorm) {
+          const { data: existing } = await supabase
+            .from("clients")
+            .select("id,cedula")
+            .eq("technician_id", user.id)
+            .eq("phone", phoneNorm)
+            .maybeSingle();
+          if (existing?.id) {
+            clientId = existing.id;
+            if (cedulaNorm && !existing.cedula) {
+              await supabase.from("clients").update({ cedula: cedulaNorm }).eq("id", clientId);
+            }
+          }
+        }
+        if (!clientId) {
+          const { data: created, error: cErr } = await supabase
+            .from("clients")
+            .insert({ company_id: resolvedCompanyId, technician_id: user.id, name: customerName, phone: phoneNorm, cedula: cedulaNorm })
+            .select("id")
+            .single();
+          if (cErr) throw cErr;
+          clientId = created.id;
+        }
       }
 
       const { data: numData, error: numErr } = await supabase.rpc("generate_order_number", { _company_id: resolvedCompanyId });
