@@ -60,6 +60,8 @@
     --status-entregado-bg: 262 50% 22%;
     --status-garantia: 280 90% 75%;
     --status-garantia-bg: 280 60% 22%;
+    --status-retirado: 15 70% 72%;
+    --status-retirado-bg: 15 40% 20%;
 
     /* Sidebar — dark navy with cyan active */
     --sidebar-background: 212 52% 11%;          /* #0D1B2A */

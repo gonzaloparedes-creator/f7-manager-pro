@@ -414,6 +414,17 @@ export default function NewOrderDialog({
         });
       } catch (e) { console.warn("notification failed", e); }
 
+      if (order.assigned_technician_id && order.assigned_technician_id !== user.id) {
+        supabase.functions.invoke("send-technician-notification", {
+          body: {
+            order_number: order.order_number,
+            technician_id: order.assigned_technician_id,
+            customer_name: order.customer_name,
+            device_type: order.device_type,
+          },
+        }).catch((e) => console.warn("technician notification failed", e));
+      }
+
       toast({ title: "¡Orden creada!", description: `${order_number} fue registrada.` });
       reset(true);
       onOpenChange(false);

@@ -27,6 +27,7 @@ import SubscriptionTab from "@/components/SubscriptionTab";
 import WarrantyPresetsTab from "@/components/WarrantyPresetsTab";
 import AccessoryPresetsTab from "@/components/AccessoryPresetsTab";
 import ChecklistPresetsTab from "@/components/ChecklistPresetsTab";
+import PaymentMethodPresetsTab from "@/components/PaymentMethodPresetsTab";
 import ProblemPresetsTab from "@/components/ProblemPresetsTab";
 import DeviceTypePresetsTab from "@/components/DeviceTypePresetsTab";
 import MarcaPresetsTab from "@/components/MarcaPresetsTab";
@@ -343,6 +344,7 @@ export default function Settings() {
           <ProblemPresetsTab />
           <AccessoryPresetsTab />
           <ChecklistPresetsTab />
+          <PaymentMethodPresetsTab />
         </TabsContent>
 
         <TabsContent value="estados">
@@ -859,6 +861,7 @@ function CategoryManagerTab() {
 /* ---------- Usuarios ---------- */
 function UsersTab() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const { companyId } = useCompany();
   const { isStarter, isRetail, limits } = usePlan();
   const canUseCommissions = !isStarter && !isRetail;
@@ -867,6 +870,8 @@ function UsersTab() {
   const [loading, setLoading] = useState(true);
   const [commissionEnabled, setCommissionEnabled] = useState(false);
   const [savingCommissionToggle, setSavingCommissionToggle] = useState(false);
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<UserRow | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -969,6 +974,22 @@ function UsersTab() {
     load();
   };
 
+  const deleteUser = async (targetUser: UserRow) => {
+    setDeletingUser(true);
+    const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+      body: { user_id: targetUser.id },
+    });
+    setDeletingUser(false);
+    if (error || data?.error) {
+      const description = data?.error ?? await edgeFunctionErrorMessage(error, "No se pudo eliminar");
+      toast({ title: "Error", description, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Usuario eliminado" });
+    setPendingDeleteUser(null);
+    load();
+  };
+
   const atUserLimit = isStarter && users.length >= limits.users;
 
   return (
@@ -1011,9 +1032,22 @@ function UsersTab() {
             <div className="space-y-3 sm:hidden">
               {users.map((u) => (
                 <div key={u.id} className="space-y-3 rounded-lg border border-border bg-card p-3">
-                  <div>
-                    <div className="font-medium text-foreground">{u.full_name || "—"}</div>
-                    <div className="text-xs text-muted-foreground">{u.phone || "Sin teléfono"}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-foreground">{u.full_name || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{u.phone || "Sin teléfono"}</div>
+                    </div>
+                    {u.id !== currentUser?.id && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setPendingDeleteUser(u)}
+                        aria-label={`Eliminar ${u.full_name || "usuario"}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
@@ -1072,6 +1106,7 @@ function UsersTab() {
                     <TableHead>Rol</TableHead>
                     <TableHead>Sucursal</TableHead>
                     {commissionEnabled && canUseCommissions && <TableHead>Comisión</TableHead>}
+                    <TableHead className="w-12 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1117,6 +1152,19 @@ function UsersTab() {
                           </div>
                         </TableCell>
                       )}
+                      <TableCell className="text-right">
+                        {u.id !== currentUser?.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setPendingDeleteUser(u)}
+                            aria-label={`Eliminar ${u.full_name || "usuario"}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1124,6 +1172,19 @@ function UsersTab() {
             </div>
           </>
         )}
+
+        <ConfirmDialog
+          open={!!pendingDeleteUser}
+          onOpenChange={(o) => !o && setPendingDeleteUser(null)}
+          title="¿Eliminar este usuario?"
+          description={
+            pendingDeleteUser
+              ? `Se eliminará el acceso de "${pendingDeleteUser.full_name || "este usuario"}". Si tiene órdenes registradas a su nombre, no se podrá eliminar hasta reasignarlas.`
+              : ""
+          }
+          loading={deletingUser}
+          onConfirm={() => pendingDeleteUser && deleteUser(pendingDeleteUser)}
+        />
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>

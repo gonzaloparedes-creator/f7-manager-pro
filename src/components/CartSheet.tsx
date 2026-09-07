@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2 } from "lucide-react";
 import { formatPYG } from "@/lib/orders";
 import QuantityStepper from "@/components/QuantityStepper";
+import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 
 export type CartLine = { quantity: number; unitPrice: number };
 export type Cart = Record<string, CartLine>;
@@ -44,6 +45,7 @@ export default function CartSheet({
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const { presets: paymentMethodPresets } = usePaymentMethodPresets();
   const [paymentMethod, setPaymentMethod] = useState("Efectivo");
   const [loading, setLoading] = useState(false);
   const [completedSale, setCompletedSale] = useState<CompletedCartSale | null>(null);
@@ -202,9 +204,9 @@ export default function CartSheet({
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                       <SelectTrigger id="cart-payment"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Efectivo">Efectivo</SelectItem>
-                        <SelectItem value="Transferencia">Transferencia</SelectItem>
-                        <SelectItem value="Otro">Otro</SelectItem>
+                        {paymentMethodPresets.map((m) => (
+                          <SelectItem key={m.id} value={m.label}>{m.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

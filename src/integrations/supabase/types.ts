@@ -847,6 +847,27 @@ export type Database = {
           },
         ]
       }
+      payment_method_presets: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       problem_presets: {
         Row: {
           company_id: string

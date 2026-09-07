@@ -11,13 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatPYG, renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
-import { Type, Grid3x3, Banknote, ArrowLeftRight, MoreHorizontal } from "lucide-react";
+import { Type, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { SignaturePad } from "@/components/SignaturePad";
 import WarrantySelector from "@/components/WarrantySelector";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
+import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
 
@@ -45,6 +46,7 @@ export default function ConvertQuoteDialog({
   const { user } = useAuth();
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
+  const { presets: paymentMethodPresets } = usePaymentMethodPresets();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { technicians } = useAssignableTechnicians();
   const [loading, setLoading] = useState(false);
@@ -118,6 +120,18 @@ export default function ConvertQuoteDialog({
           },
         });
       } catch (e) { console.warn("notification failed", e); }
+
+      const finalTechnicianId = assignedTechnicianId || user?.id || null;
+      if (finalTechnicianId && finalTechnicianId !== user?.id) {
+        supabase.functions.invoke("send-technician-notification", {
+          body: {
+            order_number: order.order_number,
+            technician_id: finalTechnicianId,
+            customer_name: order.customer_name,
+            device_type: order.device_type,
+          },
+        }).catch((e) => console.warn("technician notification failed", e));
+      }
 
       toast({ title: "¡Orden creada!", description: `${order.order_number} pasó de presupuesto a orden recibida.` });
       onOpenChange(false);
@@ -290,27 +304,21 @@ export default function ConvertQuoteDialog({
             <div className="space-y-2">
               <Label>Método de pago de la seña</Label>
               <div className="flex flex-wrap gap-2">
-                {([
-                  { value: "Efectivo", label: "Efectivo", icon: Banknote },
-                  { value: "Transferencia", label: "Transferencia", icon: ArrowLeftRight },
-                  { value: "Otro", label: "Otro", icon: MoreHorizontal },
-                ] as const).map((m) => {
-                  const active = depositMethod === m.value;
-                  return (
-                    <button
-                      key={m.value}
-                      type="button"
-                      onClick={() => setDepositMethod(m.value)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <m.icon className="h-3.5 w-3.5" />
-                      {m.label}
-                    </button>
-                  );
-                })}
+                {paymentMethodPresets.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setDepositMethod(m.label)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                      depositMethod === m.label
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                ))}
               </div>
             </div>
           )}

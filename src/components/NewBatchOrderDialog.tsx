@@ -328,6 +328,17 @@ export default function NewBatchOrderDialog({
             },
           }).catch((e) => console.warn("notification failed", e));
 
+          if (order.assigned_technician_id && order.assigned_technician_id !== user.id) {
+            supabase.functions.invoke("send-technician-notification", {
+              body: {
+                order_number: order.order_number,
+                technician_id: order.assigned_technician_id,
+                customer_name: order.customer_name,
+                device_type: order.device_type,
+              },
+            }).catch((e) => console.warn("technician notification failed", e));
+          }
+
           createdNumbers.push(order_number);
         } catch (e: any) {
           failed.push(`${row.device_type} (${e.message})`);

@@ -142,6 +142,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Cuando un cliente confirma un presupuesto y trae el equipo, se entra al detalle de ese presupuesto y se usa el botón para convertirlo en una orden real.",
           "Ahí se completan los datos que el Presupuesto no pedía: accesorios, checklist de recepción, seguridad (PIN/patrón), garantía, seña y firma del cliente — el presupuesto original queda como base y no hay que volver a cargar cliente, equipo ni problema.",
+          "Si el cliente NO acepta el presupuesto y se lleva el equipo sin repararlo, no hace falta convertirlo: desde el detalle del presupuesto se cambia el estado directamente a \"Retirado sin reparar\" (uno de los estados predeterminados, en Configuración → Estados) para dejarlo cerrado sin que quede colgado como saldo pendiente.",
         ],
         images: [{ file: "crear-ordenes-convertir-01.png", alt: "Diálogo para convertir un presupuesto en orden" }],
       },
@@ -418,6 +419,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "WhatsApp",
         body: [
           "Acá se conecta el número de WhatsApp del taller escaneando un código QR (usando WhatsApp Business en el celular). Una vez conectado, el sistema puede mandar avisos automáticos a tus clientes cuando cambia el estado de su orden.",
+          "Ese mismo WhatsApp conectado también avisa al técnico cuando se le asigna una orden nueva (Nueva Orden, Modo Lote o al convertir un Presupuesto) — necesita que el técnico tenga un teléfono cargado en Usuarios. Si nadie asignó el equipo a otra persona (uno mismo se la asigna), no se manda aviso.",
         ],
         images: [{ file: "configuracion-whatsapp-01.png", alt: "Conexión de WhatsApp por código QR" }],
       },
@@ -442,6 +444,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Alta de cuentas para tu equipo, con tres roles posibles: Admin (acceso completo), Staff (técnicos, sin acceso a Configuración ni Reportes) y Recepción (pensado para quien recibe equipos y atiende clientes).",
           "A cada usuario se le asigna una sucursal, y opcionalmente un porcentaje de comisión sobre lo que factura (no disponible en los planes Starter y Retail).",
+          "Un admin puede eliminar un usuario cuando alguien deja el taller (el ícono de tacho en su fila). No podés eliminarte a vos mismo ni al único admin de la empresa, y si el usuario tiene órdenes registradas a su nombre (como técnico o quien recepcionó), hay que reasignarlas primero — así no se pierde de quién es cada orden ya entregada o con garantía activa.",
         ],
         images: [{ file: "configuracion-usuarios-01.png", alt: "Alta de usuarios y roles" }],
       },
@@ -455,8 +458,9 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "accesorios",
         title: "Accesorios",
         body: [
-          "Esta pestaña agrupa cinco listas configurables que se usan al cargar una orden: tipo de equipo, marca, modelo, problemas frecuentes y checklist de recepción.",
+          "Esta pestaña agrupa seis listas configurables que se usan al cargar una orden: tipo de equipo, marca, modelo, problemas frecuentes, checklist de recepción y métodos de pago.",
           "Para cada una se puede armar la lista de opciones que van a aparecer como chips de selección rápida en los formularios, en vez de escribir todo a mano cada vez. La clasificación por marca/modelo tiene además un interruptor propio (\"Clasificación por marca/modelo\") que activa esos dos campos en los formularios y las tablas de ganancia por categoría en Reportes.",
+          "Métodos de pago controla las opciones disponibles al cobrar una seña o saldo (Nueva Orden, Modo Lote, Presupuestos y Venta Mostrador) — por defecto trae Efectivo, Transferencia, Tarjeta de débito y Tarjeta de crédito, pero podés agregar o borrar las que uses en tu taller (Giro, QR, etc.).",
         ],
         images: [{ file: "configuracion-accesorios-01.png", alt: "Listas configurables de tipo de equipo, marca, modelo, problemas y checklist" }],
       },

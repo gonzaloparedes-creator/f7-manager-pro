@@ -6,7 +6,8 @@ export type OrderStatus =
   | "listo"
   | "enviado"
   | "entregado"
-  | "garantia";
+  | "garantia"
+  | "retirado_sin_reparar";
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   presupuesto: "Presupuesto",
@@ -17,6 +18,7 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   enviado: "Enviado",
   entregado: "Entregado",
   garantia: "Garantía",
+  retirado_sin_reparar: "Retirado sin reparar",
 };
 
 // Resuelve el label a mostrar para un status: el preset configurado por la
@@ -47,6 +49,8 @@ export function statusBadgeClasses(status: string) {
       return "bg-[hsl(var(--status-entregado-bg))] text-[hsl(var(--status-entregado))]";
     case "garantia":
       return "bg-[hsl(var(--status-garantia-bg))] text-[hsl(var(--status-garantia))]";
+    case "retirado_sin_reparar":
+      return "bg-[hsl(var(--status-retirado-bg))] text-[hsl(var(--status-retirado))]";
     default:
       return "bg-muted text-muted-foreground";
   }

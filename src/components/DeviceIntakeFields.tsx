@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 import { useAccessoryPresets } from "@/hooks/useAccessoryPresets";
 import { useChecklistPresets } from "@/hooks/useChecklistPresets";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
+import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { useMarcaPresets } from "@/hooks/useMarcaPresets";
 import { useModeloPresets } from "@/hooks/useModeloPresets";
@@ -20,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatPYG } from "@/lib/orders";
 import { compressPhoto, type PhotoEntry } from "@/lib/photos";
 import WarrantySelector from "@/components/WarrantySelector";
-import { Upload, CalendarIcon, Camera, Type, Grid3x3, Banknote, ArrowLeftRight, MoreHorizontal, X } from "lucide-react";
+import { Upload, CalendarIcon, Camera, Type, Grid3x3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
@@ -90,6 +91,7 @@ export default function DeviceIntakeFields({
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
   const { presets: problemPresets } = useProblemPresets();
+  const { presets: paymentMethodPresets } = usePaymentMethodPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode, loading: deviceTypePresetsLoading } = useDeviceTypePresets();
   const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
   const { presets: modeloPresets } = useModeloPresets();
@@ -528,29 +530,16 @@ export default function DeviceIntakeFields({
           <div className="space-y-2">
             <Label>Método de pago de la seña</Label>
             <div className="flex flex-wrap gap-2">
-              {([
-                { value: "Efectivo", label: "Efectivo", icon: Banknote },
-                { value: "Transferencia", label: "Transferencia", icon: ArrowLeftRight },
-                { value: "Otro", label: "Otro", icon: MoreHorizontal },
-              ] as const).map((m) => {
-                const active = value.deposit_payment_method === m.value;
-                return (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => onChange({ deposit_payment_method: m.value })}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                      active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <m.icon className="h-3.5 w-3.5" />
-                    {m.label}
-                  </button>
-                );
-              })}
+              {paymentMethodPresets.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onChange({ deposit_payment_method: m.label })}
+                  className={chipClass(value.deposit_payment_method === m.label)}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
           </div>
         )}
