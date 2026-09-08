@@ -212,21 +212,12 @@
        configurado en Configuración → Perfil, para que coincida con el rollo
        de la impresora — un ancho más chico que el papel real hace que el
        driver achique todo el ticket y el texto salga ilegible. */
-    padding: 3mm;
     margin: 0;
     background: #fff;
-    color: #000;
-    font-family: ui-monospace, "Courier New", monospace;
-    font-size: 12px;
-    line-height: 1.45;
-    box-sizing: border-box;
   }
 
-  .print-ticket > * + * { margin-top: 1.5mm; }
-
-  .ticket-dashed {
-    border-top: 1px dashed #000;
-    margin: 1.5mm 0;
-  }
+  /* El contenido (texto, líneas punteadas, padding) se dibuja directo en el
+     canvas ya convertido a blanco/negro puro — ver SaleTicket.tsx. */
+  .print-ticket canvas { display: block; width: 100%; height: auto; }
 }
 
