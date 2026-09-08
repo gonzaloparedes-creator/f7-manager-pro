@@ -9,7 +9,7 @@ import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printe
 import NewProductDialog from "@/components/NewProductDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
-import { SaleTicket } from "@/components/SaleTicket";
+import { printTicket } from "@/components/SaleTicket";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
@@ -92,7 +92,6 @@ export default function Products() {
   const [cartOpen, setCartOpen] = useState(false);
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [ticketWidthMm, setTicketWidthMm] = useState(80);
-  const [printingSale, setPrintingSale] = useState<CompletedCartSale | null>(null);
 
   useEffect(() => {
     if (!companyId) return;
@@ -123,26 +122,16 @@ export default function Products() {
     });
   }, [items]);
 
-  useEffect(() => {
-    if (!printingSale) return;
-    // Los navegadores no soportan @page con nombre de forma confiable, así
-    // que el tamaño de la página (80mm, sin la A4 del comprobante de orden)
-    // se inyecta acá y se retira apenas termina de imprimir.
-    const style = document.createElement("style");
-    style.textContent = `@page { size: ${ticketWidthMm}mm auto; margin: 0; }`;
-    document.head.appendChild(style);
-    const cleanup = () => {
-      style.remove();
-      setPrintingSale(null);
-    };
-    window.addEventListener("afterprint", cleanup, { once: true });
-    const t = window.setTimeout(() => window.print(), 80);
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("afterprint", cleanup);
-      style.remove();
-    };
-  }, [printingSale, ticketWidthMm]);
+  // El ticket se imprime en un documento aislado (ver printTicket): así el
+  // trabajo de impresión contiene solo la imagen del ticket, sin el CSS de la
+  // app que lo reescalaba y lo repetía en cada página.
+  const handlePrintSale = (sale: CompletedCartSale) => {
+    printTicket(sale, {
+      businessName,
+      branchName: branches.find((b) => b.id === sale.branch_id)?.name ?? null,
+      widthMm: ticketWidthMm,
+    });
+  };
 
   const hasExternalInventory = isBusiness || isRetail;
 
@@ -443,7 +432,7 @@ export default function Products() {
                       variant="ghost"
                       className="h-10 w-10"
                       aria-label="Imprimir ticket"
-                      onClick={() => setPrintingSale({
+                      onClick={() => handlePrintSale({
                         id: g.key,
                         created_at: g.created_at,
                         payment_method: g.payment_method,
@@ -483,17 +472,8 @@ export default function Products() {
         cart={cart}
         setCart={setCart}
         onSold={load}
-        onPrintRequest={setPrintingSale}
+        onPrintRequest={handlePrintSale}
       />
-
-      {printingSale && (
-        <SaleTicket
-          sale={printingSale}
-          businessName={businessName}
-          branchName={branches.find((b) => b.id === printingSale.branch_id)?.name ?? null}
-          widthMm={ticketWidthMm}
-        />
-      )}
 
       <ConfirmDialog
         open={!!pendingDelete}

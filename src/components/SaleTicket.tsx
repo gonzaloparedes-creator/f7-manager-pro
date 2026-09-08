@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatPYG } from "@/lib/orders";
@@ -9,15 +8,14 @@ interface TicketLineItem {
   unit_price: number;
 }
 
-interface TicketSale {
+export interface TicketSale {
   id: string;
   created_at: string;
   payment_method: string | null;
   items: TicketLineItem[];
 }
 
-interface SaleTicketProps {
-  sale: TicketSale;
+interface TicketOptions {
   businessName?: string | null;
   branchName?: string | null;
   widthMm?: number;
@@ -50,16 +48,24 @@ type Block =
   | { kind: "dashed"; height: number }
   | { kind: "gap"; height: number };
 
-// Dibuja el ticket en un <canvas> y lo pasa a blanco/negro puro (sin grises)
-// antes de imprimir. Las impresoras térmicas/matriciales de bajo costo no
-// saben qué hacer con el texto suavizado (antialiased) que genera el
-// navegador: cada pixel gris del borde de una letra lo "ditherean" a su
-// manera, y con fuentes chicas eso convierte el texto en ruido ilegible. Al
-// forzar cada pixel a blanco o negro nosotros mismos, la impresora no tiene
-// que adivinar nada.
-function drawTicket(canvas: HTMLCanvasElement, sale: TicketSale, shopName: string, branchName: string | null | undefined, widthMm: number) {
+// Dibuja el ticket en un canvas y lo pasa a blanco/negro puro (sin grises).
+// Las impresoras térmicas/POS baratas no saben qué hacer con el texto
+// suavizado (antialiased) del navegador: "ditherean" cada pixel gris a su
+// manera y con fuentes chicas el texto se vuelve ruido ilegible. Forzando
+// cada pixel a blanco o negro, la impresora no tiene que adivinar nada.
+export interface TicketImage {
+  dataUrl: string;
+  widthMm: number;
+  heightMm: number;
+}
+
+export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}): TicketImage | null {
+  const { businessName, branchName, widthMm = 80 } = options;
+  const shopName = businessName?.trim() || "F7 Manager Pro";
+
+  const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) return null;
 
   const total = sale.items.reduce((s, i) => s + i.quantity * Number(i.unit_price || 0), 0);
   const ticketNumber = sale.id.slice(-6).toUpperCase();
@@ -82,12 +88,10 @@ function drawTicket(canvas: HTMLCanvasElement, sale: TicketSale, shopName: strin
 
   const blocks: Block[] = [];
   const addCenter = (text: string, size: number) => {
-    const font = `bold ${size}px monospace`;
-    blocks.push({ kind: "center", text, font, height: size + lineGap });
+    blocks.push({ kind: "center", text, font: `bold ${size}px monospace`, height: size + lineGap });
   };
   const addRow = (left: string, right: string, size: number) => {
-    const font = `bold ${size}px monospace`;
-    blocks.push({ kind: "row", left, right, font, height: size + lineGap });
+    blocks.push({ kind: "row", left, right, font: `bold ${size}px monospace`, height: size + lineGap });
   };
   const addWrapped = (text: string, size: number) => {
     const font = `bold ${size}px monospace`;
@@ -118,7 +122,7 @@ function drawTicket(canvas: HTMLCanvasElement, sale: TicketSale, shopName: strin
   addGap(1);
 
   const totalHeight = padding * 2 + blocks.reduce((s, b) => s + b.height, 0);
-  canvas.height = totalHeight; // vuelve a limpiar el canvas y resetea el estado del contexto
+  canvas.height = totalHeight; // limpia el canvas y resetea el estado del contexto
 
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, width, totalHeight);
@@ -163,26 +167,69 @@ function drawTicket(canvas: HTMLCanvasElement, sale: TicketSale, shopName: strin
     data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 255;
   }
   ctx.putImageData(imageData, 0, 0);
+
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    widthMm,
+    // Se redondea hacia arriba: si la página quedara un pelo más baja que la
+    // imagen, el sobrante se va a una segunda página (y en un rollo continuo
+    // eso sale como una segunda impresión pegada a la primera).
+    heightMm: Math.ceil((totalHeight / PX_PER_MM) * 10) / 10 + 0.5,
+  };
 }
 
-export function SaleTicket({ sale, businessName, branchName, widthMm = 80 }: SaleTicketProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const shopName = businessName?.trim() || "F7 Manager Pro";
+// Imprime el ticket en un iframe aislado que contiene únicamente la imagen,
+// con la página del tamaño exacto del ticket.
+//
+// Antes se imprimía desde la propia página y salía doble/encimado por dos
+// motivos que se acumulaban:
+//   1. El documento arrastraba el CSS de la app (`html, body, #root` forzados
+//      a 210mm de ancho por el comprobante A4) y el ticket estaba en
+//      `position: fixed`, que por especificación se repite en cada página.
+//   2. `@page { size: Xmm auto }` Chrome lo ignora y cae a tamaño Carta, así
+//      que el trabajo nunca fue del ancho del rollo: el driver lo reescalaba
+//      para "ajustar a página". Con ambas medidas explícitas sí lo respeta.
+export function printTicket(sale: TicketSale, options: TicketOptions = {}): void {
+  const image = buildTicketImage(sale, options);
+  if (!image) return;
+  const { dataUrl, widthMm, heightMm } = image;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    drawTicket(canvas, sale, shopName, branchName, widthMm);
-  }, [sale, shopName, branchName, widthMm]);
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  document.body.appendChild(iframe);
 
-  return (
-    <div className="print-ticket" style={{ width: `${widthMm}mm` }}>
-      <canvas
-        ref={canvasRef}
-        role="img"
-        aria-label={`Ticket de venta ${sale.id.slice(-6).toUpperCase()}`}
-        style={{ width: "100%", height: "auto", display: "block", imageRendering: "pixelated" }}
-      />
-    </div>
+  const cleanup = () => iframe.remove();
+
+  const doc = iframe.contentDocument;
+  if (!doc) return cleanup();
+  doc.open();
+  doc.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>Ticket</title><style>` +
+      `@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }` +
+      `html, body { margin: 0; padding: 0; background: #fff; }` +
+      `img { display: block; width: ${widthMm}mm; height: auto; image-rendering: pixelated; }` +
+      `</style></head><body><img src="${dataUrl}" alt="Ticket de venta"></body></html>`
   );
+  doc.close();
+
+  // Esperar a la imagen explícitamente: el load del iframe puede dispararse
+  // con el about:blank inicial, antes de que exista el contenido.
+  const start = () => {
+    const win = iframe.contentWindow;
+    if (!win) return cleanup();
+    win.addEventListener("afterprint", cleanup, { once: true });
+    win.focus();
+    win.print();
+    // Respaldo por si el navegador no dispara afterprint (algunos móviles).
+    window.setTimeout(cleanup, 60000);
+  };
+
+  const img = doc.querySelector("img");
+  if (!img) return cleanup();
+  if (img.complete) start();
+  else {
+    img.onload = start;
+    img.onerror = cleanup;
+  }
 }
