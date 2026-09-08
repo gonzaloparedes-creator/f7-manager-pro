@@ -208,14 +208,17 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 80mm;
-    padding: 4mm;
+    /* El ancho real (80mm/58mm/etc.) lo pone el style inline según lo
+       configurado en Configuración → Perfil, para que coincida con el rollo
+       de la impresora — un ancho más chico que el papel real hace que el
+       driver achique todo el ticket y el texto salga ilegible. */
+    padding: 3mm;
     margin: 0;
     background: #fff;
     color: #000;
     font-family: ui-monospace, "Courier New", monospace;
-    font-size: 11px;
-    line-height: 1.4;
+    font-size: 12px;
+    line-height: 1.45;
     box-sizing: border-box;
   }
 

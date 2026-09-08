@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks } from "lucide-react";
+import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -243,6 +243,8 @@ export default function Settings() {
 
           <BusinessIdentityCard />
 
+          <TicketWidthCard />
+
           <LocationCard />
 
           <Card>
@@ -459,6 +461,88 @@ function BusinessIdentityCard() {
           <Input id="company_name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <Button onClick={saveName} disabled={saving || !companyId}>{saving ? "Guardando..." : "Guardar cambios"}</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ---------- Ancho del ticket de venta (Productos) ---------- */
+function TicketWidthCard() {
+  const { toast } = useToast();
+  const { companyId } = useCompany();
+  const [width, setWidth] = useState("80");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!companyId) return;
+    supabase.from("companies").select("ticket_width_mm").eq("id", companyId).maybeSingle()
+      .then(({ data }) => setWidth(String(data?.ticket_width_mm ?? 80)));
+  }, [companyId]);
+
+  const save = async (value: number) => {
+    if (!companyId) return;
+    setSaving(true);
+    const { error } = await supabase.from("companies").update({ ticket_width_mm: value }).eq("id", companyId);
+    setSaving(false);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    setWidth(String(value));
+    toast({ title: "Ancho de ticket actualizado" });
+  };
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-6">
+        <div className="flex items-center gap-2">
+          <Printer className="h-5 w-5 text-primary" />
+          <div>
+            <div className="font-semibold">Impresión de tickets (Productos)</div>
+            <div className="text-xs text-muted-foreground">
+              El ancho de papel de tu impresora de tickets. Si no coincide con el rollo real, el ticket sale achicado e ilegible.
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="ticket_width">Ancho (mm)</Label>
+            <Input
+              id="ticket_width"
+              type="number"
+              min={40}
+              max={120}
+              className="w-28"
+              value={width}
+              onChange={(e) => setWidth(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => save(58)}
+            disabled={saving}
+          >
+            58mm
+          </Button>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => save(80)}
+            disabled={saving}
+          >
+            80mm
+          </Button>
+          <Button
+            onClick={() => {
+              const n = Math.round(Number(width));
+              if (!Number.isFinite(n) || n < 40 || n > 120) {
+                return toast({ title: "Ancho inválido", description: "Ingresá un valor entre 40 y 120mm.", variant: "destructive" });
+              }
+              save(n);
+            }}
+            disabled={saving}
+          >
+            {saving ? "Guardando..." : "Guardar"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

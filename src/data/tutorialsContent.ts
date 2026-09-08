@@ -347,7 +347,10 @@ export const tutorialCategories: TutorialCategory[] = [
       {
         id: "ventas",
         title: "Ventas recientes y ticket imprimible",
-        body: ["Cada venta queda registrada en un listado, con la opción de imprimir el ticket correspondiente."],
+        body: [
+          "Cada venta queda registrada en un listado, con la opción de imprimir el ticket correspondiente.",
+          "El ancho del ticket (58mm u 80mm, según la impresora) se configura una sola vez en Configuración → Perfil → Impresión de tickets. Si no coincide con el rollo real de la impresora, el ticket sale achicado e ilegible.",
+        ],
         images: [{ file: "productos-ventas-01.png", alt: "Listado de ventas recientes con ticket" }],
       },
     ],

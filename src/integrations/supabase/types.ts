@@ -177,6 +177,7 @@ export type Database = {
           previous_system: string | null
           referral_partner_id: string | null
           service_terms_template: string | null
+          ticket_width_mm: number
           updated_at: string
           use_device_classification: boolean
           use_device_type_presets: boolean
@@ -201,6 +202,7 @@ export type Database = {
           previous_system?: string | null
           referral_partner_id?: string | null
           service_terms_template?: string | null
+          ticket_width_mm?: number
           updated_at?: string
           use_device_classification?: boolean
           use_device_type_presets?: boolean
@@ -225,6 +227,7 @@ export type Database = {
           previous_system?: string | null
           referral_partner_id?: string | null
           service_terms_template?: string | null
+          ticket_width_mm?: number
           updated_at?: string
           use_device_classification?: boolean
           use_device_type_presets?: boolean

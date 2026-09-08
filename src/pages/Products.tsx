@@ -91,12 +91,16 @@ export default function Products() {
   });
   const [cartOpen, setCartOpen] = useState(false);
   const [businessName, setBusinessName] = useState<string | null>(null);
+  const [ticketWidthMm, setTicketWidthMm] = useState(80);
   const [printingSale, setPrintingSale] = useState<CompletedCartSale | null>(null);
 
   useEffect(() => {
     if (!companyId) return;
-    supabase.from("companies").select("name").eq("id", companyId).maybeSingle()
-      .then(({ data }) => setBusinessName(data?.name ?? null));
+    supabase.from("companies").select("name, ticket_width_mm").eq("id", companyId).maybeSingle()
+      .then(({ data }) => {
+        setBusinessName(data?.name ?? null);
+        setTicketWidthMm(data?.ticket_width_mm ?? 80);
+      });
   }, [companyId]);
 
   useEffect(() => {
@@ -125,7 +129,7 @@ export default function Products() {
     // que el tamaño de la página (80mm, sin la A4 del comprobante de orden)
     // se inyecta acá y se retira apenas termina de imprimir.
     const style = document.createElement("style");
-    style.textContent = "@page { size: 80mm auto; margin: 0; }";
+    style.textContent = `@page { size: ${ticketWidthMm}mm auto; margin: 0; }`;
     document.head.appendChild(style);
     const cleanup = () => {
       style.remove();
@@ -138,7 +142,7 @@ export default function Products() {
       window.removeEventListener("afterprint", cleanup);
       style.remove();
     };
-  }, [printingSale]);
+  }, [printingSale, ticketWidthMm]);
 
   const hasExternalInventory = isBusiness || isRetail;
 
@@ -487,6 +491,7 @@ export default function Products() {
           sale={printingSale}
           businessName={businessName}
           branchName={branches.find((b) => b.id === printingSale.branch_id)?.name ?? null}
+          widthMm={ticketWidthMm}
         />
       )}
 
