@@ -121,8 +121,23 @@ export default function Products() {
 
   useEffect(() => {
     if (!printingSale) return;
+    // Los navegadores no soportan @page con nombre de forma confiable, así
+    // que el tamaño de la página (80mm, sin la A4 del comprobante de orden)
+    // se inyecta acá y se retira apenas termina de imprimir.
+    const style = document.createElement("style");
+    style.textContent = "@page { size: 80mm auto; margin: 0; }";
+    document.head.appendChild(style);
+    const cleanup = () => {
+      style.remove();
+      setPrintingSale(null);
+    };
+    window.addEventListener("afterprint", cleanup, { once: true });
     const t = window.setTimeout(() => window.print(), 80);
-    return () => window.clearTimeout(t);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("afterprint", cleanup);
+      style.remove();
+    };
   }, [printingSale]);
 
   const hasExternalInventory = isBusiness || isRetail;

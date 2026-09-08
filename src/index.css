@@ -198,16 +198,13 @@
 .print-ticket { display: none; }
 
 @media print {
-  @page ticket {
-    size: 80mm auto;
-    margin: 0;
-  }
-
+  /* El tamaño de página (80mm) se inyecta dinámicamente por JS al imprimir:
+     los navegadores no soportan de forma confiable @page con nombre, así que
+     una regla @page sin nombre acá pisaría el A4 del comprobante de orden. */
   .print-ticket, .print-ticket * { visibility: visible !important; }
 
   .print-ticket {
     display: block !important;
-    page: ticket;
     position: fixed;
     top: 0;
     left: 0;
