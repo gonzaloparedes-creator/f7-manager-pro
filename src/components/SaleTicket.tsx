@@ -56,6 +56,9 @@ type Block =
 export interface TicketImage {
   dataUrl: string;
   widthMm: number;
+  /** Alto real del contenido dibujado. */
+  contentHeightMm: number;
+  /** Alto de la página a imprimir (nunca menor al ancho: ver buildTicketImage). */
   heightMm: number;
 }
 
@@ -168,13 +171,20 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
   }
   ctx.putImageData(imageData, 0, 0);
 
+  // Se redondea hacia arriba: si la página quedara un pelo más baja que la
+  // imagen, el sobrante se va a una segunda página (y en un rollo continuo eso
+  // sale como una segunda impresión pegada a la primera).
+  const contentHeightMm = Math.ceil((totalHeight / PX_PER_MM) * 10) / 10 + 0.5;
+
   return {
     dataUrl: canvas.toDataURL("image/png"),
     widthMm,
-    // Se redondea hacia arriba: si la página quedara un pelo más baja que la
-    // imagen, el sobrante se va a una segunda página (y en un rollo continuo
-    // eso sale como una segunda impresión pegada a la primera).
-    heightMm: Math.ceil((totalHeight / PX_PER_MM) * 10) / 10 + 0.5,
+    contentHeightMm,
+    // La página nunca puede ser más ancha que alta: una página apaisada hace
+    // que el driver rote el ticket 90° y salga impreso de costado sobre el
+    // rollo. Con tickets cortos (pocos ítems) se agrega un poco de papel en
+    // blanco al final, que es el precio de que salga derecho.
+    heightMm: Math.max(contentHeightMm, widthMm + 5),
   };
 }
 
@@ -189,6 +199,9 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
 //   2. `@page { size: Xmm auto }` Chrome lo ignora y cae a tamaño Carta, así
 //      que el trabajo nunca fue del ancho del rollo: el driver lo reescalaba
 //      para "ajustar a página". Con ambas medidas explícitas sí lo respeta.
+//   3. Con las medidas explícitas, un ticket corto daba una página más ancha
+//      que alta (apaisada) y el driver la rotaba 90°: salía de costado. Por
+//      eso el alto de página nunca baja del ancho — ver buildTicketImage.
 export function printTicket(sale: TicketSale, options: TicketOptions = {}): void {
   const image = buildTicketImage(sale, options);
   if (!image) return;
