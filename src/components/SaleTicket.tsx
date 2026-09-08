@@ -21,9 +21,22 @@ interface TicketOptions {
   widthMm?: number;
 }
 
-// ~203dpi: la resolución típica del cabezal de una impresora térmica/POS.
+// 8 puntos/mm = 203dpi, la resolución del cabezal de casi toda térmica POS
+// (3nstar RPT001, Epson TM-T20, genéricas POS-58/80). Dibujar a esta escala
+// hace que la imagen entre 1:1 en el cabezal, sin reescalados.
 const PX_PER_MM = 8;
 const PADDING_MM = 3;
+
+// El cabezal NO cubre todo el ancho del papel: un rollo de 80mm imprime 72mm
+// y uno de 58mm imprime 48mm (el resto son los márgenes mecánicos). Si se
+// manda una imagen del ancho del papel, el driver la achica para que entre en
+// el área imprimible y, al ser blanco/negro puro, ese achique borra columnas
+// enteras de píxeles: las letras salen rotas y despintadas.
+function printableWidthMm(paperWidthMm: number): number {
+  if (paperWidthMm >= 76) return 72;
+  if (paperWidthMm >= 54) return 48;
+  return Math.max(20, paperWidthMm - 8);
+}
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
@@ -55,7 +68,10 @@ type Block =
 // cada pixel a blanco o negro, la impresora no tiene que adivinar nada.
 export interface TicketImage {
   dataUrl: string;
+  /** Ancho del papel = ancho de la página a imprimir. */
   widthMm: number;
+  /** Ancho de la imagen: el área que el cabezal realmente imprime. */
+  imageWidthMm: number;
   /** Alto real del contenido dibujado. */
   contentHeightMm: number;
   /** Alto de la página a imprimir (nunca menor al ancho: ver buildTicketImage). */
@@ -63,8 +79,11 @@ export interface TicketImage {
 }
 
 export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}): TicketImage | null {
-  const { businessName, branchName, widthMm = 80 } = options;
+  const { businessName, branchName, widthMm: paperWidthMm = 80 } = options;
   const shopName = businessName?.trim() || "F7 Manager Pro";
+  // Se dibuja al ancho imprimible, no al del papel: así la imagen entra tal
+  // cual en el cabezal y el driver no tiene que reescalar nada.
+  const widthMm = printableWidthMm(paperWidthMm);
 
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -178,13 +197,14 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
 
   return {
     dataUrl: canvas.toDataURL("image/png"),
-    widthMm,
+    widthMm: paperWidthMm,
+    imageWidthMm: widthMm,
     contentHeightMm,
     // La página nunca puede ser más ancha que alta: una página apaisada hace
     // que el driver rote el ticket 90° y salga impreso de costado sobre el
     // rollo. Con tickets cortos (pocos ítems) se agrega un poco de papel en
     // blanco al final, que es el precio de que salga derecho.
-    heightMm: Math.max(contentHeightMm, widthMm + 5),
+    heightMm: Math.max(contentHeightMm, paperWidthMm + 5),
   };
 }
 
@@ -202,10 +222,14 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
 //   3. Con las medidas explícitas, un ticket corto daba una página más ancha
 //      que alta (apaisada) y el driver la rotaba 90°: salía de costado. Por
 //      eso el alto de página nunca baja del ancho — ver buildTicketImage.
+//   4. La imagen iba al ancho del papel (80mm) pero el cabezal solo imprime
+//      72mm, así que el driver la achicaba ~10% y ese achique, sobre una
+//      imagen de 1 bit, borraba columnas de píxeles: letras rotas. Ahora se
+//      dibuja directo al ancho imprimible — ver printableWidthMm.
 export function printTicket(sale: TicketSale, options: TicketOptions = {}): void {
   const image = buildTicketImage(sale, options);
   if (!image) return;
-  const { dataUrl, widthMm, heightMm } = image;
+  const { dataUrl, widthMm, imageWidthMm, heightMm } = image;
 
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
@@ -221,7 +245,10 @@ export function printTicket(sale: TicketSale, options: TicketOptions = {}): void
     `<!doctype html><html><head><meta charset="utf-8"><title>Ticket</title><style>` +
       `@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }` +
       `html, body { margin: 0; padding: 0; background: #fff; }` +
-      `img { display: block; width: ${widthMm}mm; height: auto; image-rendering: pixelated; }` +
+      // Sin image-rendering: pixelated. Si igual quedara algún reescalado
+      // mínimo, la interpolación suave degrada los trazos; el vecino más
+      // cercano directamente los borra.
+      `img { display: block; width: ${imageWidthMm}mm; height: auto; margin: 0 auto; }` +
       `</style></head><body><img src="${dataUrl}" alt="Ticket de venta"></body></html>`
   );
   doc.close();
