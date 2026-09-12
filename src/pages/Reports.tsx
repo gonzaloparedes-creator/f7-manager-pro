@@ -340,7 +340,8 @@ export default function Reports() {
       setLoading(true);
       let hadError = false;
 
-      if (hasTaller) {
+      const loadTaller = async () => {
+        if (!hasTaller) return;
         const { data: o, error: oErr } = await supabase
           .from("orders")
           .select("id, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, current_branch_id, assigned_technician_id, device_type, marca, modelo")
@@ -358,25 +359,35 @@ export default function Reports() {
         }
         setOrders((o ?? []) as unknown as OrderRow[]);
         setParts(p as unknown as PartRow[]);
-      }
+      };
 
-      if (hasTienda) {
+      const loadTienda = async () => {
+        if (!hasTienda) return;
         const { data: s, error: sErr } = await (supabase as any)
           .from("product_sales")
           .select("quantity, unit_price, unit_cost, created_at, branch_id, category_name, subcategory_name, created_by")
           .eq("company_id", companyId);
         if (sErr) hadError = true;
         setSales((s ?? []) as SaleRow[]);
-      }
+      };
 
-      const [{ data: profs, error: profsErr }, { data: company, error: companyErr }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, commission_rate").eq("company_id", companyId),
-        supabase.from("companies").select("commission_enabled, use_device_classification").eq("id", companyId).maybeSingle(),
-      ]);
-      if (profsErr || companyErr) hadError = true;
-      setStaff((profs ?? []) as unknown as StaffRow[]);
-      setCommissionEnabled(!!company?.commission_enabled);
-      setUseDeviceClassification(!!(company as any)?.use_device_classification);
+      const loadStaffAndSettings = async () => {
+        const [{ data: profs, error: profsErr }, { data: company, error: companyErr }] = await Promise.all([
+          supabase.from("profiles").select("id, full_name, commission_rate").eq("company_id", companyId),
+          supabase.from("companies").select("commission_enabled, use_device_classification").eq("id", companyId).maybeSingle(),
+        ]);
+        if (profsErr || companyErr) hadError = true;
+        setStaff((profs ?? []) as unknown as StaffRow[]);
+        setCommissionEnabled(!!company?.commission_enabled);
+        setUseDeviceClassification(!!(company as any)?.use_device_classification);
+      };
+
+      // Antes se esperaba taller -> tienda -> staff en secuencia. Como nada
+      // en el JSX bloqueaba el render hasta que `loading` bajara (ver el early
+      // return más abajo, agregado ahora), la tarjeta de Tienda y la Ganancia
+      // Neta Total se veían en cero varios segundos mientras esa cadena
+      // secuencial terminaba — parecía que el reporte no reflejaba las ventas.
+      await Promise.all([loadTaller(), loadTienda(), loadStaffAndSettings()]);
 
       if (hadError) {
         toast({ title: "Error al cargar reportes", description: "Algunos datos no se pudieron cargar. Los números mostrados pueden estar incompletos.", variant: "destructive" });
@@ -489,6 +500,18 @@ export default function Reports() {
     );
   }
   if (!planLoading && isStarter) return <Navigate to="/dashboard" replace />;
+
+  // Antes las tarjetas de resumen (Ingresos, Ganancia Neta, etc.) se
+  // renderizaban de una con lo que hubiera en el estado — que arranca vacío —
+  // mientras las consultas todavía estaban en vuelo. Mostraban ceros o
+  // totales incompletos por unos segundos en cada carga de la página.
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -676,44 +699,38 @@ export default function Reports() {
           )}
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex h-64 items-center justify-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            </div>
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => {
-                      const n = Number(v);
-                      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-                      if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
-                      return String(n);
-                    }}
-                    width={48}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "hsl(var(--accent))", opacity: 0.4 }}
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    formatter={(v: number) => [formatPYG(Number(v)), chartLabel]}
-                  />
-                  <Bar dataKey={chartKey} fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => {
+                    const n = Number(v);
+                    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+                    if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+                    return String(n);
+                  }}
+                  width={48}
+                />
+                <Tooltip
+                  cursor={{ fill: "hsl(var(--accent))", opacity: 0.4 }}
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  formatter={(v: number) => [formatPYG(Number(v)), chartLabel]}
+                />
+                <Bar dataKey={chartKey} fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </CardContent>
       </Card>
     </div>

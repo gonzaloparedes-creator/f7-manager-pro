@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Package, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, Package, AlertTriangle, Trash2, EyeOff } from "lucide-react";
 import NewInventoryItemDialog from "@/components/NewInventoryItemDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useCanViewStock } from "@/hooks/useCanViewStock";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -39,6 +40,7 @@ export default function Inventory() {
   // Todos los hooks van primero, sin condicionar — el early return de plan
   // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
+  const { canViewStock } = useCanViewStock();
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
   const { categories, subcategories } = useCategories();
@@ -120,10 +122,14 @@ export default function Inventory() {
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Bajo stock</div>
-          <div className="mt-1 flex items-center gap-2 text-2xl font-bold text-secondary">
-            {lowStockCount}
-            {lowStockCount > 0 && <AlertTriangle className="h-5 w-5" />}
-          </div>
+          {canViewStock ? (
+            <div className="mt-1 flex items-center gap-2 text-2xl font-bold text-secondary">
+              {lowStockCount}
+              {lowStockCount > 0 && <AlertTriangle className="h-5 w-5" />}
+            </div>
+          ) : (
+            <div className="mt-1 text-2xl font-bold text-muted-foreground">—</div>
+          )}
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Valor inventario (costo)</div>
@@ -169,7 +175,7 @@ export default function Inventory() {
             {/* Mobile: tarjetas — la tabla de hasta 9 columnas no entra en un viewport chico */}
             <div className="space-y-2 sm:hidden">
               {filtered.map((i) => {
-                const low = i.stock <= i.min_stock_alert;
+                const low = canViewStock && i.stock <= i.min_stock_alert;
                 const cat = categoryName(i.category_id);
                 const sub = subcategoryName(i.subcategory_id);
                 return (
@@ -213,13 +219,19 @@ export default function Inventory() {
                       </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2 text-sm">
-                      <span className={cn(
-                        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold",
-                        low ? "bg-secondary/15 text-secondary border border-secondary/30" : "text-foreground"
-                      )}>
-                        {low && <AlertTriangle className="h-3 w-3" />}
-                        Stock: {i.stock} <span className="font-normal text-muted-foreground">(mín. {i.min_stock_alert})</span>
-                      </span>
+                      {canViewStock ? (
+                        <span className={cn(
+                          "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold",
+                          low ? "bg-secondary/15 text-secondary border border-secondary/30" : "text-foreground"
+                        )}>
+                          {low && <AlertTriangle className="h-3 w-3" />}
+                          Stock: {i.stock} <span className="font-normal text-muted-foreground">(mín. {i.min_stock_alert})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <EyeOff className="h-3 w-3" /> Stock oculto
+                        </span>
+                      )}
                       <span className="text-muted-foreground">
                         {formatPYG(i.cost_price)} → <span className="font-medium text-foreground">{formatPYG(i.selling_price)}</span>
                       </span>
@@ -247,7 +259,7 @@ export default function Inventory() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map((i) => {
-                    const low = i.stock <= i.min_stock_alert;
+                    const low = canViewStock && i.stock <= i.min_stock_alert;
                     const cat = categoryName(i.category_id);
                     const sub = subcategoryName(i.subcategory_id);
                     return (
@@ -276,15 +288,19 @@ export default function Inventory() {
                           <TableCell className="text-muted-foreground">{branchName(i.branch_id) ?? "—"}</TableCell>
                         )}
                         <TableCell className="text-right">
-                          <span className={cn(
-                            "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold",
-                            low ? "bg-secondary/15 text-secondary border border-secondary/30" : "text-foreground"
-                          )}>
-                            {low && <AlertTriangle className="h-3 w-3" />}
-                            {i.stock}
-                          </span>
+                          {canViewStock ? (
+                            <span className={cn(
+                              "inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold",
+                              low ? "bg-secondary/15 text-secondary border border-secondary/30" : "text-foreground"
+                            )}>
+                              {low && <AlertTriangle className="h-3 w-3" />}
+                              {i.stock}
+                            </span>
+                          ) : (
+                            <EyeOff className="ml-auto h-3.5 w-3.5 text-muted-foreground" aria-label="Stock oculto" />
+                          )}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground">{i.min_stock_alert}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{canViewStock ? i.min_stock_alert : "—"}</TableCell>
                         <TableCell className="text-right">{formatPYG(i.cost_price)}</TableCell>
                         <TableCell className="text-right">{formatPYG(i.selling_price)}</TableCell>
                         {isAdmin && (

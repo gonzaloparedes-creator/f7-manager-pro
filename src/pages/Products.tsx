@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printer } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printer, EyeOff } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useCanViewStock } from "@/hooks/useCanViewStock";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
@@ -67,6 +68,7 @@ export default function Products() {
   // Todos los hooks van primero, sin condicionar — el early return de plan
   // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
+  const { canViewStock } = useCanViewStock();
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { isBusiness, isRetail, loading: planLoading } = usePlan();
@@ -257,10 +259,14 @@ export default function Products() {
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Sin / bajo stock</div>
-          <div className="mt-1 flex items-center gap-2 text-2xl font-bold text-secondary">
-            {outOfStockCount + lowStockCount}
-            {outOfStockCount + lowStockCount > 0 && <AlertTriangle className="h-5 w-5" />}
-          </div>
+          {canViewStock ? (
+            <div className="mt-1 flex items-center gap-2 text-2xl font-bold text-secondary">
+              {outOfStockCount + lowStockCount}
+              {outOfStockCount + lowStockCount > 0 && <AlertTriangle className="h-5 w-5" />}
+            </div>
+          ) : (
+            <div className="mt-1 text-2xl font-bold text-muted-foreground">—</div>
+          )}
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Ventas de hoy</div>
@@ -315,7 +321,7 @@ export default function Products() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((i) => {
             const outOfStock = i.stock <= 0;
-            const lowStock = !outOfStock && i.stock <= i.min_stock_alert;
+            const lowStock = canViewStock && !outOfStock && i.stock <= i.min_stock_alert;
             const cat = categoryName(i.category_id);
             const sub = subcategoryName(i.subcategory_id);
             return (
@@ -369,6 +375,10 @@ export default function Products() {
                       <Badge variant="outline" className="gap-1 border-secondary/40 text-secondary">
                         <AlertTriangle className="h-3 w-3" /> Bajo stock: {i.stock}
                       </Badge>
+                    ) : !canViewStock ? (
+                      <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                        <EyeOff className="h-3 w-3" /> Stock oculto
+                      </span>
                     ) : (
                       <span className="text-sm text-muted-foreground">Stock: {i.stock}</span>
                     )}
