@@ -35,6 +35,12 @@ export function useCanViewStock() {
     return () => { active = false; };
   }, [companyId, companyLoading]);
 
-  const canViewStock = role !== "staff" || staffCanViewStock;
-  return { canViewStock, loading: loading || roleLoading || companyLoading };
+  const stillLoading = loading || roleLoading || companyLoading;
+  // Mientras no sepamos con certeza el rol (arranca en null) hay que ocultar
+  // por defecto ("fail closed"): antes, con role=null todavía sin resolver,
+  // `role !== "staff"` daba true y el stock se mostraba de arranque a
+  // cualquiera — justo la ventana en la que alguien recién entra a probar el
+  // switch y lo ve "roto".
+  const canViewStock = !stillLoading && (role !== "staff" || staffCanViewStock);
+  return { canViewStock, loading: stillLoading };
 }
