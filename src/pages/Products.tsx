@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printer, EyeOff } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printer, EyeOff, Pencil } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
@@ -80,6 +80,7 @@ export default function Products() {
   const [pendingDelete, setPendingDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
@@ -232,6 +233,10 @@ export default function Products() {
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [sales]);
 
+  const openCreate = () => { setEditItem(null); setOpen(true); };
+  const openEdit = (item: Product) => { setEditItem(item); setOpen(true); };
+  const closeDialog = (o: boolean) => { setOpen(o); if (!o) setEditItem(null); };
+
   if (!planLoading && !hasExternalInventory) return <Navigate to="/dashboard" replace />;
   if (!staffPermsLoading && !canViewProducts) return <Navigate to="/dashboard" replace />;
 
@@ -247,7 +252,7 @@ export default function Products() {
             Catálogo de venta al público — separado de los repuestos de reparación.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />
           Nuevo Producto
         </Button>
@@ -348,11 +353,16 @@ export default function Products() {
                         <div className="text-sm font-medium text-primary">{formatPYG(i.selling_price)}</div>
                       </div>
                     </div>
-                    {isAdmin && (
-                      <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                    <div className="flex shrink-0 items-center">
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(i)} aria-label={`Editar ${i.name}`}>
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
                       </Button>
-                    )}
+                      {isAdmin && (
+                        <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {(cat || i.branch_id) && (
@@ -475,7 +485,7 @@ export default function Products() {
         </button>
       )}
 
-      <NewProductDialog open={open} onOpenChange={setOpen} onCreated={load} />
+      <NewProductDialog open={open} onOpenChange={closeDialog} onCreated={load} editItem={editItem} />
       <CartSheet
         open={cartOpen}
         onOpenChange={setCartOpen}

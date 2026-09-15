@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Package, AlertTriangle, Trash2, EyeOff } from "lucide-react";
+import { Plus, Package, AlertTriangle, Trash2, EyeOff, Pencil } from "lucide-react";
 import NewInventoryItemDialog from "@/components/NewInventoryItemDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
@@ -50,6 +50,7 @@ export default function Inventory() {
   const [pendingDelete, setPendingDelete] = useState<Item | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
+  const [editItem, setEditItem] = useState<Item | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
@@ -97,6 +98,10 @@ export default function Inventory() {
 
   const lowStockCount = items.filter((i) => i.stock <= i.min_stock_alert).length;
 
+  const openCreate = () => { setEditItem(null); setOpen(true); };
+  const openEdit = (item: Item) => { setEditItem(item); setOpen(true); };
+  const closeDialog = (o: boolean) => { setOpen(o); if (!o) setEditItem(null); };
+
   if (!planLoading && isStarter) return <Navigate to="/dashboard" replace />;
 
   return (
@@ -109,7 +114,7 @@ export default function Inventory() {
           </h1>
           <p className="text-sm text-muted-foreground">Gestiona repuestos, accesorios y herramientas.</p>
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />
           Nuevo Artículo
         </Button>
@@ -191,17 +196,28 @@ export default function Inventory() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <div className="truncate font-medium text-foreground">{i.name}</div>
-                          {isAdmin && (
+                          <div className="-mr-2 -mt-1 flex shrink-0 items-center">
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="-mr-2 -mt-1 h-9 w-9 shrink-0"
-                              onClick={() => setPendingDelete(i)}
-                              aria-label={`Eliminar ${i.name}`}
+                              className="h-9 w-9"
+                              onClick={() => openEdit(i)}
+                              aria-label={`Editar ${i.name}`}
                             >
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
-                          )}
+                            {isAdmin && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-9 w-9"
+                                onClick={() => setPendingDelete(i)}
+                                aria-label={`Eliminar ${i.name}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-1">
                           {cat ? (
@@ -254,7 +270,7 @@ export default function Inventory() {
                     <TableHead className="text-right">Mín.</TableHead>
                     <TableHead className="text-right">Costo</TableHead>
                     <TableHead className="text-right">Precio</TableHead>
-                    {isAdmin && <TableHead></TableHead>}
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -303,13 +319,18 @@ export default function Inventory() {
                         <TableCell className="text-right text-muted-foreground">{canViewStock ? i.min_stock_alert : "—"}</TableCell>
                         <TableCell className="text-right">{formatPYG(i.cost_price)}</TableCell>
                         <TableCell className="text-right">{formatPYG(i.selling_price)}</TableCell>
-                        {isAdmin && (
-                          <TableCell>
-                            <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                        <TableCell>
+                          <div className="flex items-center justify-end">
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(i)} aria-label={`Editar ${i.name}`}>
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
-                          </TableCell>
-                        )}
+                            {isAdmin && (
+                              <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -320,7 +341,7 @@ export default function Inventory() {
         )}
       </Card>
 
-      <NewInventoryItemDialog open={open} onOpenChange={setOpen} onCreated={load} />
+      <NewInventoryItemDialog open={open} onOpenChange={closeDialog} onCreated={load} editItem={editItem} />
 
       <ConfirmDialog
         open={!!pendingDelete}

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +19,30 @@ const CREATE_CATEGORY = "__create_category__";
 const CREATE_SUBCATEGORY = "__create_subcategory__";
 const NO_SUBCATEGORY = "__none__";
 
+export interface EditableProduct {
+  id: string;
+  name: string;
+  category_id: string | null;
+  subcategory_id: string | null;
+  branch_id: string | null;
+  stock: number;
+  min_stock_alert: number;
+  cost_price: number;
+  selling_price: number;
+  image_url: string | null;
+}
+
 export default function NewProductDialog({
   open,
   onOpenChange,
   onCreated,
+  editItem,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onCreated?: () => void;
+  /** Si se pasa, el diálogo edita este producto en vez de crear uno nuevo. */
+  editItem?: EditableProduct | null;
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
@@ -67,6 +83,25 @@ export default function NewProductDialog({
     setName(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
     setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setFile(null); setPreview(null);
   };
+
+  // Precarga el formulario con el producto a editar cada vez que se abre.
+  useEffect(() => {
+    if (!open) return;
+    if (editItem) {
+      setName(editItem.name);
+      setCategoryId(editItem.category_id);
+      setSubcategoryId(editItem.subcategory_id);
+      setBranchId(editItem.branch_id);
+      setStock(String(editItem.stock));
+      setMinAlert(String(editItem.min_stock_alert));
+      setCost(String(editItem.cost_price));
+      setPrice(String(editItem.selling_price));
+      setFile(null);
+      setPreview(editItem.image_url);
+    } else {
+      reset();
+    }
+  }, [open, editItem]);
 
   const onFile = (f: File | null) => {
     setFile(f);
@@ -109,7 +144,7 @@ export default function NewProductDialog({
     if (!name.trim()) { toast.error("Ingresa un nombre"); return; }
     setLoading(true);
     try {
-      let image_url: string | null = null;
+      let image_url: string | null = editItem?.image_url ?? null;
       if (file) {
         setCompressing(true);
         const compressed = await imageCompression(file, {
@@ -127,28 +162,38 @@ export default function NewProductDialog({
         image_url = data.publicUrl;
       }
 
-      const { error } = await (supabase as any).from("inventory_items").insert({
-        company_id: companyId,
+      const payload = {
         branch_id: branchId,
         name: name.trim(),
         category_id: categoryId,
         subcategory_id: subcategoryId,
-        is_for_repair: false,
-        is_for_sale: true,
         stock: parseInt(stock) || 0,
         min_stock_alert: parseInt(minAlert) || 0,
         cost_price: parseFloat(cost) || 0,
         selling_price: parseFloat(price) || 0,
         image_url,
-        created_by: user.id,
-      });
-      if (error) throw error;
-      toast.success("Producto creado");
+      };
+
+      if (editItem) {
+        const { error } = await (supabase as any).from("inventory_items").update(payload).eq("id", editItem.id);
+        if (error) throw error;
+        toast.success("Producto actualizado");
+      } else {
+        const { error } = await (supabase as any).from("inventory_items").insert({
+          ...payload,
+          company_id: companyId,
+          is_for_repair: false,
+          is_for_sale: true,
+          created_by: user.id,
+        });
+        if (error) throw error;
+        toast.success("Producto creado");
+      }
       reset();
       onOpenChange(false);
       onCreated?.();
     } catch (e: any) {
-      toast.error(e.message || "Error al crear el producto");
+      toast.error(e.message || `Error al ${editItem ? "actualizar" : "crear"} el producto`);
     } finally {
       setLoading(false);
       setCompressing(false);
@@ -166,8 +211,12 @@ export default function NewProductDialog({
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nuevo Producto</DialogTitle>
-          <DialogDescription>Agrega un producto a tu catálogo de venta (celulares, accesorios, etc.).</DialogDescription>
+          <DialogTitle>{editItem ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
+          <DialogDescription>
+            {editItem
+              ? "Actualizá el stock, precio u otros datos de este producto."
+              : "Agrega un producto a tu catálogo de venta (celulares, accesorios, etc.)."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
@@ -317,7 +366,7 @@ export default function NewProductDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
           <Button onClick={submit} disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar
+            {editItem ? "Guardar cambios" : "Guardar"}
           </Button>
         </DialogFooter>
       </DialogContent>

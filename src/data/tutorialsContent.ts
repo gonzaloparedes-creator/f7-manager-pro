@@ -313,7 +313,10 @@ export const tutorialCategories: TutorialCategory[] = [
       {
         id: "cargar",
         title: "Cargar un repuesto nuevo",
-        body: ["Se carga nombre, categoría/subcategoría, sucursal, costo, precio y cantidad en stock. Solo los administradores pueden eliminar ítems."],
+        body: [
+          "Se carga nombre, categoría/subcategoría, sucursal, costo, precio y cantidad en stock. Solo los administradores pueden eliminar ítems.",
+          "Para restockear un repuesto que se agotó (o corregir cualquier dato), usá el lápiz de \"Editar\" en su fila — no hace falta eliminarlo y cargarlo de nuevo.",
+        ],
         images: [{ file: "inventario-cargar-01.png", alt: "Formulario para cargar un repuesto nuevo" }],
       },
       {
@@ -335,7 +338,10 @@ export const tutorialCategories: TutorialCategory[] = [
       {
         id: "catalogo",
         title: "Catálogo de venta y estadísticas",
-        body: ["Muestra el total de productos, cuáles están sin stock o con bajo stock, las ventas del día y el valor total del catálogo."],
+        body: [
+          "Muestra el total de productos, cuáles están sin stock o con bajo stock, las ventas del día y el valor total del catálogo.",
+          "Para restockear un producto que se agotó (o corregir nombre, precio, imagen, etc.), usá el lápiz de \"Editar\" en su tarjeta — no hace falta eliminarlo y cargarlo de nuevo.",
+        ],
         images: [{ file: "productos-catalogo-01.png", alt: "Catálogo de productos y estadísticas" }],
       },
       {
