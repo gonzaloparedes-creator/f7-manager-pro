@@ -3,6 +3,7 @@ import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingB
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import f7Logo from "@/assets/f7-logo.png";
@@ -30,6 +31,7 @@ const adminNav = [
 export default function AppLayout() {
   const { user, loading } = useAuth();
   const { isAdmin } = useUserRole();
+  const { canViewProducts } = useStaffPermissions();
   const { isSuperAdmin } = useSuperAdmin();
   const { isActive, loading: statusLoading } = useCompanyStatus();
   const { isStarter, isBusiness, isRetail, loading: planLoading } = usePlan();
@@ -38,12 +40,13 @@ export default function AppLayout() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const nav = useMemo(() => {
     const items = isAdmin ? [...baseNav, ...adminNav] : baseNav;
-    const filtered = items.filter((i) => !i.adminOnly || isAdmin);
+    let filtered = items.filter((i) => !i.adminOnly || isAdmin);
+    if (!canViewProducts) filtered = filtered.filter((i) => i.to !== "/productos");
     if (isSuperAdmin) {
       filtered.push({ to: "/superadmin", label: "Super Admin", icon: ShieldCheck, proOnly: false, businessOnly: false, adminOnly: false });
     }
     return filtered;
-  }, [isAdmin, isSuperAdmin]);
+  }, [isAdmin, isSuperAdmin, canViewProducts]);
 
   // La barra inferior mobile no entra con más de ~5 ítems (peor todavía con
   // el badge de bloqueo PRO/BUSINESS) — Configuración y Super Admin son de

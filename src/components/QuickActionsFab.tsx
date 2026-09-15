@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, ClipboardList, ShoppingCart, FileText, Layers } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { usePlan } from "@/hooks/usePlan";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 
 // Botón flotante accesible desde cualquier pantalla mobile — antes "Nueva
 // Orden" solo vivía arriba de la página de Órdenes, así que si estabas en
@@ -16,7 +17,8 @@ export default function QuickActionsFab() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { isBusiness, isRetail } = usePlan();
-  const hasStore = isBusiness || isRetail;
+  const { canViewProducts } = useStaffPermissions();
+  const hasStore = (isBusiness || isRetail) && canViewProducts;
 
   const actions = [
     {

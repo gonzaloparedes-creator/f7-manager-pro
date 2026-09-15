@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Plus, Package, AlertTriangle, Trash2, EyeOff } from "lucide-react";
 import NewInventoryItemDialog from "@/components/NewInventoryItemDialog";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useCanViewStock } from "@/hooks/useCanViewStock";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -40,7 +40,7 @@ export default function Inventory() {
   // Todos los hooks van primero, sin condicionar — el early return de plan
   // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
-  const { canViewStock } = useCanViewStock();
+  const { canViewStock } = useStaffPermissions();
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
   const { categories, subcategories } = useCategories();

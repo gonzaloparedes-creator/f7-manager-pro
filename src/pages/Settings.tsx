@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff } from "lucide-react";
+import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff, ShoppingBag } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -956,6 +956,8 @@ function UsersTab() {
   const [savingCommissionToggle, setSavingCommissionToggle] = useState(false);
   const [staffCanViewStock, setStaffCanViewStock] = useState(false);
   const [savingStockToggle, setSavingStockToggle] = useState(false);
+  const [staffCanViewProducts, setStaffCanViewProducts] = useState(true);
+  const [savingProductsToggle, setSavingProductsToggle] = useState(false);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<UserRow | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
 
@@ -973,7 +975,7 @@ function UsersTab() {
     const [{ data: profs }, { data: brs }, { data: company }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, phone, branch_id, commission_rate").eq("company_id", companyId),
       supabase.from("branches").select("id, name, address").eq("company_id", companyId).order("name"),
-      supabase.from("companies").select("commission_enabled, staff_can_view_stock").eq("id", companyId).maybeSingle(),
+      supabase.from("companies").select("commission_enabled, staff_can_view_stock, staff_can_view_products").eq("id", companyId).maybeSingle(),
     ]);
     const userIds = (profs ?? []).map((p: any) => p.id);
     let roles: any[] = [];
@@ -991,6 +993,7 @@ function UsersTab() {
     setBranches((brs ?? []) as Branch[]);
     setCommissionEnabled(!!company?.commission_enabled);
     setStaffCanViewStock(!!(company as { staff_can_view_stock?: boolean } | null)?.staff_can_view_stock);
+    setStaffCanViewProducts((company as { staff_can_view_products?: boolean } | null)?.staff_can_view_products ?? true);
     setLoading(false);
   };
   useEffect(() => { load(); }, [companyId]);
@@ -1019,6 +1022,19 @@ function UsersTab() {
       return toast({ title: "Error", description: error.message, variant: "destructive" });
     }
     toast({ title: value ? "Staff ahora ve el stock" : "Stock oculto para staff" });
+  };
+
+  const toggleStaffCanViewProducts = async (value: boolean) => {
+    if (!companyId) return;
+    setSavingProductsToggle(true);
+    setStaffCanViewProducts(value);
+    const { error } = await supabase.from("companies").update({ staff_can_view_products: value }).eq("id", companyId);
+    setSavingProductsToggle(false);
+    if (error) {
+      setStaffCanViewProducts(!value);
+      return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    toast({ title: value ? "Staff ahora ve Productos" : "Sección Productos oculta para staff" });
   };
 
   const updateUserCommissionRate = async (userId: string, rate: number) => {
@@ -1137,6 +1153,22 @@ function UsersTab() {
           <div className="flex items-center gap-2">
             {savingStockToggle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             <Switch id="stock-toggle" checked={staffCanViewStock} onCheckedChange={toggleStaffCanViewStock} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4 text-primary" />
+            <div>
+              <Label htmlFor="products-toggle" className="cursor-pointer text-sm font-medium">Sección Productos visible para staff</Label>
+              <div className="text-xs text-muted-foreground">
+                Si lo apagás, el personal con rol "Staff" no puede entrar a Productos (venta de catálogo). Admin y Recepción siempre pueden.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {savingProductsToggle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Switch id="products-toggle" checked={staffCanViewProducts} onCheckedChange={toggleStaffCanViewProducts} />
           </div>
         </div>
 

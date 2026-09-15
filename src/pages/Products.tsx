@@ -11,7 +11,7 @@ import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartS
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useCanViewStock } from "@/hooks/useCanViewStock";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
@@ -68,7 +68,7 @@ export default function Products() {
   // Todos los hooks van primero, sin condicionar — el early return de plan
   // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
-  const { canViewStock } = useCanViewStock();
+  const { canViewStock, canViewProducts, loading: staffPermsLoading } = useStaffPermissions();
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { isBusiness, isRetail, loading: planLoading } = usePlan();
@@ -233,6 +233,7 @@ export default function Products() {
   }, [sales]);
 
   if (!planLoading && !hasExternalInventory) return <Navigate to="/dashboard" replace />;
+  if (!staffPermsLoading && !canViewProducts) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="space-y-6">
