@@ -9,6 +9,7 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   QrCode,
+  Wallet,
 } from "lucide-react";
 
 export interface TutorialImageRef {
@@ -400,8 +401,17 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Además del total general, hay tablas que separan la ganancia por categoría de producto (en Tienda) y, si tu taller activó la \"Clasificación por marca/modelo\" en Configuración → Accesorios, por tipo de equipo, por marca y por modelo (esta última limitada a los 8 modelos con más ingresos, para que sea un reporte legible y no una lista interminable).",
           "Esto sirve para saber, por ejemplo, si tu taller gana más reparando celulares Apple o notebooks, sin tener que revisar orden por orden.",
+          "\"Ventas por categoría\" además se puede desplegar: hacé clic en una categoría (por ejemplo \"Cargadores\") para ver qué producto puntual del catálogo se vendió adentro, no solo el total de la categoría.",
         ],
         images: [{ file: "reportes-categorias-01.png", alt: "Ganancia por categoría, tipo de equipo, marca y modelo" }],
+      },
+      {
+        id: "medio-de-pago",
+        title: "Ingresos por medio de pago",
+        body: [
+          "Suma cuánto entró por Efectivo, Transferencia y cualquier otro medio que hayas configurado, combinando Taller y Tienda — usando la fecha real en que se cobró cada pago, no la fecha de la orden.",
+        ],
+        images: [{ file: "reportes-medio-pago-01.png", alt: "Ingresos por medio de pago" }],
       },
       {
         id: "sucursal-tecnico",
@@ -410,6 +420,33 @@ export const tutorialCategories: TutorialCategory[] = [
           "Si tu taller tiene varias sucursales, hay un desglose de ingresos por sucursal. También hay un desglose por técnico, que incluye el cálculo de comisión si la tenés activada para ese usuario en Configuración → Usuarios.",
         ],
         images: [{ file: "reportes-sucursal-tecnico-01.png", alt: "Desglose por sucursal y por técnico" }],
+      },
+    ],
+  },
+  {
+    id: "cierre-caja",
+    label: "Cierre de Caja",
+    icon: Wallet,
+    description: "Comparar el efectivo contado físicamente contra lo que debería haber entrado ese día.",
+    note: "Solo para Admin · Disponible en los planes Pro y Business.",
+    topics: [
+      {
+        id: "como-funciona",
+        title: "Elegir el día y comparar",
+        body: [
+          "Elegís una fecha (por defecto, hoy) y el sistema muestra cuánto entró por cada medio de pago ese día, combinando Taller y Tienda.",
+          "Solo el efectivo necesita contarse a mano: transferencia y tarjeta ya quedan verificadas por el banco o el procesador de pago. Ingresá cuánto contaste físicamente en la caja y el sistema calcula si sobró, faltó o cuadró exacto.",
+        ],
+        images: [{ file: "cierre-caja-comparar-01.png", alt: "Comparación de efectivo esperado vs contado" }],
+      },
+      {
+        id: "historial",
+        title: "Volver a cerrar e historial",
+        body: [
+          "Una vez cerrado, ese día queda marcado — si te equivocaste al contar, \"Volver a cerrar este día\" te deja repetirlo.",
+          "Más abajo queda un historial navegable de todos los cierres anteriores; hacé clic en una fecha para volver a ver el detalle de ese día.",
+        ],
+        images: [{ file: "cierre-caja-historial-01.png", alt: "Historial de cierres de caja" }],
       },
     ],
   },

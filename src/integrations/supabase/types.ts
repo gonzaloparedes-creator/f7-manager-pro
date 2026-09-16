@@ -95,6 +95,60 @@ export type Database = {
           },
         ]
       }
+      cash_closings: {
+        Row: {
+          breakdown: Json
+          closed_by: string | null
+          closing_date: string
+          company_id: string
+          counted_cash: number
+          created_at: string
+          difference: number
+          expected_cash: number
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          breakdown?: Json
+          closed_by?: string | null
+          closing_date: string
+          company_id: string
+          counted_cash: number
+          created_at?: string
+          difference: number
+          expected_cash?: number
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          breakdown?: Json
+          closed_by?: string | null
+          closing_date?: string
+          company_id?: string
+          counted_cash?: number
+          created_at?: string
+          difference?: number
+          expected_cash?: number
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_closings_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_closings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_presets: {
         Row: {
           company_id: string
