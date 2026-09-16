@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
+import { renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
 import { X, Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -399,6 +399,9 @@ export default function NewOrderDialog({
       await supabase.from("order_status_history").insert({
         order_id: order.id, status: "recibido", status_label: STATUS_LABELS.recibido, note: "Orden creada",
       });
+      if (deposit > 0) {
+        logOrderPayment({ orderId: order.id, companyId, amount: deposit, method: form.deposit_payment_method || null, userId: user.id });
+      }
 
       try {
         const notificationPhone = order.secondary_phone ? order.secondary_phone : order.customer_phone;

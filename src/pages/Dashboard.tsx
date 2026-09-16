@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
+import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, logOrderPayment, type QuoteResponse } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
@@ -37,6 +37,7 @@ interface Order {
   problems: string[] | null;
   quote_amount: number | null;
   deposit_amount: number | null;
+  deposit_payment_method: string | null;
   cargos_adicionales: CargoAdicional[] | null;
   estimated_delivery_date: string | null;
   current_branch_id: string | null;
@@ -114,7 +115,7 @@ export default function Dashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, customer_name, customer_phone, device_type, imei, marca, modelo, status, created_at, problems, quote_amount, deposit_amount, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
+      .select("id, order_number, customer_name, customer_phone, device_type, imei, marca, modelo, status, created_at, problems, quote_amount, deposit_amount, deposit_payment_method, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false });
     if (error) {
@@ -155,6 +156,7 @@ export default function Dashboard() {
     e.preventDefault();
     e.stopPropagation();
     setCollectingId(order.id);
+    const amountCollected = total - Number(order.deposit_amount ?? 0);
     // Optimistic update
     setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, deposit_amount: total } : o));
     const { error } = await supabase
@@ -166,6 +168,12 @@ export default function Dashboard() {
       toast({ title: "Error al cobrar saldo", description: error.message, variant: "destructive" });
       load();
       return;
+    }
+    // Este atajo no pregunta el medio de pago (a diferencia de "Registrar
+    // pago" en el detalle) — se asume el último medio conocido de la orden,
+    // mejor estimación disponible acá.
+    if (companyId && user) {
+      logOrderPayment({ orderId: order.id, companyId, amount: amountCollected, method: order.deposit_payment_method, userId: user.id });
     }
     toast({ title: "Saldo cobrado", description: `Orden ${order.order_number} marcada como totalmente pagada.` });
   };

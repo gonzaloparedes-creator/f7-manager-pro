@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompany } from "@/hooks/useCompany";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
+import { formatPYG, renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
 import { Type, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
@@ -44,6 +45,7 @@ export default function ConvertQuoteDialog({
 }: { order: QuoteOrder; open: boolean; onOpenChange: (o: boolean) => void; onConverted: () => void }) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { companyId } = useCompany();
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: checklistPresets } = useChecklistPresets();
   const { presets: paymentMethodPresets } = usePaymentMethodPresets();
@@ -106,6 +108,9 @@ export default function ConvertQuoteDialog({
       await supabase.from("order_status_history").insert({
         order_id: order.id, status: "recibido", status_label: STATUS_LABELS.recibido, note: "Presupuesto convertido a orden — equipo recibido",
       });
+      if (deposit > 0 && companyId && user) {
+        logOrderPayment({ orderId: order.id, companyId, amount: deposit, method: depositMethod || null, userId: user.id });
+      }
 
       try {
         const notificationPhone = order.secondary_phone ? order.secondary_phone : order.customer_phone;

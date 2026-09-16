@@ -47,6 +47,7 @@ interface SaleRow {
   quantity: number;
   unit_price: number;
   unit_cost: number;
+  payment_method: string | null;
   created_at: string;
   branch_id: string | null;
   category_name: string | null;
@@ -57,6 +58,11 @@ interface StaffRow {
   id: string;
   full_name: string | null;
   commission_rate: number;
+}
+interface PaymentRow {
+  amount: number;
+  payment_method: string | null;
+  created_at: string;
 }
 
 type PresetKey = "hoy" | "ayer" | "esta_semana" | "semana_pasada" | "este_mes" | "mes_pasado" | "este_anio" | "todo";
@@ -276,6 +282,29 @@ function salesByCategory(sales: SaleRow[], from: Date | null, to: Date | null) {
   return map;
 }
 
+/**
+ * A diferencia de revenueInRange (que reconoce el ingreso en deposit_date/
+ * final_payment_date de la orden), acá se usa la fecha real de cada pago —
+ * es la pregunta de caja: "cuánto entró por cada medio hoy", no la de
+ * reconocimiento contable de la orden.
+ */
+function revenueByPaymentMethod(payments: PaymentRow[], sales: SaleRow[], from: Date | null, to: Date | null) {
+  const map = new Map<string, number>();
+  const bump = (method: string | null, amount: number) => {
+    const key = method?.trim() || "Sin especificar";
+    map.set(key, (map.get(key) ?? 0) + amount);
+  };
+  for (const p of payments) {
+    if (!inRange(p.created_at, from, to)) continue;
+    bump(p.payment_method, Number(p.amount || 0));
+  }
+  for (const s of sales) {
+    if (!inRange(s.created_at, from, to)) continue;
+    bump(s.payment_method, s.quantity * Number(s.unit_price || 0));
+  }
+  return map;
+}
+
 function revenueByBranchId(orders: OrderRow[], sales: SaleRow[], from: Date | null, to: Date | null) {
   const map = new Map<string, number>();
   const add = (id: string | null, amount: number) => {
@@ -331,6 +360,7 @@ export default function Reports() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [parts, setParts] = useState<PartRow[]>([]);
   const [sales, setSales] = useState<SaleRow[]>([]);
+  const [orderPayments, setOrderPayments] = useState<PaymentRow[]>([]);
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [commissionEnabled, setCommissionEnabled] = useState(false);
   const [useDeviceClassification, setUseDeviceClassification] = useState(false);
@@ -371,13 +401,20 @@ export default function Reports() {
         }
         setOrders((o ?? []) as unknown as OrderRow[]);
         setParts(p as unknown as PartRow[]);
+
+        const { data: pay, error: payErr } = await (supabase as any)
+          .from("order_payments")
+          .select("amount, payment_method, created_at")
+          .eq("company_id", companyId);
+        if (payErr) hadError = true;
+        setOrderPayments((pay ?? []) as PaymentRow[]);
       };
 
       const loadTienda = async () => {
         if (!hasTienda) return;
         const { data: s, error: sErr } = await (supabase as any)
           .from("product_sales")
-          .select("product_name, quantity, unit_price, unit_cost, created_at, branch_id, category_name, subcategory_name, created_by")
+          .select("product_name, quantity, unit_price, unit_cost, payment_method, created_at, branch_id, category_name, subcategory_name, created_by")
           .eq("company_id", companyId);
         if (sErr) hadError = true;
         setSales((s ?? []) as SaleRow[]);
@@ -450,6 +487,11 @@ export default function Reports() {
     const map = revenueByBranchId(orders, sales, from, to);
     return Array.from(map.entries()).map(([id, revenue]) => ({ id, label: branchName(id), revenue }));
   }, [orders, sales, from, to, branches]);
+
+  const paymentMethodBreakdown = useMemo(() => {
+    const map = revenueByPaymentMethod(orderPayments, sales, from, to);
+    return Array.from(map.entries()).map(([label, revenue]) => ({ id: label, label, revenue }));
+  }, [orderPayments, sales, from, to]);
 
   const staffBreakdown = useMemo(() => {
     const map = revenueByStaffId(orders, sales, from, to);
@@ -665,7 +707,7 @@ export default function Reports() {
       </div>
 
       {(categoriaTaller.size > 0 || categoriaTienda.size > 0 || (hasMultipleBranches && branchBreakdown.length > 0) || staffBreakdown.length > 1
-        || gananciaPorEquipo.size > 0 || gananciaPorMarca.size > 0 || gananciaPorModeloTop.size > 0) && (
+        || gananciaPorEquipo.size > 0 || gananciaPorMarca.size > 0 || gananciaPorModeloTop.size > 0 || paymentMethodBreakdown.length > 0) && (
         <div className="grid gap-4 md:grid-cols-2">
           {categoriaTaller.size > 0 && (
             <CostByCategoryCard title="Costo de repuestos por categoría" rows={categoriaTaller} />
@@ -684,6 +726,9 @@ export default function Reports() {
           )}
           {hasMultipleBranches && branchBreakdown.length > 0 && (
             <RevenueListCard title="Por sucursal" icon={Building2} rows={branchBreakdown} />
+          )}
+          {paymentMethodBreakdown.length > 0 && (
+            <RevenueListCard title="Ingresos por medio de pago" icon={Wallet} rows={paymentMethodBreakdown} />
           )}
           {staffBreakdown.length > 1 && (
             <StaffCommissionCard rows={staffBreakdown} commissionEnabled={commissionEnabled} />

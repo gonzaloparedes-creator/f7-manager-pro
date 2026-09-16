@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
-import { renderServiceTerms, STATUS_LABELS } from "@/lib/orders";
+import { renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -332,6 +332,9 @@ export default function NewBatchOrderDialog({
           await supabase.from("order_status_history").insert({
             order_id: order.id, status: "recibido", status_label: STATUS_LABELS.recibido, note: "Orden creada (Modo Lote)",
           });
+          if (deposit > 0) {
+            logOrderPayment({ orderId: order.id, companyId: resolvedCompanyId, amount: deposit, method: row.deposit_payment_method || null, userId: user.id });
+          }
 
           // No se espera la notificación: con varios equipos, esperar el
           // WhatsApp de cada uno antes de pasar al siguiente multiplicaba

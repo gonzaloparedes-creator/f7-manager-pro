@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
-import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
+import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, logOrderPayment, type QuoteResponse } from "@/lib/orders";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
@@ -630,6 +630,9 @@ export default function OrderDetail() {
       if (error) throw error;
       const methodNote = payMethod ? ` (${payMethod})` : "";
       await logSystemHistory(order.id, order.status, `Pago registrado: ${formatPYG(amount)}${methodNote}`);
+      if (companyId && user) {
+        logOrderPayment({ orderId: order.id, companyId, amount, method: payMethod || null, userId: user.id });
+      }
       toast({
         title: "Pago registrado",
         description: amount >= saldo ? `${order.order_number} quedó totalmente pagada.` : `Saldo restante: ${formatPYG(saldo - amount)}.`,

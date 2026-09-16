@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export type OrderStatus =
   | "presupuesto"
   | "recibido"
@@ -167,4 +169,29 @@ export function renderStatusMessage(template: string, vars: StatusMessageVars) {
     (acc, key) => acc.replaceAll(`{{${key}}}`, vars[key]),
     template
   );
+}
+
+/**
+ * Registra un pago real en order_payments (una fila por pago, con su propio
+ * medio y fecha) — a diferencia de orders.deposit_payment_method, que es un
+ * solo campo que se pisa en cada pago nuevo y por eso no alcanza para saber
+ * cuánto entró por cada medio de pago en un día puntual.
+ *
+ * Es deliberadamente "best effort": si el pago principal (crear la orden,
+ * registrar el cobro) ya se guardó bien, un fallo acá no debe hacerle creer
+ * al usuario que el pago no se registró — solo se pierde precisión en
+ * Reportes/cierre de caja, no la plata del cliente.
+ */
+export async function logOrderPayment(
+  params: { orderId: string; companyId: string; amount: number; method: string | null; userId: string }
+) {
+  if (params.amount <= 0) return;
+  const { error } = await (supabase as any).from("order_payments").insert({
+    order_id: params.orderId,
+    company_id: params.companyId,
+    amount: params.amount,
+    payment_method: params.method,
+    created_by: params.userId,
+  });
+  if (error) console.error("No se pudo registrar el pago en el historial:", error.message);
 }
