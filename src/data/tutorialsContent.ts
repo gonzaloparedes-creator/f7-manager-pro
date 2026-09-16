@@ -347,7 +347,10 @@ export const tutorialCategories: TutorialCategory[] = [
       {
         id: "vender",
         title: "Vender con el carrito (POS)",
-        body: ["Se van agregando productos al carrito con su cantidad, y al confirmar la venta se descuenta el stock automáticamente."],
+        body: [
+          "Se van agregando productos al carrito con su cantidad, y al confirmar la venta se descuenta el stock automáticamente.",
+          "Si querés aplicarle un descuento a la venta (por porcentaje o por un monto fijo en Gs.), se carga en el campo \"Descuento\" del carrito antes de confirmar — se reparte proporcionalmente entre los productos, así queda reflejado en el precio de venta real y en Reportes.",
+        ],
         images: [{ file: "productos-vender-01.png", alt: "Carrito de venta (POS) en Productos" }],
       },
       {

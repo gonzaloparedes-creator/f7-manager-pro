@@ -10,8 +10,11 @@ import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2 } from "lucide-react";
 import { formatPYG } from "@/lib/orders";
+import { cn } from "@/lib/utils";
 import QuantityStepper from "@/components/QuantityStepper";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
+
+type DiscountUnit = "percent" | "amount";
 
 export type CartLine = { quantity: number; unitPrice: number };
 export type Cart = Record<string, CartLine>;
@@ -49,12 +52,24 @@ export default function CartSheet({
   const [paymentMethod, setPaymentMethod] = useState("Efectivo");
   const [loading, setLoading] = useState(false);
   const [completedSale, setCompletedSale] = useState<CompletedCartSale | null>(null);
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountUnit, setDiscountUnit] = useState<DiscountUnit>("percent");
 
   const lines = Object.entries(cart)
     .map(([id, line]) => ({ id, product: products.find((p) => p.id === id), ...line }))
     .filter((l): l is typeof l & { product: CartProduct } => !!l.product);
 
-  const total = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+  const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+  const discountInput = parseFloat(discountValue) || 0;
+  // El descuento se reparte como el mismo % en cada línea (no un monto fijo
+  // restado del total), para que el ticket siga mostrando un precio por
+  // unidad creíble en vez de un número raro por el reparto.
+  const discountRaw = discountUnit === "percent"
+    ? subtotal * (Math.min(100, Math.max(0, discountInput)) / 100)
+    : Math.max(0, discountInput);
+  const discountAmount = Math.min(subtotal, Math.round(discountRaw));
+  const discountFraction = subtotal > 0 ? discountAmount / subtotal : 0;
+  const total = subtotal - discountAmount;
 
   const setQty = (id: string, qty: number) => {
     setCart((prev) => {
@@ -81,6 +96,8 @@ export default function CartSheet({
     onOpenChange(false);
     setCompletedSale(null);
     setPaymentMethod("Efectivo");
+    setDiscountValue("");
+    setDiscountUnit("percent");
   };
 
   const checkout = async () => {
@@ -99,7 +116,10 @@ export default function CartSheet({
         inventory_item_id: l.id,
         product_name: l.product.name,
         quantity: l.quantity,
-        unit_price: l.unitPrice,
+        // El descuento queda "adentro" del precio unitario vendido, así
+        // Reportes (que suma quantity*unit_price) ya refleja la venta real
+        // sin tocar nada del lado del cálculo de ingresos/ganancia.
+        unit_price: discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice,
         unit_cost: l.product.cost_price,
         payment_method: paymentMethod,
         created_by: user.id,
@@ -210,6 +230,58 @@ export default function CartSheet({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cart-discount">Descuento (opcional)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cart-discount"
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(e.target.value)}
+                        placeholder="0"
+                        className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                      <div className="flex shrink-0 overflow-hidden rounded-md border border-input">
+                        <button
+                          type="button"
+                          onClick={() => setDiscountUnit("percent")}
+                          className={cn(
+                            "px-3 text-sm font-medium transition-colors",
+                            discountUnit === "percent" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          %
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDiscountUnit("amount")}
+                          className={cn(
+                            "px-3 text-sm font-medium transition-colors",
+                            discountUnit === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Gs.
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {discountAmount > 0 && (
+                    <>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Subtotal</span>
+                        <span>{formatPYG(subtotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-secondary">
+                        <span>Descuento</span>
+                        <span>-{formatPYG(discountAmount)}</span>
+                      </div>
+                    </>
+                  )}
+
                   <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-4 py-3">
                     <span className="text-sm text-muted-foreground">Total</span>
                     <span className="text-xl font-bold text-primary">{formatPYG(total)}</span>
