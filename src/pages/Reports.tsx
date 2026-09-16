@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { formatPYG } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Wallet, TrendingUp, PackageMinus, TrendingDown, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone } from "lucide-react";
 import { usePlan } from "@/hooks/usePlan";
@@ -42,6 +43,7 @@ interface PartRow {
   subcategory_name: string | null;
 }
 interface SaleRow {
+  product_name: string;
   quantity: number;
   unit_price: number;
   unit_cost: number;
@@ -251,14 +253,24 @@ function partsCostByCategory(orders: OrderRow[], parts: PartRow[], from: Date | 
   return map;
 }
 
+type CategoryTotals = { revenue: number; cost: number };
+type CategoryWithProducts = CategoryTotals & { products: Map<string, CategoryTotals> };
+
 function salesByCategory(sales: SaleRow[], from: Date | null, to: Date | null) {
-  const map = new Map<string, { revenue: number; cost: number }>();
+  const map = new Map<string, CategoryWithProducts>();
   for (const s of sales) {
     if (!inRange(s.created_at, from, to)) continue;
     const key = categoryLabel(s.category_name, s.subcategory_name);
-    const cur = map.get(key) ?? { revenue: 0, cost: 0 };
-    cur.revenue += s.quantity * Number(s.unit_price || 0);
-    cur.cost += s.quantity * Number(s.unit_cost || 0);
+    const cur = map.get(key) ?? { revenue: 0, cost: 0, products: new Map<string, CategoryTotals>() };
+    const revenue = s.quantity * Number(s.unit_price || 0);
+    const cost = s.quantity * Number(s.unit_cost || 0);
+    cur.revenue += revenue;
+    cur.cost += cost;
+    const productKey = s.product_name || "Sin nombre";
+    const curProduct = cur.products.get(productKey) ?? { revenue: 0, cost: 0 };
+    curProduct.revenue += revenue;
+    curProduct.cost += cost;
+    cur.products.set(productKey, curProduct);
     map.set(key, cur);
   }
   return map;
@@ -365,7 +377,7 @@ export default function Reports() {
         if (!hasTienda) return;
         const { data: s, error: sErr } = await (supabase as any)
           .from("product_sales")
-          .select("quantity, unit_price, unit_cost, created_at, branch_id, category_name, subcategory_name, created_by")
+          .select("product_name, quantity, unit_price, unit_cost, created_at, branch_id, category_name, subcategory_name, created_by")
           .eq("company_id", companyId);
         if (sErr) hadError = true;
         setSales((s ?? []) as SaleRow[]);
@@ -414,7 +426,7 @@ export default function Reports() {
     [hasTaller, orders, parts, from, to]
   );
   const categoriaTienda = useMemo(
-    () => hasTienda ? salesByCategory(sales, from, to) : new Map<string, { revenue: number; cost: number }>(),
+    () => hasTienda ? salesByCategory(sales, from, to) : new Map<string, CategoryWithProducts>(),
     [hasTienda, sales, from, to]
   );
 
@@ -659,7 +671,7 @@ export default function Reports() {
             <CostByCategoryCard title="Costo de repuestos por categoría" rows={categoriaTaller} />
           )}
           {categoriaTienda.size > 0 && (
-            <MarginByCategoryCard title="Ventas por categoría" rows={categoriaTienda} />
+            <SalesByCategoryCard title="Ventas por categoría" rows={categoriaTienda} />
           )}
           {gananciaPorEquipo.size > 0 && (
             <MarginByCategoryCard title="Ganancia por tipo de equipo" rows={gananciaPorEquipo} icon={Smartphone} />
@@ -838,6 +850,52 @@ function MarginByCategoryCard({ title, rows, icon = Tags }: { title: string; row
           </tbody>
         </table>
       </div>
+    </BreakdownCardShell>
+  );
+}
+
+/** Como MarginByCategoryCard pero con cada categoría desplegable para ver
+ * qué producto puntual se vendió adentro — "Cargadores" solo no dice cuál
+ * de los cargadores del catálogo fue. */
+function SalesByCategoryCard({ title, rows }: { title: string; rows: Map<string, CategoryWithProducts> }) {
+  const sorted = Array.from(rows.entries()).sort((a, b) => b[1].revenue - a[1].revenue);
+  return (
+    <BreakdownCardShell title={title} icon={Tags}>
+      <Accordion type="multiple" className="space-y-1">
+        {sorted.map(([label, v]) => {
+          const products = Array.from(v.products.entries()).sort((a, b) => b[1].revenue - a[1].revenue);
+          return (
+            <AccordionItem key={label} value={label} className="rounded-md border border-border/50 px-3">
+              <AccordionTrigger className="py-2 text-sm hover:no-underline">
+                <div className="flex flex-1 items-center justify-between pr-2">
+                  <span className="text-foreground">{label}</span>
+                  <span className="flex items-center gap-3 text-sm">
+                    <span className="text-muted-foreground">{formatPYG(v.revenue)}</span>
+                    <span className={cn("font-medium", v.revenue - v.cost >= 0 ? "text-primary" : "text-destructive")}>
+                      {formatPYG(v.revenue - v.cost)}
+                    </span>
+                  </span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-2 pt-0">
+                <div className="space-y-1 border-t border-border/50 pt-2">
+                  {products.map(([name, pv]) => (
+                    <div key={name} className="flex items-center justify-between pl-3 text-xs">
+                      <span className="text-muted-foreground">{name}</span>
+                      <span className="flex items-center gap-3">
+                        <span className="text-muted-foreground">{formatPYG(pv.revenue)}</span>
+                        <span className={cn("font-medium", pv.revenue - pv.cost >= 0 ? "text-primary" : "text-destructive")}>
+                          {formatPYG(pv.revenue - pv.cost)}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </BreakdownCardShell>
   );
 }
