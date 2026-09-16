@@ -4,8 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Receipt, Printer, EyeOff, Pencil } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
@@ -56,8 +58,8 @@ type SaleGroup = {
   branch_id: string | null;
 };
 
-const ALL_CATEGORIES = "__all__";
 const ALL_BRANCHES = "__all__";
+const NO_CATEGORY_KEY = "__sin_categoria__";
 const CART_STORAGE_KEY = "f7_products_cart";
 
 function isSameDay(a: Date, b: Date) {
@@ -72,7 +74,7 @@ export default function Products() {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { isBusiness, isRetail, loading: planLoading } = usePlan();
-  const { categories, subcategories } = useCategories();
+  const { categories, subcategories, reload: reloadCategories } = useCategories();
   const { branches, hasMultipleBranches } = useBranches();
   const [items, setItems] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -82,7 +84,6 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [cart, setCart] = useState<Cart>(() => {
     try {
@@ -197,14 +198,37 @@ export default function Products() {
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null;
   const subcategoryName = (id: string | null) => subcategories.find((s) => s.id === id)?.name ?? null;
 
+  const isSearching = search.trim().length > 0;
+
   const filtered = items.filter((i) => {
     const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === ALL_CATEGORIES || i.category_id === categoryFilter;
     const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
-    return matchesSearch && matchesCategory && matchesBranch;
+    return matchesSearch && matchesBranch;
   });
   const outOfStockCount = items.filter((i) => i.stock <= 0).length;
   const lowStockCount = items.filter((i) => i.stock > 0 && i.stock <= i.min_stock_alert).length;
+
+  // Mientras no se esté buscando, se agrupa por categoría en secciones
+  // desplegables — con catálogos grandes, una sola grilla plana se vuelve
+  // interminable para escanear. Al buscar se vuelve a la grilla plana: ver
+  // el resultado ya filtrado adentro de un acordeón que hay que abrir a
+  // mano sería peor, no mejor.
+  const groupedByCategory = useMemo(() => {
+    const map = new Map<string, { label: string; items: Product[] }>();
+    for (const p of filtered) {
+      const key = p.category_id ?? NO_CATEGORY_KEY;
+      const label = p.category_id ? (categoryName(p.category_id) ?? "Sin categoría") : "Sin categoría";
+      const cur = map.get(key) ?? { label, items: [] };
+      cur.items.push(p);
+      map.set(key, cur);
+    }
+    return Array.from(map.entries()).sort(([keyA, a], [keyB, b]) => {
+      if (keyA === NO_CATEGORY_KEY) return 1;
+      if (keyB === NO_CATEGORY_KEY) return -1;
+      return a.label.localeCompare(b.label);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, categories]);
 
   const today = new Date();
   const salesToday = sales.filter((s) => isSameDay(new Date(s.created_at), today));
@@ -236,6 +260,106 @@ export default function Products() {
   const openCreate = () => { setEditItem(null); setOpen(true); };
   const openEdit = (item: Product) => { setEditItem(item); setOpen(true); };
   const closeDialog = (o: boolean) => { setOpen(o); if (!o) setEditItem(null); };
+  // El diálogo puede crear una categoría nueva al vuelo con su propia
+  // instancia de useCategories — esta página tiene la suya aparte, así que
+  // sin este reload quedaba desactualizada (el producto recién creado caía
+  // en el agrupado "Sin categoría" hasta refrescar la página a mano).
+  const handleSaved = () => { load(); reloadCategories(); };
+
+  const renderProductCard = (i: Product) => {
+    const outOfStock = i.stock <= 0;
+    const lowStock = canViewStock && !outOfStock && i.stock <= i.min_stock_alert;
+    const cat = categoryName(i.category_id);
+    const sub = subcategoryName(i.subcategory_id);
+    return (
+      <Card
+        key={i.id}
+        className={cn(
+          "group h-full transition-all hover:shadow-elevated",
+          outOfStock ? "border-l-4 border-l-destructive" : lowStock ? "border-l-4 border-l-secondary" : "hover:border-primary/50"
+        )}
+      >
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3">
+              {i.image_url ? (
+                <img src={i.image_url} alt={i.name} className="h-12 w-12 rounded-md object-cover" />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted">
+                  <ShoppingBag className="h-5 w-5 text-muted-foreground" />
+                </div>
+              )}
+              <div>
+                <div className="font-semibold text-foreground">{i.name}</div>
+                <div className="text-sm font-medium text-primary">{formatPYG(i.selling_price)}</div>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center">
+              <Button size="icon" variant="ghost" onClick={() => openEdit(i)} aria-label={`Editar ${i.name}`}>
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              {isAdmin && (
+                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {(cat || i.branch_id) && (
+            <div className="flex flex-wrap items-center gap-1">
+              {cat && <Badge variant="outline" className="text-[11px]">{cat}</Badge>}
+              {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
+              {hasMultipleBranches && i.branch_id && (
+                <Badge variant="secondary" className="text-[10px]">
+                  {branches.find((b) => b.id === i.branch_id)?.name ?? "Sucursal"}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            {outOfStock ? (
+              <Badge variant="destructive" className="gap-1">
+                <AlertTriangle className="h-3 w-3" /> Sin stock
+              </Badge>
+            ) : lowStock ? (
+              <Badge variant="outline" className="gap-1 border-secondary/40 text-secondary">
+                <AlertTriangle className="h-3 w-3" /> Bajo stock: {i.stock}
+              </Badge>
+            ) : !canViewStock ? (
+              <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                <EyeOff className="h-3 w-3" /> Stock oculto
+              </span>
+            ) : (
+              <span className="text-sm text-muted-foreground">Stock: {i.stock}</span>
+            )}
+          </div>
+
+          {cart[i.id] ? (
+            <div className="flex items-center justify-between gap-2">
+              <QuantityStepper
+                value={cart[i.id].quantity}
+                max={i.stock}
+                onChange={(q) => updateCartQty(i, q)}
+              />
+              <span className="text-sm font-semibold text-foreground">
+                {formatPYG(cart[i.id].quantity * cart[i.id].unitPrice)}
+              </span>
+            </div>
+          ) : (
+            <Button
+              className="w-full gap-2"
+              disabled={outOfStock}
+              onClick={() => addToCart(i)}
+            >
+              <ShoppingCart className="h-4 w-4" /> Agregar
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (!planLoading && !hasExternalInventory) return <Navigate to="/dashboard" replace />;
   if (!staffPermsLoading && !canViewProducts) return <Navigate to="/dashboard" replace />;
@@ -287,189 +411,115 @@ export default function Products() {
         </Card>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Input
-          placeholder="Buscar producto..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-        {categories.length > 0 && (
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_CATEGORIES}>Todas las categorías</SelectItem>
-              {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-        {hasMultipleBranches && (
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_BRANCHES}>Todas las sucursales</SelectItem>
-              {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+      <Tabs defaultValue="catalogo">
+        <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+          <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
+          <TabsTrigger value="ventas">
+            Ventas recientes{saleGroups.length > 0 ? ` (${saleGroups.length})` : ""}
+          </TabsTrigger>
+        </TabsList>
 
-      {loading ? (
-        <p className="text-center text-sm text-muted-foreground">Cargando...</p>
-      ) : filtered.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
-            <ShoppingBag className="h-8 w-8" />
-            Sin productos todavía.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((i) => {
-            const outOfStock = i.stock <= 0;
-            const lowStock = canViewStock && !outOfStock && i.stock <= i.min_stock_alert;
-            const cat = categoryName(i.category_id);
-            const sub = subcategoryName(i.subcategory_id);
-            return (
-              <Card
-                key={i.id}
-                className={cn(
-                  "group h-full transition-all hover:shadow-elevated",
-                  outOfStock ? "border-l-4 border-l-destructive" : lowStock ? "border-l-4 border-l-secondary" : "hover:border-primary/50"
-                )}
-              >
-                <CardContent className="space-y-3 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      {i.image_url ? (
-                        <img src={i.image_url} alt={i.name} className="h-12 w-12 rounded-md object-cover" />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted">
-                          <ShoppingBag className="h-5 w-5 text-muted-foreground" />
+        <TabsContent value="catalogo" className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Input
+              placeholder="Buscar producto..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            {hasMultipleBranches && (
+              <Select value={branchFilter} onValueChange={setBranchFilter}>
+                <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_BRANCHES}>Todas las sucursales</SelectItem>
+                  {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {loading ? (
+            <p className="text-center text-sm text-muted-foreground">Cargando...</p>
+          ) : filtered.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
+                <ShoppingBag className="h-8 w-8" />
+                Sin productos todavía.
+              </CardContent>
+            </Card>
+          ) : isSearching ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map(renderProductCard)}
+            </div>
+          ) : (
+            <Accordion type="multiple" defaultValue={groupedByCategory.map(([key]) => key)} className="space-y-2">
+              {groupedByCategory.map(([key, group]) => (
+                <AccordionItem key={key} value={key} className="rounded-lg border border-border px-3">
+                  <AccordionTrigger className="py-3 text-left hover:no-underline">
+                    <span className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">{group.label}</span>
+                      <Badge variant="secondary" className="text-[11px]">{group.items.length}</Badge>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-4 pt-1">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {group.items.map(renderProductCard)}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
+        </TabsContent>
+
+        <TabsContent value="ventas">
+          <Card>
+            <CardContent className="space-y-3 p-4">
+              {saleGroups.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Todavía no registraste ninguna venta.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {saleGroups.map((g) => (
+                    <div key={g.key} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-foreground">
+                          {g.items.length === 1 ? g.items[0].product_name : `${g.items.length} productos`}
                         </div>
-                      )}
-                      <div>
-                        <div className="font-semibold text-foreground">{i.name}</div>
-                        <div className="text-sm font-medium text-primary">{formatPYG(i.selling_price)}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {new Date(g.created_at).toLocaleString("es-PY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          {" · "}
+                          {g.items.length === 1
+                            ? `Cant: ${g.items[0].quantity}`
+                            : g.items.map((i) => i.product_name).join(", ")}
+                          {g.payment_method ? ` · ${g.payment_method}` : ""}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="font-semibold text-foreground">{formatPYG(g.total)}</span>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-10 w-10"
+                          aria-label="Imprimir ticket"
+                          onClick={() => handlePrintSale({
+                            id: g.key,
+                            created_at: g.created_at,
+                            payment_method: g.payment_method,
+                            branch_id: g.branch_id,
+                            items: g.items.map((i) => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price })),
+                          })}
+                        >
+                          <Printer className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center">
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(i)} aria-label={`Editar ${i.name}`}>
-                        <Pencil className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                      {isAdmin && (
-                        <Button size="icon" variant="ghost" onClick={() => setPendingDelete(i)} aria-label={`Eliminar ${i.name}`}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {(cat || i.branch_id) && (
-                    <div className="flex flex-wrap items-center gap-1">
-                      {cat && <Badge variant="outline" className="text-[11px]">{cat}</Badge>}
-                      {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
-                      {hasMultipleBranches && i.branch_id && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {branches.find((b) => b.id === i.branch_id)?.name ?? "Sucursal"}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    {outOfStock ? (
-                      <Badge variant="destructive" className="gap-1">
-                        <AlertTriangle className="h-3 w-3" /> Sin stock
-                      </Badge>
-                    ) : lowStock ? (
-                      <Badge variant="outline" className="gap-1 border-secondary/40 text-secondary">
-                        <AlertTriangle className="h-3 w-3" /> Bajo stock: {i.stock}
-                      </Badge>
-                    ) : !canViewStock ? (
-                      <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                        <EyeOff className="h-3 w-3" /> Stock oculto
-                      </span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Stock: {i.stock}</span>
-                    )}
-                  </div>
-
-                  {cart[i.id] ? (
-                    <div className="flex items-center justify-between gap-2">
-                      <QuantityStepper
-                        value={cart[i.id].quantity}
-                        max={i.stock}
-                        onChange={(q) => updateCartQty(i, q)}
-                      />
-                      <span className="text-sm font-semibold text-foreground">
-                        {formatPYG(cart[i.id].quantity * cart[i.id].unitPrice)}
-                      </span>
-                    </div>
-                  ) : (
-                    <Button
-                      className="w-full gap-2"
-                      disabled={outOfStock}
-                      onClick={() => addToCart(i)}
-                    >
-                      <ShoppingCart className="h-4 w-4" /> Agregar
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Receipt className="h-4 w-4 text-primary" /> Ventas recientes
-          </div>
-          {saleGroups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Todavía no registraste ninguna venta.</p>
-          ) : (
-            <div className="space-y-1.5">
-              {saleGroups.map((g) => (
-                <div key={g.key} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-foreground">
-                      {g.items.length === 1 ? g.items[0].product_name : `${g.items.length} productos`}
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {new Date(g.created_at).toLocaleString("es-PY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      {" · "}
-                      {g.items.length === 1
-                        ? `Cant: ${g.items[0].quantity}`
-                        : g.items.map((i) => i.product_name).join(", ")}
-                      {g.payment_method ? ` · ${g.payment_method}` : ""}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-semibold text-foreground">{formatPYG(g.total)}</span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-10 w-10"
-                      aria-label="Imprimir ticket"
-                      onClick={() => handlePrintSale({
-                        id: g.key,
-                        created_at: g.created_at,
-                        payment_method: g.payment_method,
-                        branch_id: g.branch_id,
-                        items: g.items.map((i) => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price })),
-                      })}
-                    >
-                      <Printer className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {cartCount > 0 && (
         <button
@@ -485,7 +535,7 @@ export default function Products() {
         </button>
       )}
 
-      <NewProductDialog open={open} onOpenChange={closeDialog} onCreated={load} editItem={editItem} />
+      <NewProductDialog open={open} onOpenChange={closeDialog} onCreated={handleSaved} editItem={editItem} />
       <CartSheet
         open={cartOpen}
         onOpenChange={setCartOpen}

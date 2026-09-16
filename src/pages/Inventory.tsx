@@ -43,7 +43,7 @@ export default function Inventory() {
   const { canViewStock } = useStaffPermissions();
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
-  const { categories, subcategories } = useCategories();
+  const { categories, subcategories, reload: reloadCategories } = useCategories();
   const { branches, hasMultipleBranches } = useBranches();
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +101,10 @@ export default function Inventory() {
   const openCreate = () => { setEditItem(null); setOpen(true); };
   const openEdit = (item: Item) => { setEditItem(item); setOpen(true); };
   const closeDialog = (o: boolean) => { setOpen(o); if (!o) setEditItem(null); };
+  // El diálogo puede crear una categoría nueva al vuelo con su propia
+  // instancia de useCategories — esta página tiene la suya aparte, así que
+  // sin este reload quedaba desactualizada hasta refrescar a mano.
+  const handleSaved = () => { load(); reloadCategories(); };
 
   if (!planLoading && isStarter) return <Navigate to="/dashboard" replace />;
 
@@ -341,7 +345,7 @@ export default function Inventory() {
         )}
       </Card>
 
-      <NewInventoryItemDialog open={open} onOpenChange={closeDialog} onCreated={load} editItem={editItem} />
+      <NewInventoryItemDialog open={open} onOpenChange={closeDialog} onCreated={handleSaved} editItem={editItem} />
 
       <ConfirmDialog
         open={!!pendingDelete}

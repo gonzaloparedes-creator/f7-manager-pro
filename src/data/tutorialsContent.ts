@@ -340,6 +340,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Catálogo de venta y estadísticas",
         body: [
           "Muestra el total de productos, cuáles están sin stock o con bajo stock, las ventas del día y el valor total del catálogo.",
+          "El catálogo (pestaña \"Catálogo\") se agrupa solo por categoría en secciones desplegables — cada una se puede colapsar para no tener que scrollear entre categorías que no estás usando en el momento. Al buscar un producto por nombre, se muestra directo el resultado sin agrupar.",
           "Para restockear un producto que se agotó (o corregir nombre, precio, imagen, etc.), usá el lápiz de \"Editar\" en su tarjeta — no hace falta eliminarlo y cargarlo de nuevo.",
         ],
         images: [{ file: "productos-catalogo-01.png", alt: "Catálogo de productos y estadísticas" }],
@@ -357,7 +358,7 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "ventas",
         title: "Ventas recientes y ticket imprimible",
         body: [
-          "Cada venta queda registrada en un listado, con la opción de imprimir el ticket correspondiente.",
+          "La pestaña \"Ventas recientes\" (al lado de \"Catálogo\") muestra cada venta con la opción de imprimir el ticket correspondiente — queda a un clic, sin importar cuántos productos tenga cargado el catálogo.",
           "El ancho del ticket (58mm u 80mm, según la impresora) se configura una sola vez en Configuración → Perfil → Impresión de tickets. Si no coincide con el rollo real de la impresora, el ticket sale achicado e ilegible.",
         ],
         images: [{ file: "productos-ventas-01.png", alt: "Listado de ventas recientes con ticket" }],
