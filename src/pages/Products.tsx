@@ -85,6 +85,8 @@ export default function Products() {
   const [editItem, setEditItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
+  const [stockFilter, setStockFilter] = useState<"all" | "low">("all");
+  const [activeTab, setActiveTab] = useState("catalogo");
   const [cart, setCart] = useState<Cart>(() => {
     try {
       const raw = localStorage.getItem(CART_STORAGE_KEY);
@@ -199,20 +201,27 @@ export default function Products() {
   const subcategoryName = (id: string | null) => subcategories.find((s) => s.id === id)?.name ?? null;
 
   const isSearching = search.trim().length > 0;
+  const isLowOrOutOfStock = (i: Product) => i.stock <= 0 || i.stock <= i.min_stock_alert;
 
   const filtered = items.filter((i) => {
     const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
     const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
-    return matchesSearch && matchesBranch;
+    const matchesStock = stockFilter === "all" || isLowOrOutOfStock(i);
+    return matchesSearch && matchesBranch && matchesStock;
   });
   const outOfStockCount = items.filter((i) => i.stock <= 0).length;
   const lowStockCount = items.filter((i) => i.stock > 0 && i.stock <= i.min_stock_alert).length;
 
-  // Mientras no se esté buscando, se agrupa por categoría en secciones
-  // desplegables — con catálogos grandes, una sola grilla plana se vuelve
-  // interminable para escanear. Al buscar se vuelve a la grilla plana: ver
-  // el resultado ya filtrado adentro de un acordeón que hay que abrir a
-  // mano sería peor, no mejor.
+  const toggleStockFilter = () => {
+    setActiveTab("catalogo");
+    setStockFilter((f) => (f === "low" ? "all" : "low"));
+  };
+
+  // Mientras no se esté buscando ni filtrando por stock, se agrupa por
+  // categoría en secciones desplegables — con catálogos grandes, una sola
+  // grilla plana se vuelve interminable para escanear. Al buscar o filtrar
+  // se vuelve a la grilla plana: ver el resultado ya filtrado adentro de un
+  // acordeón que hay que abrir a mano sería peor, no mejor.
   const groupedByCategory = useMemo(() => {
     const map = new Map<string, { label: string; items: Product[] }>();
     for (const p of filtered) {
@@ -387,7 +396,22 @@ export default function Products() {
           <div className="text-xs text-muted-foreground">Total productos</div>
           <div className="mt-1 text-2xl font-bold">{items.length}</div>
         </Card>
-        <Card className="p-4">
+        <Card
+          className={cn(
+            "p-4 text-left transition-colors",
+            canViewStock && outOfStockCount + lowStockCount > 0 && "cursor-pointer hover:border-secondary/50",
+            stockFilter === "low" && "border-secondary bg-secondary/10"
+          )}
+          role={canViewStock && outOfStockCount + lowStockCount > 0 ? "button" : undefined}
+          tabIndex={canViewStock && outOfStockCount + lowStockCount > 0 ? 0 : undefined}
+          onClick={canViewStock && outOfStockCount + lowStockCount > 0 ? toggleStockFilter : undefined}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && canViewStock && outOfStockCount + lowStockCount > 0) {
+              e.preventDefault();
+              toggleStockFilter();
+            }
+          }}
+        >
           <div className="text-xs text-muted-foreground">Sin / bajo stock</div>
           {canViewStock ? (
             <div className="mt-1 flex items-center gap-2 text-2xl font-bold text-secondary">
@@ -396,6 +420,11 @@ export default function Products() {
             </div>
           ) : (
             <div className="mt-1 text-2xl font-bold text-muted-foreground">—</div>
+          )}
+          {canViewStock && outOfStockCount + lowStockCount > 0 && (
+            <div className="mt-1 text-[11px] font-medium text-secondary">
+              {stockFilter === "low" ? "Mostrando estos ↓" : "Ver cuáles →"}
+            </div>
           )}
         </Card>
         <Card className="p-4">
@@ -411,7 +440,7 @@ export default function Products() {
         </Card>
       </div>
 
-      <Tabs defaultValue="catalogo">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
           <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
           <TabsTrigger value="ventas">
@@ -427,6 +456,17 @@ export default function Products() {
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
+            {stockFilter === "low" && (
+              <Badge
+                variant="outline"
+                className="w-fit cursor-pointer gap-1.5 border-secondary/40 text-secondary hover:bg-secondary/10"
+                onClick={() => setStockFilter("all")}
+              >
+                <AlertTriangle className="h-3 w-3" />
+                Filtrando: sin / bajo stock
+                <span className="ml-0.5 font-bold">✕</span>
+              </Badge>
+            )}
             {hasMultipleBranches && (
               <Select value={branchFilter} onValueChange={setBranchFilter}>
                 <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
@@ -444,10 +484,10 @@ export default function Products() {
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
                 <ShoppingBag className="h-8 w-8" />
-                Sin productos todavía.
+                {stockFilter === "low" ? "Ningún producto con bajo o sin stock." : "Sin productos todavía."}
               </CardContent>
             </Card>
-          ) : isSearching ? (
+          ) : isSearching || stockFilter === "low" ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map(renderProductCard)}
             </div>
