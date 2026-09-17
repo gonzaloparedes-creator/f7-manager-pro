@@ -69,7 +69,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Cada tarjeta muestra el número de orden, el cliente, el equipo (con marca/modelo si tu taller activó esa clasificación) y el IMEI o número de serie si se cargó.",
           "La etiqueta de color indica el estado actual de la orden. Al lado puede aparecer una etiqueta de garantía (si el trabajo tiene garantía vigente), el técnico asignado, y los problemas reportados por el cliente.",
           "Si la orden es un presupuesto, vas a ver una etiqueta con la respuesta del cliente (aceptado, rechazado o pendiente) apenas responda desde el link de seguimiento.",
-          "Cuando una orden tiene saldo pendiente de cobro, aparece un botón \"Cobrar Saldo\" directo en la tarjeta para no tener que entrar al detalle.",
+          "Cuando una orden tiene saldo pendiente de cobro, aparece un botón \"Cobrar Saldo\" directo en la tarjeta para no tener que entrar al detalle. Abre la misma ventana de registrar pago que hay en el detalle de la orden: monto, método de pago y, si hace falta, un descuento — sin salir del Dashboard.",
         ],
         images: [{ file: "ordenes-tarjeta-01.png", alt: "Detalle de una tarjeta de orden en el Dashboard" }],
       },
@@ -199,6 +199,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Acá se ve y edita el presupuesto, la seña, el saldo pendiente y los cargos adicionales que se le sumen al trabajo sobre la marcha (por ejemplo, si aparece un problema extra durante la reparación). También se define la fecha estimada de entrega.",
           "Con saldo pendiente aparece el botón \"Registrar pago\": abre un monto ya cargado con el total que falta (por si el cliente paga todo de una vez) y un método de pago para elegir de la lista configurable. Si el cliente va completando de a poco, se cambia el monto por lo que efectivamente paga esa vez — el sistema descuenta eso del saldo y deja el resto pendiente para la próxima visita. Cada pago registrado queda anotado en el Historial de la orden, con fecha y método.",
+          "Si el taller necesita hacer un descuento al cobrar (por ejemplo, por pago al contado o como cortesía), en la misma ventana hay un campo de descuento que se puede cargar en porcentaje o en Gs. fijos. El descuento se aplica sobre el saldo pendiente y reduce el presupuesto de la orden de forma permanente, para que el total final quede reflejado correctamente en Reportes.",
           "En \"Documentos (PDF)\" se pueden adjuntar hasta 3 archivos de hasta 10 MB cada uno — útil para guardar una factura, una garantía del fabricante, o cualquier comprobante relacionado con el trabajo.",
         ],
         images: [{ file: "detalle-orden-financiero-01.png", alt: "Información financiera y documentos adjuntos" }],

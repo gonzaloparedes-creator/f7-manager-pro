@@ -11,11 +11,11 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
-import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, logOrderPayment, type QuoteResponse } from "@/lib/orders";
+import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
+import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
-import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks, Paperclip, Loader2, Tags } from "lucide-react";
 import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
@@ -83,11 +83,7 @@ export default function OrderDetail() {
   const [editQuote, setEditQuote] = useState<string>("");
   const [editDeposit, setEditDeposit] = useState<string>("");
   const [savingFinance, setSavingFinance] = useState(false);
-  const [payingOpen, setPayingOpen] = useState(false);
-  const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState("");
-  const [paying, setPaying] = useState(false);
-  const { presets: paymentMethodPresets } = usePaymentMethodPresets();
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
   const [history, setHistory] = useState<History[]>([]);
@@ -596,56 +592,6 @@ export default function OrderDetail() {
     setEditingFinance(true);
   };
 
-  const openPayment = (saldo: number) => {
-    setPayAmount(saldo > 0 ? String(saldo) : "");
-    setPayMethod((prev) => prev || order?.deposit_payment_method || paymentMethodPresets[0]?.label || "");
-    setPayingOpen(true);
-  };
-
-  // Registra un pago (total o parcial) sumándolo a lo ya pagado — no
-  // reemplaza deposit_amount, lo incrementa. Así un cliente que completa el
-  // saldo en varias visitas queda reflejado correctamente en vez de perder
-  // el rastro de lo que ya había pagado. deposit_amount funciona como
-  // "total pagado hasta ahora" en todo el sistema (Dashboard, reportes,
-  // tracking), no solo como la seña inicial — ver senia_amount para el
-  // monto original de la seña, que queda fijo.
-  const registerPayment = async (saldo: number) => {
-    if (!order) return;
-    const amount = Math.round(Number(payAmount));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast({ title: "Monto inválido", description: "Ingresá un monto mayor a 0.", variant: "destructive" });
-      return;
-    }
-    if (amount > saldo) {
-      toast({ title: "Monto inválido", description: `No puede superar el saldo pendiente (${formatPYG(saldo)}).`, variant: "destructive" });
-      return;
-    }
-    setPaying(true);
-    try {
-      const newDeposit = Number(order.deposit_amount ?? 0) + amount;
-      const { error } = await supabase
-        .from("orders")
-        .update({ deposit_amount: newDeposit, deposit_payment_method: payMethod || order.deposit_payment_method })
-        .eq("id", order.id);
-      if (error) throw error;
-      const methodNote = payMethod ? ` (${payMethod})` : "";
-      await logSystemHistory(order.id, order.status, `Pago registrado: ${formatPYG(amount)}${methodNote}`);
-      if (companyId && user) {
-        logOrderPayment({ orderId: order.id, companyId, amount, method: payMethod || null, userId: user.id });
-      }
-      toast({
-        title: "Pago registrado",
-        description: amount >= saldo ? `${order.order_number} quedó totalmente pagada.` : `Saldo restante: ${formatPYG(saldo - amount)}.`,
-      });
-      setPayingOpen(false);
-      load();
-    } catch (e: any) {
-      toast({ title: "Error al registrar el pago", description: e.message, variant: "destructive" });
-    } finally {
-      setPaying(false);
-    }
-  };
-
   const saveFinance = async () => {
     if (!order) return;
     const q = Number(editQuote);
@@ -1135,61 +1081,16 @@ export default function OrderDetail() {
                       </div>
                     </div>
 
-                    {saldo > 0 && (payingOpen ? (
-                      <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="pay-amount">Monto a registrar (Gs.)</Label>
-                            <Input
-                              id="pay-amount"
-                              type="number"
-                              min={1}
-                              max={saldo}
-                              value={payAmount}
-                              onChange={(e) => setPayAmount(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="pay-method">Método de pago</Label>
-                            <Select value={payMethod} onValueChange={setPayMethod}>
-                              <SelectTrigger id="pay-method"><SelectValue placeholder="Elegí uno" /></SelectTrigger>
-                              <SelectContent>
-                                {paymentMethodPresets.map((m) => (
-                                  <SelectItem key={m.id} value={m.label}>{m.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Saldo pendiente: {formatPYG(saldo)}. Si el cliente paga parte, ingresá solo ese monto — el resto queda como saldo.
-                        </p>
-                        <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" size="sm" onClick={() => setPayingOpen(false)} disabled={paying}>
-                            Cancelar
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => registerPayment(saldo)}
-                            disabled={paying}
-                            className="gap-2 bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                          >
-                            <Wallet className="h-4 w-4" />
-                            {paying ? "Registrando..." : "Confirmar pago"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
+                    {saldo > 0 && (
                       <Button
                         type="button"
                         className="w-full gap-2 bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                        onClick={() => openPayment(saldo)}
+                        onClick={() => setPayDialogOpen(true)}
                       >
                         <Wallet className="h-4 w-4" />
                         Registrar pago
                       </Button>
-                    ))}
+                    )}
 
                     {order.estimated_delivery_date && (
                       <div className="flex items-center gap-2 border-t border-border pt-3 text-sm">
@@ -1634,6 +1535,8 @@ export default function OrderDetail() {
       />
 
       <PrintReceipt order={order} businessName={businessName} serviceTerms={renderServiceTerms(serviceTermsTemplate, order.warranty_days)} statusLabel={resolveStatusLabel(order.status, statusPresets)} />
+
+      <RegisterPaymentDialog order={order} open={payDialogOpen} onOpenChange={setPayDialogOpen} onRegistered={load} />
     </div>
   );
 }

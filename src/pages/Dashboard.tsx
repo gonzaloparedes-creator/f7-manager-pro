@@ -10,13 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, logOrderPayment, type QuoteResponse } from "@/lib/orders";
+import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
 import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
 import DeliveryCalendarDialog from "@/components/DeliveryCalendarDialog";
+import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import { cn } from "@/lib/utils";
@@ -82,7 +83,8 @@ export default function Dashboard() {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [collectingId, setCollectingId] = useState<string | null>(null);
+  const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -152,30 +154,11 @@ export default function Dashboard() {
     });
   }, [isAdmin, companyId]);
 
-  const collectBalance = async (e: React.MouseEvent, order: Order, total: number) => {
+  const openPayDialog = (e: React.MouseEvent, order: Order) => {
     e.preventDefault();
     e.stopPropagation();
-    setCollectingId(order.id);
-    const amountCollected = total - Number(order.deposit_amount ?? 0);
-    // Optimistic update
-    setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, deposit_amount: total } : o));
-    const { error } = await supabase
-      .from("orders")
-      .update({ deposit_amount: total, final_payment_date: new Date().toISOString() })
-      .eq("id", order.id);
-    setCollectingId(null);
-    if (error) {
-      toast({ title: "Error al cobrar saldo", description: error.message, variant: "destructive" });
-      load();
-      return;
-    }
-    // Este atajo no pregunta el medio de pago (a diferencia de "Registrar
-    // pago" en el detalle) — se asume el último medio conocido de la orden,
-    // mejor estimación disponible acá.
-    if (companyId && user) {
-      logOrderPayment({ orderId: order.id, companyId, amount: amountCollected, method: order.deposit_payment_method, userId: user.id });
-    }
-    toast({ title: "Saldo cobrado", description: `Orden ${order.order_number} marcada como totalmente pagada.` });
+    setPayingOrder(order);
+    setPayDialogOpen(true);
   };
 
   const branchScoped = useMemo(() => {
@@ -360,12 +343,11 @@ export default function Dashboard() {
                           <span className="text-[11px] font-semibold text-secondary">Saldo: {formatPYG(saldo)}</span>
                           <Button
                             size="sm"
-                            disabled={collectingId === o.id}
-                            onClick={(e) => collectBalance(e, o, total)}
+                            onClick={(e) => openPayDialog(e, o)}
                             className="h-7 gap-1 bg-secondary px-2 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/90"
                           >
                             <Wallet className="h-3 w-3" />
-                            {collectingId === o.id ? "..." : "Cobrar Saldo"}
+                            Cobrar Saldo
                           </Button>
                         </div>
                       ) : hasQuoteOnly ? (
@@ -461,12 +443,11 @@ export default function Dashboard() {
                         </div>
                         <Button
                           size="sm"
-                          disabled={collectingId === o.id}
-                          onClick={(e) => collectBalance(e, o, total)}
+                          onClick={(e) => openPayDialog(e, o)}
                           className="h-7 gap-1 bg-secondary px-2 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/90"
                         >
                           <Wallet className="h-3 w-3" />
-                          {collectingId === o.id ? "..." : "Cobrar Saldo"}
+                          Cobrar Saldo
                         </Button>
                       </div>
                     ) : hasQuoteOnly ? (
@@ -491,6 +472,7 @@ export default function Dashboard() {
         orders={branchScoped}
         statusPresets={statusPresets}
       />
+      <RegisterPaymentDialog order={payingOrder} open={payDialogOpen} onOpenChange={setPayDialogOpen} onRegistered={load} />
     </div>
   );
 }
