@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompany } from "@/hooks/useCompany";
-import { sanitizeFilenameForStorage } from "@/lib/utils";
+import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1073,10 +1073,17 @@ function UsersTab() {
   };
 
   const updateUserRole = async (userId: string, newRole: "admin" | "staff" | "recepcion") => {
-    // Replace all existing roles with the chosen one
-    await supabase.from("user_roles").delete().eq("user_id", userId);
-    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole });
-    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    // Insertar el rol nuevo ANTES de borrar el anterior (y no al revés): si
+    // el insert llega a fallar, el usuario se queda con el rol que ya tenía
+    // en vez de terminar sin ninguno — invisible para todo lo que filtra por
+    // user_roles (ej. el selector de "Técnico Asignado" de las órdenes).
+    // 23505 = unique_violation: ya tenía exactamente ese rol, no es un error real.
+    const { error: insertError } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole });
+    if (insertError && insertError.code !== "23505") {
+      return toast({ title: "Error", description: insertError.message, variant: "destructive" });
+    }
+    const { error: deleteError } = await supabase.from("user_roles").delete().eq("user_id", userId).neq("role", newRole);
+    if (deleteError) return toast({ title: "Error", description: deleteError.message, variant: "destructive" });
     toast({ title: "Rol actualizado" });
     load();
   };
@@ -1200,14 +1207,22 @@ function UsersTab() {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Rol</Label>
-                      <Select value={u.role ?? "staff"} onValueChange={(v) => updateUserRole(u.id, v as any)}>
-                        <SelectTrigger aria-label={`Rol de ${u.full_name || "usuario"}`}><SelectValue /></SelectTrigger>
+                      <Select value={u.role ?? undefined} onValueChange={(v) => updateUserRole(u.id, v as any)}>
+                        <SelectTrigger
+                          aria-label={`Rol de ${u.full_name || "usuario"}`}
+                          className={cn(!u.role && "border-destructive text-destructive")}
+                        >
+                          <SelectValue placeholder="Sin rol" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="staff">Staff</SelectItem>
                           <SelectItem value="recepcion">Recepción</SelectItem>
                         </SelectContent>
                       </Select>
+                      {!u.role && (
+                        <p className="text-[11px] text-destructive">Sin rol — no aparece para asignar en órdenes. Elegí uno.</p>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Sucursal</Label>
@@ -1263,14 +1278,20 @@ function UsersTab() {
                       <TableCell className="font-medium">{u.full_name || "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{u.phone || "—"}</TableCell>
                       <TableCell>
-                        <Select value={u.role ?? "staff"} onValueChange={(v) => updateUserRole(u.id, v as any)}>
-                          <SelectTrigger className="w-32" aria-label={`Rol de ${u.full_name || "usuario"}`}><SelectValue /></SelectTrigger>
+                        <Select value={u.role ?? undefined} onValueChange={(v) => updateUserRole(u.id, v as any)}>
+                          <SelectTrigger
+                            className={cn("w-32", !u.role && "border-destructive text-destructive")}
+                            aria-label={`Rol de ${u.full_name || "usuario"}`}
+                          >
+                            <SelectValue placeholder="Sin rol" />
+                          </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="staff">Staff</SelectItem>
                             <SelectItem value="recepcion">Recepción</SelectItem>
                           </SelectContent>
                         </Select>
+                        {!u.role && <p className="mt-1 text-[11px] text-destructive">Sin rol asignado</p>}
                       </TableCell>
                       <TableCell>
                         <Select value={u.branch_id ?? ""} onValueChange={(v) => updateUserBranch(u.id, v)}>
