@@ -41,6 +41,8 @@ interface PartRow {
   historical_cost: number | null;
   category_name: string | null;
   subcategory_name: string | null;
+  part_details: string | null;
+  inventory_items?: { name: string } | null;
 }
 interface SaleRow {
   product_name: string;
@@ -247,14 +249,26 @@ function categoryLabel(category: string | null, subcategory: string | null) {
   return subcategory ? `${category} › ${subcategory}` : category;
 }
 
-/** Costo de repuestos por categoría (Taller no tiene ingreso a nivel de repuesto, solo costo). */
+type CategoryCost = { cost: number; parts: Map<string, number> };
+
+/**
+ * Costo de repuestos por categoría (Taller no tiene ingreso a nivel de
+ * repuesto, solo costo) — desglosado además por repuesto puntual dentro de
+ * cada categoría, mismo criterio que salesByCategory para Ventas por
+ * categoría: "Pantallas" solo no dice cuál pantalla se usó.
+ */
 function partsCostByCategory(orders: OrderRow[], parts: PartRow[], from: Date | null, to: Date | null) {
   const includedOrderIds = new Set(orders.filter(o => inRange(o.final_payment_date, from, to)).map(o => o.id));
-  const map = new Map<string, number>();
+  const map = new Map<string, CategoryCost>();
   for (const p of parts) {
     if (!includedOrderIds.has(p.order_id)) continue;
     const key = categoryLabel(p.category_name, p.subcategory_name);
-    map.set(key, (map.get(key) ?? 0) + Number(p.historical_cost ?? 0) * Number(p.quantity ?? 0));
+    const cur = map.get(key) ?? { cost: 0, parts: new Map<string, number>() };
+    const cost = Number(p.historical_cost ?? 0) * Number(p.quantity ?? 0);
+    cur.cost += cost;
+    const partName = p.inventory_items?.name || p.part_details || "Repuesto sin nombre";
+    cur.parts.set(partName, (cur.parts.get(partName) ?? 0) + cost);
+    map.set(key, cur);
   }
   return map;
 }
@@ -394,7 +408,7 @@ export default function Reports() {
         if (orderIds.length > 0) {
           const { data, error: pErr } = await (supabase as any)
             .from("order_parts")
-            .select("order_id, quantity, historical_cost, category_name, subcategory_name")
+            .select("order_id, quantity, historical_cost, category_name, subcategory_name, part_details, inventory_items(name)")
             .in("order_id", orderIds);
           if (pErr) hadError = true;
           p = data ?? [];
@@ -459,7 +473,7 @@ export default function Reports() {
   const gananciaNetaTotal = (hasTaller ? ingresoNetoTaller : 0) + (hasTienda ? gananciaNetaTienda : 0);
 
   const categoriaTaller = useMemo(
-    () => hasTaller ? partsCostByCategory(orders, parts, from, to) : new Map<string, number>(),
+    () => hasTaller ? partsCostByCategory(orders, parts, from, to) : new Map<string, CategoryCost>(),
     [hasTaller, orders, parts, from, to]
   );
   const categoriaTienda = useMemo(
@@ -853,18 +867,38 @@ function BreakdownCardShell({ title, icon: Icon, children }: { title: string; ic
   );
 }
 
-function CostByCategoryCard({ title, rows }: { title: string; rows: Map<string, number> }) {
-  const sorted = Array.from(rows.entries()).sort((a, b) => b[1] - a[1]);
+/** Como SalesByCategoryCard pero solo con costo (el Taller no registra un
+ * precio de venta por repuesto individual, solo el presupuesto de la orden
+ * completa) — cada categoría desplegable muestra qué repuesto puntual se usó. */
+function CostByCategoryCard({ title, rows }: { title: string; rows: Map<string, CategoryCost> }) {
+  const sorted = Array.from(rows.entries()).sort((a, b) => b[1].cost - a[1].cost);
   return (
     <BreakdownCardShell title={title} icon={Tags}>
-      <div className="space-y-1.5">
-        {sorted.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{label}</span>
-            <span className="font-medium text-foreground">{formatPYG(value)}</span>
-          </div>
-        ))}
-      </div>
+      <Accordion type="multiple" className="space-y-1">
+        {sorted.map(([label, v]) => {
+          const parts = Array.from(v.parts.entries()).sort((a, b) => b[1] - a[1]);
+          return (
+            <AccordionItem key={label} value={label} className="rounded-md border border-border/50 px-3">
+              <AccordionTrigger className="py-2 text-sm hover:no-underline">
+                <div className="flex flex-1 items-center justify-between pr-2">
+                  <span className="text-foreground">{label}</span>
+                  <span className="font-medium text-foreground">{formatPYG(v.cost)}</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-2 pt-0">
+                <div className="space-y-1 border-t border-border/50 pt-2">
+                  {parts.map(([name, cost]) => (
+                    <div key={name} className="flex items-center justify-between pl-3 text-xs">
+                      <span className="text-muted-foreground">{name}</span>
+                      <span className="font-medium text-foreground">{formatPYG(cost)}</span>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </BreakdownCardShell>
   );
 }
