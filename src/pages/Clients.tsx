@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Pencil, Search, Users as UsersIcon, MessageCircle } from "lucide-react";
 import { openWhatsApp } from "@/lib/whatsapp";
@@ -24,6 +25,7 @@ type Client = {
   name: string;
   phone: string | null;
   cedula: string | null;
+  notify_whatsapp: boolean;
   created_at: string;
 };
 
@@ -49,6 +51,7 @@ export default function Clients() {
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editCedula, setEditCedula] = useState("");
+  const [editNotifyWhatsapp, setEditNotifyWhatsapp] = useState(true);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -56,7 +59,7 @@ export default function Clients() {
     if (!user || !companyId) return;
     setLoading(true);
     const [{ data: c, error: cErr }, { data: o, error: oErr }] = await Promise.all([
-      supabase.from("clients").select("id,name,phone,cedula,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
+      supabase.from("clients").select("id,name,phone,cedula,notify_whatsapp,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
       supabase.from("orders").select("id,order_number,device_type,status,client_id,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
     ]);
     if (cErr || oErr) {
@@ -95,7 +98,7 @@ export default function Clients() {
   const openEdit = (c: Client) => {
     setEditing(c);
     // Hydrate from draft if exists, otherwise from the row
-    let draft: { name?: string; phone?: string; cedula?: string } | null = null;
+    let draft: { name?: string; phone?: string; cedula?: string; notifyWhatsapp?: boolean } | null = null;
     try {
       const raw = localStorage.getItem(clientDraftKey(c.id));
       if (raw) draft = JSON.parse(raw);
@@ -103,15 +106,16 @@ export default function Clients() {
     setEditName(draft?.name ?? c.name);
     setEditPhone(draft?.phone ?? (c.phone ?? "").replace(/^595/, ""));
     setEditCedula(draft?.cedula ?? (c.cedula ?? ""));
+    setEditNotifyWhatsapp(draft?.notifyWhatsapp ?? c.notify_whatsapp);
   };
 
   // Auto-save edit-client draft on change
   useEffect(() => {
     if (!editing) return;
     try {
-      localStorage.setItem(clientDraftKey(editing.id), JSON.stringify({ name: editName, phone: editPhone, cedula: editCedula }));
+      localStorage.setItem(clientDraftKey(editing.id), JSON.stringify({ name: editName, phone: editPhone, cedula: editCedula, notifyWhatsapp: editNotifyWhatsapp }));
     } catch { /* ignore */ }
-  }, [editing, editName, editPhone, editCedula]);
+  }, [editing, editName, editPhone, editCedula, editNotifyWhatsapp]);
 
   const saveEdit = async () => {
     if (!editing) return;
@@ -123,6 +127,7 @@ export default function Clients() {
         name: editName.trim() || "Cliente",
         phone: phone ? `595${phone}` : null,
         cedula: editCedula.trim() || null,
+        notify_whatsapp: editNotifyWhatsapp,
       })
       .eq("id", editing.id);
     setSaving(false);
@@ -280,6 +285,15 @@ export default function Clients() {
                 value={editCedula}
                 onChange={(e) => setEditCedula(e.target.value)}
               />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="edit-client-notify">Notificar por WhatsApp</Label>
+                <p className="text-xs text-muted-foreground">
+                  Desactivalo para clientes mayoristas u otros que no quieras que reciban los avisos automáticos (cambios de estado, orden creada, respuesta a presupuesto).
+                </p>
+              </div>
+              <Switch id="edit-client-notify" checked={editNotifyWhatsapp} onCheckedChange={setEditNotifyWhatsapp} />
             </div>
           </div>
           <DialogFooter>

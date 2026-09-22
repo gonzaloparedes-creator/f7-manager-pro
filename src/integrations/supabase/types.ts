@@ -177,6 +177,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          notify_whatsapp: boolean
           phone: string | null
           technician_id: string
           updated_at: string
@@ -187,6 +188,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          notify_whatsapp?: boolean
           phone?: string | null
           technician_id: string
           updated_at?: string
@@ -197,6 +199,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          notify_whatsapp?: boolean
           phone?: string | null
           technician_id?: string
           updated_at?: string

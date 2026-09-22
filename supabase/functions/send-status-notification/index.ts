@@ -47,10 +47,23 @@ Deno.serve(async (req) => {
     // La orden tiene que existir y ser visible para este usuario bajo RLS.
     const { data: ownedOrder } = await supabase
       .from("orders")
-      .select("id, company_id")
+      .select("id, company_id, client_id")
       .eq("order_number", order_number)
       .maybeSingle();
     if (!ownedOrder) return json({ error: "Orden no encontrada" }, 404);
+
+    // El cliente puede haber pedido no recibir avisos automáticos (ej.
+    // clientes mayoristas) — se respeta antes que cualquier otra cosa.
+    if (ownedOrder.client_id) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("notify_whatsapp")
+        .eq("id", ownedOrder.client_id)
+        .maybeSingle();
+      if (client?.notify_whatsapp === false) {
+        return json({ skipped: true, reason: "client opted out" });
+      }
+    }
 
     // El WhatsApp conectado y las preferencias de notificación son de LA
     // EMPRESA (configurados por el admin en Configuración), no de quien

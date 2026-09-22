@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 
     const { data: order } = await supabase
       .from("orders")
-      .select("id, company_id, status, order_number, customer_name, customer_phone, device_type, quote_amount, quote_responded_at")
+      .select("id, company_id, status, order_number, customer_name, customer_phone, device_type, quote_amount, quote_responded_at, client_id")
       .eq("tracking_token", tracking_token)
       .maybeSingle();
     if (!order) return json({ error: "Presupuesto no encontrado" }, 404);
@@ -89,7 +89,20 @@ Deno.serve(async (req) => {
       is_internal: false,
     });
 
-    if (!isRecentDuplicate) {
+    // El cliente puede haber pedido no recibir avisos automáticos (ej.
+    // clientes mayoristas) — se respeta antes que cualquier otra cosa,
+    // incluida esta confirmación de que se recibió su propia respuesta.
+    let clientOptedOut = false;
+    if (order.client_id) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("notify_whatsapp")
+        .eq("id", order.client_id)
+        .maybeSingle();
+      clientOptedOut = client?.notify_whatsapp === false;
+    }
+
+    if (!isRecentDuplicate && !clientOptedOut) {
       // El WhatsApp conectado es un recurso de LA EMPRESA (mismo patrón que
       // send-order-notification/send-status-notification) — el mensaje sale
       // desde ese mismo número, hacia el cliente, confirmando que se recibió

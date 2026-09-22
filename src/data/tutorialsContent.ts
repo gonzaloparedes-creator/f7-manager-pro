@@ -280,7 +280,10 @@ export const tutorialCategories: TutorialCategory[] = [
       {
         id: "editar",
         title: "Editar datos y contactar por WhatsApp",
-        body: ["Desde el mismo detalle se pueden corregir nombre, teléfono o cédula/RUC, y hay un botón directo para abrirle un chat de WhatsApp."],
+        body: [
+          "Desde el mismo detalle se pueden corregir nombre, teléfono o cédula/RUC, y hay un botón directo para abrirle un chat de WhatsApp.",
+          "También hay un switch \"Notificar por WhatsApp\": si lo apagás, ese cliente deja de recibir los avisos automáticos (orden creada, cambios de estado, respuesta a un presupuesto) — útil para clientes mayoristas u otros contactos que no quieran ese tipo de mensajes. Por defecto está prendido para todos.",
+        ],
         images: [{ file: "clientes-editar-01.png", alt: "Edición de datos de un cliente" }],
       },
       {
