@@ -22,7 +22,7 @@ const baseNav = [
   { to: "/inventario", label: "Inventario", icon: Package, proOnly: true, businessOnly: false, adminOnly: false },
   { to: "/productos", label: "Productos", icon: ShoppingBag, proOnly: false, businessOnly: true, adminOnly: false },
   { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true },
-  { to: "/cierre-caja", label: "Cierre de Caja", icon: Wallet, proOnly: true, businessOnly: false, adminOnly: true },
+  { to: "/cierre-caja", label: "Caja", icon: Wallet, proOnly: true, businessOnly: false, adminOnly: false },
   { to: "/gastos", label: "Gastos", icon: Receipt, proOnly: true, businessOnly: false, adminOnly: true },
   { to: "/como-usar", label: "Cómo usar", icon: BookOpen, proOnly: false, businessOnly: false, adminOnly: false },
 ];
@@ -190,10 +190,10 @@ export default function AppLayout() {
               <ShieldCheck className="h-5 w-5" />
             </Link>
           )}
-          {isAdmin && !isStarter && (
+          {!isStarter && (
             <Link
               to="/cierre-caja"
-              aria-label="Cierre de Caja"
+              aria-label="Caja"
               className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Wallet className="h-5 w-5" />

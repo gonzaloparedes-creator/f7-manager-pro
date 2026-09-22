@@ -431,23 +431,34 @@ export const tutorialCategories: TutorialCategory[] = [
   },
   {
     id: "cierre-caja",
-    label: "Cierre de Caja",
+    label: "Caja",
     icon: Wallet,
-    description: "Comparar el efectivo contado físicamente contra lo que debería haber entrado ese día.",
-    note: "Solo para Admin · Disponible en los planes Pro y Business.",
+    description: "Apertura del día y, para administradores, el cierre y la reconciliación de efectivo.",
+    note: "Apertura: cualquier miembro del equipo · Cierre: solo Admin · Disponible en los planes Pro y Business.",
     topics: [
       {
-        id: "como-funciona",
-        title: "Elegir el día y comparar",
+        id: "apertura",
+        title: "Apertura de caja",
         body: [
-          "Elegís una fecha (por defecto, hoy) y el sistema muestra cuánto entró ese día, separado en \"Reparaciones (órdenes)\" y \"Ventas de productos\" — y dentro de cada uno, desglosado por medio de pago (Efectivo, Transferencia, Tarjeta, etc.), para saber exactamente de dónde vino cada ingreso.",
-          "Solo el efectivo necesita contarse a mano: transferencia y tarjeta ya quedan verificadas por el banco o el procesador de pago. Ingresá cuánto contaste físicamente en la caja y el sistema calcula si sobró, faltó o cuadró exacto.",
+          "Al iniciar el día, cualquier miembro del equipo (staff o admin) puede abrir la caja: cuenta el efectivo con el que arranca (el fondo para dar vuelto) y lo carga acá, con una nota opcional.",
+          "Una vez abierta, queda marcada para ese día — \"Volver a abrir este día\" permite repetirlo si hubo un error al contar. Más abajo hay un historial de aperturas anteriores.",
+        ],
+        images: [{ file: "cierre-caja-comparar-01.png", alt: "Apertura de caja" }],
+      },
+      {
+        id: "como-funciona",
+        title: "Cierre: elegir el día y comparar",
+        badge: { label: "Solo Admin" },
+        body: [
+          "En la pestaña \"Cierre\" (solo visible para administradores), elegís una fecha y el sistema muestra cuánto entró ese día, separado en \"Reparaciones (órdenes)\", \"Ventas de productos\" y \"Gastos\" — y dentro de cada uno, desglosado por medio de pago (Efectivo, Transferencia, Tarjeta, etc.), para saber exactamente de dónde vino y adónde fue cada movimiento.",
+          "El efectivo esperado se calcula como: apertura del día + ingresos en efectivo - gastos pagados en efectivo. Solo el efectivo necesita contarse a mano: transferencia y tarjeta ya quedan verificadas por el banco o el procesador de pago. Ingresá cuánto contaste físicamente en la caja y el sistema calcula si sobró, faltó o cuadró exacto.",
         ],
         images: [{ file: "cierre-caja-comparar-01.png", alt: "Comparación de efectivo esperado vs contado" }],
       },
       {
         id: "historial",
         title: "Volver a cerrar e historial",
+        badge: { label: "Solo Admin" },
         body: [
           "Una vez cerrado, ese día queda marcado — si te equivocaste al contar, \"Volver a cerrar este día\" te deja repetirlo.",
           "Más abajo queda un historial navegable de todos los cierres anteriores; hacé clic en una fecha para volver a ver el detalle de ese día.",
@@ -478,6 +489,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Un gasto a crédito con saldo pendiente muestra un botón \"Abonar\": ahí elegís cuánto pagás esta vez y con qué método, y el sistema descuenta eso del pendiente y suma una cuota pagada. Se puede seguir abonando hasta cubrir el total.",
           "Las tarjetas de arriba muestran el total gastado en el mes, lo gastado hoy, y cuánto queda pendiente de pagar entre todos los gastos a crédito abiertos.",
+          "Los gastos pagados en efectivo (tanto de contado como cuotas abonadas en efectivo) se descuentan automáticamente del efectivo esperado en Caja → Cierre — no hace falta anotarlos dos veces.",
         ],
         images: [{ file: "gastos-abonar-01.png", alt: "Abonar una cuota de un gasto a crédito" }],
       },

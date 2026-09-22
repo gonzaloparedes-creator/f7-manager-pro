@@ -149,6 +149,51 @@ export type Database = {
           },
         ]
       }
+      cash_openings: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          opened_by: string | null
+          opening_cash: number
+          opening_date: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          opened_by?: string | null
+          opening_cash?: number
+          opening_date: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          opened_by?: string | null
+          opening_cash?: number
+          opening_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_openings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_openings_opened_by_fkey"
+            columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_presets: {
         Row: {
           company_id: string
