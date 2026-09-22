@@ -19,16 +19,25 @@ import { CalendarDays, Wallet, CheckCircle2, AlertTriangle, Loader2, ShieldAlert
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-interface AmountEvent { amount: number; payment_method: string | null }
+interface AmountEvent { amount: number; payment_method: string | null; source: "orden" | "venta" }
 interface ClosingRow {
   id: string;
   closing_date: string;
   expected_cash: number;
   counted_cash: number;
   difference: number;
-  breakdown: Record<string, number>;
+  breakdown: Record<string, unknown>;
   notes: string | null;
   created_at: string;
+}
+
+function groupByMethod(rows: AmountEvent[]) {
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    const key = r.payment_method?.trim() || "Sin especificar";
+    map.set(key, (map.get(key) ?? 0) + r.amount);
+  }
+  return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
 }
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
@@ -93,10 +102,15 @@ export default function CashClosing() {
           .limit(30),
       ]);
       const rows: AmountEvent[] = [
-        ...((pay ?? []) as { amount: number; payment_method: string | null }[]),
+        ...((pay ?? []) as { amount: number; payment_method: string | null }[]).map((p) => ({
+          amount: Number(p.amount || 0),
+          payment_method: p.payment_method,
+          source: "orden" as const,
+        })),
         ...((sal ?? []) as { quantity: number; unit_price: number; payment_method: string | null }[]).map((s) => ({
           amount: s.quantity * Number(s.unit_price || 0),
           payment_method: s.payment_method,
+          source: "venta" as const,
         })),
       ];
       setBreakdownRows(rows);
@@ -110,14 +124,15 @@ export default function CashClosing() {
     load();
   }, [companyId, selectedDate]);
 
-  const breakdown = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of breakdownRows) {
-      const key = r.payment_method?.trim() || "Sin especificar";
-      map.set(key, (map.get(key) ?? 0) + r.amount);
-    }
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [breakdownRows]);
+  const breakdown = useMemo(() => groupByMethod(breakdownRows), [breakdownRows]);
+  const breakdownByOrdenes = useMemo(
+    () => groupByMethod(breakdownRows.filter((r) => r.source === "orden")),
+    [breakdownRows]
+  );
+  const breakdownByVentas = useMemo(
+    () => groupByMethod(breakdownRows.filter((r) => r.source === "venta")),
+    [breakdownRows]
+  );
 
   const expectedCash = useMemo(
     () => breakdown.reduce((s, [method, amount]) => s + (isCashLabel(method) ? amount : 0), 0),
@@ -135,8 +150,10 @@ export default function CashClosing() {
       return;
     }
     setSaving(true);
-    const breakdownObj: Record<string, number> = {};
-    breakdown.forEach(([k, v]) => { breakdownObj[k] = v; });
+    const breakdownObj = {
+      ordenes: Object.fromEntries(breakdownByOrdenes),
+      ventas: Object.fromEntries(breakdownByVentas),
+    };
     const { error } = await (supabase as any).from("cash_closings").insert({
       company_id: companyId,
       closing_date: ymd(selectedDate),
@@ -237,16 +254,52 @@ export default function CashClosing() {
                 {breakdown.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No hubo movimientos ese día.</p>
                 ) : (
-                  <div className="space-y-1.5">
-                    {breakdown.map(([label, amount]) => (
-                      <div key={label} className="flex items-center justify-between text-sm">
-                        <span className={cn("text-muted-foreground", isCashLabel(label) && "font-medium text-foreground")}>
-                          {label}{isCashLabel(label) ? " (a contar)" : ""}
-                        </span>
-                        <span className={cn(isCashLabel(label) && "font-semibold text-foreground")}>{formatPYG(amount)}</span>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between border-t border-border pt-1.5 text-sm font-semibold">
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reparaciones (órdenes)</div>
+                      {breakdownByOrdenes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Sin pagos de órdenes ese día.</p>
+                      ) : (
+                        <>
+                          {breakdownByOrdenes.map(([label, amount]) => (
+                            <div key={label} className="flex items-center justify-between text-sm">
+                              <span className={cn("text-muted-foreground", isCashLabel(label) && "font-medium text-foreground")}>
+                                {label}{isCashLabel(label) ? " (a contar)" : ""}
+                              </span>
+                              <span className={cn(isCashLabel(label) && "font-semibold text-foreground")}>{formatPYG(amount)}</span>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                            <span>Subtotal reparaciones</span>
+                            <span>{formatPYG(breakdownByOrdenes.reduce((s, [, a]) => s + a, 0))}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 border-t border-border/60 pt-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ventas de productos</div>
+                      {breakdownByVentas.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Sin ventas de productos ese día.</p>
+                      ) : (
+                        <>
+                          {breakdownByVentas.map(([label, amount]) => (
+                            <div key={label} className="flex items-center justify-between text-sm">
+                              <span className={cn("text-muted-foreground", isCashLabel(label) && "font-medium text-foreground")}>
+                                {label}{isCashLabel(label) ? " (a contar)" : ""}
+                              </span>
+                              <span className={cn(isCashLabel(label) && "font-semibold text-foreground")}>{formatPYG(amount)}</span>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                            <span>Subtotal ventas</span>
+                            <span>{formatPYG(breakdownByVentas.reduce((s, [, a]) => s + a, 0))}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-border pt-2 text-sm font-semibold">
                       <span>Total</span>
                       <span>{formatPYG(totalAllMethods)}</span>
                     </div>

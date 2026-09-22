@@ -199,6 +199,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Acá se ve y edita el presupuesto, la seña, el saldo pendiente y los cargos adicionales que se le sumen al trabajo sobre la marcha (por ejemplo, si aparece un problema extra durante la reparación). También se define la fecha estimada de entrega.",
           "Con saldo pendiente aparece el botón \"Registrar pago\": abre un monto ya cargado con el total que falta (por si el cliente paga todo de una vez) y un método de pago para elegir de la lista configurable. Si el cliente va completando de a poco, se cambia el monto por lo que efectivamente paga esa vez — el sistema descuenta eso del saldo y deja el resto pendiente para la próxima visita. Cada pago registrado queda anotado en el Historial de la orden, con fecha y método.",
+          "Si el cliente paga con más de un método a la vez (por ejemplo, la mitad en efectivo y la otra mitad por transferencia), tocá \"Agregar otro método\" para sumar una línea de monto + método por cada uno — el sistema valida que la suma de todas las líneas no supere el saldo, y registra cada una por separado para que Reportes y Cierre de Caja reflejen bien de dónde vino cada parte del pago.",
           "Si el taller necesita hacer un descuento al cobrar (por ejemplo, por pago al contado o como cortesía), en la misma ventana hay un campo de descuento que se puede cargar en porcentaje o en Gs. fijos. El descuento se aplica sobre el saldo pendiente y reduce el presupuesto de la orden de forma permanente, para que el total final quede reflejado correctamente en Reportes.",
           "En \"Documentos (PDF)\" se pueden adjuntar hasta 3 archivos de hasta 10 MB cada uno — útil para guardar una factura, una garantía del fabricante, o cualquier comprobante relacionado con el trabajo.",
         ],
@@ -435,7 +436,7 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "como-funciona",
         title: "Elegir el día y comparar",
         body: [
-          "Elegís una fecha (por defecto, hoy) y el sistema muestra cuánto entró por cada medio de pago ese día, combinando Taller y Tienda.",
+          "Elegís una fecha (por defecto, hoy) y el sistema muestra cuánto entró ese día, separado en \"Reparaciones (órdenes)\" y \"Ventas de productos\" — y dentro de cada uno, desglosado por medio de pago (Efectivo, Transferencia, Tarjeta, etc.), para saber exactamente de dónde vino cada ingreso.",
           "Solo el efectivo necesita contarse a mano: transferencia y tarjeta ya quedan verificadas por el banco o el procesador de pago. Ingresá cuánto contaste físicamente en la caja y el sistema calcula si sobró, faltó o cuadró exacto.",
         ],
         images: [{ file: "cierre-caja-comparar-01.png", alt: "Comparación de efectivo esperado vs contado" }],

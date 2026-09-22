@@ -11,10 +11,11 @@ import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useToast } from "@/hooks/use-toast";
 import { formatPYG, logOrderPayment, resolveStatusLabel } from "@/lib/orders";
-import { Wallet, Loader2 } from "lucide-react";
+import { Wallet, Loader2, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type DiscountUnit = "percent" | "amount";
+interface PayLine { id: string; amount: string; method: string }
 
 export interface OrderForPayment {
   id: string;
@@ -25,6 +26,9 @@ export interface OrderForPayment {
   deposit_payment_method: string | null;
   cargos_adicionales: { motivo: string; monto: number }[] | null;
 }
+
+let lineIdSeq = 0;
+function newLineId() { lineIdSeq += 1; return `line-${lineIdSeq}`; }
 
 export default function RegisterPaymentDialog({
   order,
@@ -43,8 +47,7 @@ export default function RegisterPaymentDialog({
   const { presets: statusPresets } = useOrderStatusPresets();
   const { toast } = useToast();
 
-  const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState("");
+  const [payLines, setPayLines] = useState<PayLine[]>([]);
   const [discountValue, setDiscountValue] = useState("");
   const [discountUnit, setDiscountUnit] = useState<DiscountUnit>("percent");
   const [saving, setSaving] = useState(false);
@@ -62,56 +65,100 @@ export default function RegisterPaymentDialog({
   const discountAmount = Math.min(saldo, Math.round(discountRaw));
   const saldoConDescuento = saldo - discountAmount;
 
-  // Al abrir (o cambiar de orden) se resetean método y descuento.
+  // Al abrir (o cambiar de orden) se resetea a una sola línea con el saldo
+  // completo y el último método conocido — el caso común (un solo método)
+  // queda idéntico a como era antes de soportar pagos divididos.
   useEffect(() => {
     if (!open || !order) return;
     setDiscountValue("");
     setDiscountUnit("percent");
-    setPayMethod(order.deposit_payment_method || paymentMethodPresets[0]?.label || "");
+    setPayLines([{
+      id: newLineId(),
+      amount: saldo > 0 ? String(saldo) : "0",
+      method: order.deposit_payment_method || paymentMethodPresets[0]?.label || "",
+    }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order?.id]);
 
-  // El monto sugerido sigue al saldo con descuento — si el usuario ya lo
-  // editó a mano para un pago parcial, alcanza con no tocar el descuento de
-  // nuevo para que su edición no se pise.
+  // `usePaymentMethodPresets` carga de forma asíncrona — si el dialog se
+  // abre antes de que termine, la línea inicial queda sin método. Se
+  // completa acá apenas los presets están listos, sin pisar una línea que
+  // el usuario ya haya elegido a mano.
+  useEffect(() => {
+    if (!open || paymentMethodPresets.length === 0) return;
+    setPayLines((prev) => prev.map((l) => (l.method ? l : { ...l, method: paymentMethodPresets[0].label })));
+  }, [open, paymentMethodPresets]);
+
+  // El monto sugerido sigue al saldo con descuento, pero solo mientras haya
+  // una única línea — si el usuario ya dividió el pago en varios métodos,
+  // tocar el descuento no debe pisarle esa distribución manual.
   useEffect(() => {
     if (!open) return;
-    setPayAmount(saldoConDescuento > 0 ? String(saldoConDescuento) : "0");
+    setPayLines((prev) => {
+      if (prev.length !== 1) return prev;
+      const only = prev[0];
+      const suggested = saldoConDescuento > 0 ? String(saldoConDescuento) : "0";
+      if (only.amount === suggested) return prev;
+      return [{ ...only, amount: suggested }];
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, saldoConDescuento]);
 
-  const amount = Math.round(Number(payAmount) || 0);
+  const totalPay = payLines.reduce((s, l) => s + (Math.round(Number(l.amount)) || 0), 0);
+
+  const addLine = () => {
+    const usedMethods = new Set(payLines.map((l) => l.method));
+    const nextMethod = paymentMethodPresets.find((m) => !usedMethods.has(m.label))?.label
+      ?? paymentMethodPresets[0]?.label ?? "";
+    setPayLines((prev) => [...prev, { id: newLineId(), amount: "", method: nextMethod }]);
+  };
+  const removeLine = (id: string) => {
+    setPayLines((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
+  };
+  const updateLine = (id: string, patch: Partial<PayLine>) => {
+    setPayLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  };
 
   const handleConfirm = async () => {
     if (!order || !user || !companyId) return;
-    if (amount <= 0 && discountAmount <= 0) {
+    const activeLines = payLines
+      .map((l) => ({ ...l, amountNum: Math.round(Number(l.amount)) || 0 }))
+      .filter((l) => l.amountNum > 0);
+
+    if (totalPay <= 0 && discountAmount <= 0) {
       toast({ title: "Nada para registrar", description: "Ingresá un monto a cobrar o un descuento.", variant: "destructive" });
       return;
     }
-    if (amount < 0 || amount > saldoConDescuento) {
+    if (totalPay < 0 || totalPay > saldoConDescuento) {
       toast({ title: "Monto inválido", description: `No puede superar el saldo (${formatPYG(saldoConDescuento)}).`, variant: "destructive" });
       return;
     }
-    if (amount > 0 && !payMethod) {
-      toast({ title: "Elegí un método de pago", variant: "destructive" });
+    if (activeLines.some((l) => !l.method)) {
+      toast({ title: "Elegí un método de pago", description: "Cada monto necesita su método de pago.", variant: "destructive" });
       return;
     }
+
     setSaving(true);
     try {
       const newQuoteAmount = discountAmount > 0 ? Number(order.quote_amount ?? 0) - discountAmount : order.quote_amount;
-      const newDeposit = Number(order.deposit_amount ?? 0) + amount;
+      const newDeposit = Number(order.deposit_amount ?? 0) + totalPay;
+      const distinctMethods = Array.from(new Set(activeLines.map((l) => l.method)));
+      const combinedMethod = distinctMethods.length > 0 ? distinctMethods.join(" + ") : order.deposit_payment_method;
       const { error } = await supabase
         .from("orders")
         .update({
           quote_amount: newQuoteAmount,
           deposit_amount: newDeposit,
-          deposit_payment_method: amount > 0 ? payMethod : order.deposit_payment_method,
+          deposit_payment_method: combinedMethod,
         })
         .eq("id", order.id);
       if (error) throw error;
 
       const noteParts: string[] = [];
-      if (amount > 0) noteParts.push(`Pago registrado: ${formatPYG(amount)} (${payMethod})`);
+      if (activeLines.length > 0) {
+        const paidList = activeLines.map((l) => `${formatPYG(l.amountNum)} (${l.method})`).join(", ");
+        noteParts.push(`Pago registrado: ${paidList}`);
+      }
       if (discountAmount > 0) {
         const pctNote = discountUnit === "percent" ? ` (${discountInput}%)` : "";
         noteParts.push(`Descuento aplicado: ${formatPYG(discountAmount)}${pctNote}`);
@@ -129,15 +176,18 @@ export default function RegisterPaymentDialog({
         console.warn("Failed to log system history", e);
       }
 
-      if (amount > 0) {
-        logOrderPayment({ orderId: order.id, companyId, amount, method: payMethod, userId: user.id });
+      // Un `logOrderPayment` por línea — así el ledger refleja cada método
+      // real por separado (necesario para que Reportes/Cierre de Caja
+      // desglosen bien un pago dividido entre efectivo y transferencia).
+      for (const line of activeLines) {
+        logOrderPayment({ orderId: order.id, companyId, amount: line.amountNum, method: line.method, userId: user.id });
       }
 
       toast({
         title: discountAmount > 0 ? "Pago registrado con descuento" : "Pago registrado",
-        description: saldoConDescuento - amount <= 0
+        description: saldoConDescuento - totalPay <= 0
           ? `${order.order_number} quedó totalmente pagada.`
-          : `Saldo restante: ${formatPYG(saldoConDescuento - amount)}.`,
+          : `Saldo restante: ${formatPYG(saldoConDescuento - totalPay)}.`,
       });
       onOpenChange(false);
       onRegistered();
@@ -200,33 +250,57 @@ export default function RegisterPaymentDialog({
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Monto a cobrar y método de pago</Label>
             <div className="space-y-2">
-              <Label htmlFor="rp-amount">Monto a cobrar (Gs.)</Label>
-              <Input
-                id="rp-amount"
-                type="number"
-                min={0}
-                max={saldoConDescuento}
-                value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
-              />
+              {payLines.map((line, idx) => (
+                <div key={line.id} className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={line.amount}
+                    onChange={(e) => updateLine(line.id, { amount: e.target.value })}
+                    placeholder="0"
+                    aria-label={`Monto ${idx + 1}`}
+                  />
+                  <Select value={line.method} onValueChange={(v) => updateLine(line.id, { method: v })}>
+                    <SelectTrigger className="w-40 shrink-0" aria-label={`Método ${idx + 1}`}>
+                      <SelectValue placeholder="Elegí uno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethodPresets.map((m) => (
+                        <SelectItem key={m.id} value={m.label}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="shrink-0"
+                    disabled={payLines.length <= 1}
+                    onClick={() => removeLine(line.id)}
+                    aria-label="Quitar este método"
+                  >
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="rp-method">Método de pago</Label>
-              <Select value={payMethod} onValueChange={setPayMethod}>
-                <SelectTrigger id="rp-method"><SelectValue placeholder="Elegí uno" /></SelectTrigger>
-                <SelectContent>
-                  {paymentMethodPresets.map((m) => (
-                    <SelectItem key={m.id} value={m.label}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-2">
+              <Plus className="h-3.5 w-3.5" />
+              Agregar otro método
+            </Button>
+            <p className={cn(
+              "text-xs font-medium",
+              totalPay > saldoConDescuento ? "text-destructive" : "text-muted-foreground"
+            )}>
+              Total a registrar: {formatPYG(totalPay)} / Saldo: {formatPYG(saldoConDescuento)}
+            </p>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Si el cliente paga parte, ingresá solo ese monto — el resto queda como saldo.
+            Si el cliente paga parte, ingresá solo ese monto — el resto queda como saldo. Si paga con más de un método (ej. mitad efectivo, mitad transferencia), agregá una línea por cada uno.
           </p>
         </div>
 
