@@ -327,6 +327,150 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_categories: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          label: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          label: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_payments: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          expense_id: string
+          id: string
+          payment_method: string | null
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          expense_id: string
+          id?: string
+          payment_method?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          expense_id?: string
+          id?: string
+          payment_method?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_payments_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          amount_paid: number
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          expense_date: string
+          id: string
+          installments_paid: number
+          installments_total: number | null
+          notes: string | null
+          payment_type: string
+        }
+        Insert: {
+          amount: number
+          amount_paid?: number
+          category: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expense_date?: string
+          id?: string
+          installments_paid?: number
+          installments_total?: number | null
+          notes?: string | null
+          payment_type: string
+        }
+        Update: {
+          amount?: number
+          amount_paid?: number
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expense_date?: string
+          id?: string
+          installments_paid?: number
+          installments_total?: number | null
+          notes?: string | null
+          payment_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_categories: {
         Row: {
           company_id: string

@@ -28,6 +28,7 @@ import WarrantyPresetsTab from "@/components/WarrantyPresetsTab";
 import AccessoryPresetsTab from "@/components/AccessoryPresetsTab";
 import ChecklistPresetsTab from "@/components/ChecklistPresetsTab";
 import PaymentMethodPresetsTab from "@/components/PaymentMethodPresetsTab";
+import ExpenseCategoryPresetsTab from "@/components/ExpenseCategoryPresetsTab";
 import ProblemPresetsTab from "@/components/ProblemPresetsTab";
 import DeviceTypePresetsTab from "@/components/DeviceTypePresetsTab";
 import MarcaPresetsTab from "@/components/MarcaPresetsTab";
@@ -347,6 +348,7 @@ export default function Settings() {
           <AccessoryPresetsTab />
           <ChecklistPresetsTab />
           <PaymentMethodPresetsTab />
+          {!isStarterPlan && <ExpenseCategoryPresetsTab />}
         </TabsContent>
 
         <TabsContent value="estados">

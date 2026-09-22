@@ -14,6 +14,7 @@ import Settings from "./pages/Settings.tsx";
 import Clients from "./pages/Clients.tsx";
 import Reports from "./pages/Reports.tsx";
 import CashClosing from "./pages/CashClosing.tsx";
+import Gastos from "./pages/Gastos.tsx";
 import Inventory from "./pages/Inventory.tsx";
 import Products from "./pages/Products.tsx";
 import HowToUse from "./pages/HowToUse.tsx";
@@ -66,6 +67,7 @@ const App = () => (
             <Route path="/productos" element={<Products />} />
             <Route path="/reportes" element={<Reports />} />
             <Route path="/cierre-caja" element={<CashClosing />} />
+            <Route path="/gastos" element={<Gastos />} />
             <Route path="/como-usar" element={<HowToUse />} />
             <Route path="/configuracion" element={<Settings />} />
           </Route>

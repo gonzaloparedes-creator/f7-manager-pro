@@ -10,6 +10,7 @@ import {
   Settings as SettingsIcon,
   QrCode,
   Wallet,
+  Receipt,
 } from "lucide-react";
 
 export interface TutorialImageRef {
@@ -456,6 +457,33 @@ export const tutorialCategories: TutorialCategory[] = [
     ],
   },
   {
+    id: "gastos",
+    label: "Gastos",
+    icon: Receipt,
+    description: "Repuestos, mercadería, alquiler y cualquier otro gasto del taller o la tienda.",
+    note: "Solo para Admin · Disponible en los planes Pro y Business.",
+    topics: [
+      {
+        id: "cargar",
+        title: "Cargar un gasto",
+        body: [
+          "Elegís una categoría (Repuestos, Mercadería, Alquiler, Sueldos, Servicios y Otros vienen precargadas, y podés agregar las propias con \"Nueva categoría...\" al momento de cargar el gasto, o desde Configuración → Accesorios → Categorías de gastos), una descripción opcional, el monto y la fecha.",
+          "Si lo pagaste todo de una vez, elegís \"Contado\" y el método de pago (Efectivo, Transferencia, etc.) — queda registrado como pagado en el momento. Si lo compraste a crédito, elegís \"Crédito\" y opcionalmente la cantidad de cuotas: el gasto queda pendiente de pago hasta que vayas registrando cada cuota.",
+        ],
+        images: [{ file: "gastos-nuevo-01.png", alt: "Cargar un nuevo gasto" }],
+      },
+      {
+        id: "cuotas",
+        title: "Abonar cuotas de un gasto a crédito",
+        body: [
+          "Un gasto a crédito con saldo pendiente muestra un botón \"Abonar\": ahí elegís cuánto pagás esta vez y con qué método, y el sistema descuenta eso del pendiente y suma una cuota pagada. Se puede seguir abonando hasta cubrir el total.",
+          "Las tarjetas de arriba muestran el total gastado en el mes, lo gastado hoy, y cuánto queda pendiente de pagar entre todos los gastos a crédito abiertos.",
+        ],
+        images: [{ file: "gastos-abonar-01.png", alt: "Abonar una cuota de un gasto a crédito" }],
+      },
+    ],
+  },
+  {
     id: "configuracion",
     label: "Configuración",
     icon: SettingsIcon,
@@ -514,9 +542,10 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "accesorios",
         title: "Accesorios",
         body: [
-          "Esta pestaña agrupa seis listas configurables que se usan al cargar una orden: tipo de equipo, marca, modelo, problemas frecuentes, checklist de recepción y métodos de pago.",
+          "Esta pestaña agrupa varias listas configurables que se usan al cargar una orden o un gasto: tipo de equipo, marca, modelo, problemas frecuentes, checklist de recepción, métodos de pago y categorías de gastos.",
           "Para cada una se puede armar la lista de opciones que van a aparecer como chips de selección rápida en los formularios, en vez de escribir todo a mano cada vez. La clasificación por marca/modelo tiene además un interruptor propio (\"Clasificación por marca/modelo\") que activa esos dos campos en los formularios y las tablas de ganancia por categoría en Reportes.",
           "Métodos de pago controla las opciones disponibles al cobrar una seña o saldo (Nueva Orden, Modo Lote, Presupuestos y Venta Mostrador) — por defecto trae Efectivo, Transferencia, Tarjeta de débito y Tarjeta de crédito, pero podés agregar o borrar las que uses en tu taller (Giro, QR, etc.).",
+          "Categorías de gastos controla las opciones disponibles al cargar un gasto en el módulo de Gastos (Pro y Business) — trae Repuestos, Mercadería, Alquiler, Sueldos, Servicios y Otros por defecto.",
         ],
         images: [{ file: "configuracion-accesorios-01.png", alt: "Listas configurables de tipo de equipo, marca, modelo, problemas y checklist" }],
       },
