@@ -111,6 +111,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Se pueden marcar los accesorios que el cliente deja junto con el equipo (cargador, funda, etc.) y completar un checklist de recepción (estado de la pantalla, batería, etc.) para dejar registro del estado con el que entró.",
           "Si el equipo tiene PIN o patrón de desbloqueo, se puede cargar ahí mismo para que el técnico lo tenga a mano sin tener que preguntarlo de nuevo.",
           "Se completan los datos financieros (presupuesto y seña si el cliente adelanta algo), se elige la garantía y el técnico asignado (por defecto queda quien está creando la orden, pero se puede cambiar), y se puede tomar una firma del cliente y fotos del estado del equipo al recibirlo.",
+          "Si el cliente es nuevo (no se seleccionó uno ya existente del buscador), aparece un switch \"Notificar por WhatsApp\" junto a sus datos — permite dejarlo desactivado desde el momento en que se crea, sin tener que ir después a Clientes a apagarlo. Si el cliente ya existe, no se muestra: se respeta la preferencia que ese cliente ya tiene guardada.",
         ],
         images: [
           { file: "crear-ordenes-nueva-orden-01.png", alt: "Formulario de Nueva Orden - datos del cliente y equipo" },
@@ -124,6 +125,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Formulario liviano para cuando todavía no tenés el equipo físicamente: cliente, tipo de equipo, el problema que describe el cliente, y un monto estimado.",
           "A propósito no pide fotos, seguridad ni firma — esos datos se completan recién si el presupuesto se confirma y se convierte en una orden real.",
           "El cliente puede ver y responder este presupuesto desde su link de seguimiento (aceptar, pedir cambios o rechazar), y esa respuesta se refleja como una etiqueta en la tarjeta de la orden en el Dashboard.",
+          "Igual que en Nueva Orden, si el cliente es nuevo aparece el switch \"Notificar por WhatsApp\" para definir de una si va a recibir avisos automáticos o no.",
         ],
         images: [{ file: "crear-ordenes-presupuesto-01.png", alt: "Formulario de Nuevo Presupuesto" }],
       },
@@ -132,6 +134,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Modo Lote",
         body: [
           "Pensado para cuando un mismo cliente deja varios equipos juntos. Se cargan los datos del cliente una sola vez, y después se agrega un equipo por fila — cada fila es un acordeón que se puede expandir o colapsar sin perder lo ya cargado.",
+          "Si el cliente es nuevo, junto a sus datos aparece el switch \"Notificar por WhatsApp\" — se define una sola vez para todo el lote, ya que es un solo cliente el que se está creando.",
           "Cada equipo tiene exactamente los mismos datos que se cargan en Nueva Orden: tipo/IMEI/marca/modelo, técnico asignado, problemas y observaciones, fotos, accesorios, checklist de recepción, presupuesto/seña/garantía, y PIN o patrón de desbloqueo. Las filas nuevas arrancan expandidas para cargar rápido; se pueden colapsar a mano una vez completadas para ver de un vistazo el progreso del lote.",
           "La firma del cliente y la aceptación de los términos se completan una sola vez para todo el lote, no por equipo — un cliente que deja varios equipos firma una sola vez por todos.",
           "Al confirmar, cada fila se convierte en una orden real e independiente, cada una con su propio número de orden, su propio link de seguimiento para el cliente y la misma firma/términos.",
@@ -293,6 +296,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "¿Cómo se agregan clientes nuevos?",
         body: [
           "No hay un botón de \"Nuevo cliente\" en esta pantalla — los clientes se crean automáticamente la primera vez que se los carga desde Nueva Orden, Nuevo Presupuesto o Modo Lote. Si ya existe un cliente con esa cédula o teléfono, el sistema lo reconoce y no duplica el registro.",
+          "Esos mismos formularios incluyen el switch \"Notificar por WhatsApp\" cuando el cliente es nuevo, así que no hace falta venir después a Clientes solo para desactivar los avisos automáticos de alguien que ya sabés que no los quiere.",
         ],
       },
     ],

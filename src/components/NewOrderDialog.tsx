@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -160,6 +161,7 @@ export default function NewOrderDialog({
     return !!(d?.form?.secondary_phone || d?.form?.secondary_contact_name);
   });
   const [searchingCedula, setSearchingCedula] = useState(false);
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(true);
 
   const searchByCedula = async () => {
     const cedula = form.customer_cedula.trim();
@@ -246,6 +248,7 @@ export default function NewOrderDialog({
     setSelectedClientId(null);
     setClientSearch("");
     setShowSecondaryContact(false);
+    setNotifyWhatsapp(true);
     setFormKey((k) => k + 1);
     if (clearDraft) {
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
@@ -318,6 +321,7 @@ export default function NewOrderDialog({
           customerName: form.customer_name,
           customerPhone: form.customer_phone || null,
           customerCedula: cedulaNorm,
+          notifyWhatsapp,
         });
       } else if (cedulaNorm) {
         // Selected existing client — update cedula if provided/changed
@@ -648,6 +652,18 @@ export default function NewOrderDialog({
                 </div>
               </div>
             </div>
+
+            {!selectedClientId && (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="notify_whatsapp_new_client" className="cursor-pointer text-sm font-medium">Notificar por WhatsApp</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Aplica solo si este es un cliente nuevo — desactivalo para mayoristas u otros que no quieras que reciban avisos automáticos.
+                  </p>
+                </div>
+                <Switch id="notify_whatsapp_new_client" checked={notifyWhatsapp} onCheckedChange={setNotifyWhatsapp} />
+              </div>
+            )}
 
             <div className="pt-1">
               <button

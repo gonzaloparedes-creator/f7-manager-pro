@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -119,6 +120,7 @@ export default function NewBatchOrderDialog({
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [searchingCedula, setSearchingCedula] = useState(false);
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(true);
 
   useEffect(() => {
     if (!open || !user || !companyId) return;
@@ -132,7 +134,7 @@ export default function NewBatchOrderDialog({
 
   const reset = () => {
     setCustomerName(""); setCustomerPhone(""); setCustomerCedula("");
-    setSelectedClientId(null); setClientSearch("");
+    setSelectedClientId(null); setClientSearch(""); setNotifyWhatsapp(true);
     rows.forEach((r) => r.files.forEach((f) => URL.revokeObjectURL(f.previewUrl)));
     const fresh = [newRow(), newRow()];
     setRows(fresh);
@@ -242,6 +244,7 @@ export default function NewBatchOrderDialog({
           customerName,
           customerPhone: customerPhone || null,
           customerCedula: cedulaNorm,
+          notifyWhatsapp,
         });
       }
 
@@ -499,6 +502,18 @@ export default function NewBatchOrderDialog({
               </div>
             </div>
           </div>
+
+          {!selectedClientId && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="batch_notify_whatsapp" className="cursor-pointer text-sm font-medium">Notificar por WhatsApp</Label>
+                <p className="text-xs text-muted-foreground">
+                  Aplica solo si este es un cliente nuevo — desactivalo para mayoristas u otros que no quieras que reciban avisos automáticos.
+                </p>
+              </div>
+              <Switch id="batch_notify_whatsapp" checked={notifyWhatsapp} onCheckedChange={setNotifyWhatsapp} />
+            </div>
+          )}
 
           <div className="space-y-3 border-t border-border pt-4">
             <div className="flex items-center justify-between">

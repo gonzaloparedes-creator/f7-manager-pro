@@ -31,6 +31,13 @@ export async function resolveClientId(params: {
   customerName: string;
   customerPhone: string | null;
   customerCedula: string | null;
+  /**
+   * Solo se aplica si acá se termina creando un cliente NUEVO — si el
+   * teléfono coincide con un cliente ya existente, se respeta la
+   * preferencia que ese cliente ya tenía guardada (no se pisa solo porque
+   * el formulario haya quedado con el switch en su valor por defecto).
+   */
+  notifyWhatsapp?: boolean;
 }): Promise<string> {
   const cedulaNorm = params.customerCedula?.trim() || null;
   const phoneNorm = normalizedRealPhone(params.customerPhone);
@@ -58,6 +65,7 @@ export async function resolveClientId(params: {
       name: params.customerName || "Cliente",
       phone: phoneNorm,
       cedula: cedulaNorm,
+      notify_whatsapp: params.notifyWhatsapp ?? true,
     })
     .select("id")
     .single();
