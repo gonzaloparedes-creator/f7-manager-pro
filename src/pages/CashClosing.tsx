@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,7 @@ export default function CashClosing() {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
-  const { isAdmin, loading: roleLoading } = useUserRole();
+  const { canCloseCaja, loading: permLoading } = useStaffPermissions();
   const { toast } = useToast();
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
@@ -86,7 +86,7 @@ export default function CashClosing() {
 
   useEffect(() => {
     const load = async () => {
-      if (!companyId || roleLoading) return;
+      if (!companyId || permLoading) return;
       setLoading(true);
       const from = startOfDay(selectedDate).toISOString();
       const to = endOfDay(selectedDate).toISOString();
@@ -109,10 +109,10 @@ export default function CashClosing() {
           .order("created_at", { ascending: false })
           .limit(30),
       ];
-      // El resto (ingresos, gastos, cierres) es información admin-only — no
-      // tiene sentido pedirla para un usuario staff que ni va a ver esa
-      // pestaña, y RLS la bloquearía igual.
-      const adminQueries = isAdmin
+      // El resto (ingresos, gastos, cierres) es información de la pestaña
+      // Cierre — no tiene sentido pedirla para alguien que ni la ve, y RLS
+      // la bloquearía igual si no tiene el permiso habilitado.
+      const adminQueries = canCloseCaja
         ? [
             (supabase as any)
               .from("order_payments")
@@ -158,7 +158,7 @@ export default function CashClosing() {
       setOpeningCashInput("");
       setOpeningNotes("");
 
-      if (isAdmin) {
+      if (canCloseCaja) {
         const [{ data: pay }, { data: sal }, { data: exp }, { data: closing }, { data: hist }] = adminRes;
         const rows: AmountEvent[] = [
           ...((pay ?? []) as { amount: number; payment_method: string | null }[]).map((p) => ({
@@ -186,7 +186,7 @@ export default function CashClosing() {
       setLoading(false);
     };
     load();
-  }, [companyId, selectedDate, isAdmin, roleLoading]);
+  }, [companyId, selectedDate, canCloseCaja, permLoading]);
 
   const breakdown = useMemo(() => groupByMethod(breakdownRows), [breakdownRows]);
   const breakdownByOrdenes = useMemo(
@@ -339,7 +339,7 @@ export default function CashClosing() {
         <Tabs defaultValue="apertura">
           <TabsList>
             <TabsTrigger value="apertura" className="gap-2"><DoorOpen className="h-4 w-4" /> Apertura</TabsTrigger>
-            {!roleLoading && isAdmin && (
+            {!permLoading && canCloseCaja && (
               <TabsTrigger value="cierre" className="gap-2"><Wallet className="h-4 w-4" /> Cierre</TabsTrigger>
             )}
           </TabsList>
@@ -437,7 +437,7 @@ export default function CashClosing() {
             )}
           </TabsContent>
 
-          {!roleLoading && isAdmin && (
+          {!permLoading && canCloseCaja && (
             <TabsContent value="cierre" className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <Card>

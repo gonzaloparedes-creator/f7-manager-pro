@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff, ShoppingBag } from "lucide-react";
+import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff, ShoppingBag, Receipt, Wallet } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -960,6 +960,10 @@ function UsersTab() {
   const [savingStockToggle, setSavingStockToggle] = useState(false);
   const [staffCanViewProducts, setStaffCanViewProducts] = useState(true);
   const [savingProductsToggle, setSavingProductsToggle] = useState(false);
+  const [staffCanViewGastos, setStaffCanViewGastos] = useState(false);
+  const [savingGastosToggle, setSavingGastosToggle] = useState(false);
+  const [staffCanCloseCaja, setStaffCanCloseCaja] = useState(false);
+  const [savingCajaToggle, setSavingCajaToggle] = useState(false);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<UserRow | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
 
@@ -977,7 +981,7 @@ function UsersTab() {
     const [{ data: profs }, { data: brs }, { data: company }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, phone, branch_id, commission_rate").eq("company_id", companyId),
       supabase.from("branches").select("id, name, address").eq("company_id", companyId).order("name"),
-      supabase.from("companies").select("commission_enabled, staff_can_view_stock, staff_can_view_products").eq("id", companyId).maybeSingle(),
+      supabase.from("companies").select("commission_enabled, staff_can_view_stock, staff_can_view_products, staff_can_view_gastos, staff_can_close_caja").eq("id", companyId).maybeSingle(),
     ]);
     const userIds = (profs ?? []).map((p: any) => p.id);
     let roles: any[] = [];
@@ -996,6 +1000,8 @@ function UsersTab() {
     setCommissionEnabled(!!company?.commission_enabled);
     setStaffCanViewStock(!!(company as { staff_can_view_stock?: boolean } | null)?.staff_can_view_stock);
     setStaffCanViewProducts((company as { staff_can_view_products?: boolean } | null)?.staff_can_view_products ?? true);
+    setStaffCanViewGastos(!!(company as { staff_can_view_gastos?: boolean } | null)?.staff_can_view_gastos);
+    setStaffCanCloseCaja(!!(company as { staff_can_close_caja?: boolean } | null)?.staff_can_close_caja);
     setLoading(false);
   };
   useEffect(() => { load(); }, [companyId]);
@@ -1037,6 +1043,32 @@ function UsersTab() {
       return toast({ title: "Error", description: error.message, variant: "destructive" });
     }
     toast({ title: value ? "Staff ahora ve Productos" : "Sección Productos oculta para staff" });
+  };
+
+  const toggleStaffCanViewGastos = async (value: boolean) => {
+    if (!companyId) return;
+    setSavingGastosToggle(true);
+    setStaffCanViewGastos(value);
+    const { error } = await supabase.from("companies").update({ staff_can_view_gastos: value }).eq("id", companyId);
+    setSavingGastosToggle(false);
+    if (error) {
+      setStaffCanViewGastos(!value);
+      return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    toast({ title: value ? "Staff y Recepción ahora ven Gastos" : "Sección Gastos oculta para Staff y Recepción" });
+  };
+
+  const toggleStaffCanCloseCaja = async (value: boolean) => {
+    if (!companyId) return;
+    setSavingCajaToggle(true);
+    setStaffCanCloseCaja(value);
+    const { error } = await supabase.from("companies").update({ staff_can_close_caja: value }).eq("id", companyId);
+    setSavingCajaToggle(false);
+    if (error) {
+      setStaffCanCloseCaja(!value);
+      return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    toast({ title: value ? "Staff y Recepción ahora pueden cerrar caja" : "Cierre de Caja oculto para Staff y Recepción" });
   };
 
   const updateUserCommissionRate = async (userId: string, rate: number) => {
@@ -1178,6 +1210,38 @@ function UsersTab() {
           <div className="flex items-center gap-2">
             {savingProductsToggle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             <Switch id="products-toggle" checked={staffCanViewProducts} onCheckedChange={toggleStaffCanViewProducts} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-primary" />
+            <div>
+              <Label htmlFor="gastos-toggle" className="cursor-pointer text-sm font-medium">Sección Gastos visible para Staff y Recepción</Label>
+              <div className="text-xs text-muted-foreground">
+                Por defecto solo el Admin puede ver y cargar gastos. Si lo activás, Staff y Recepción también pueden.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {savingGastosToggle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Switch id="gastos-toggle" checked={staffCanViewGastos} onCheckedChange={toggleStaffCanViewGastos} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-primary" />
+            <div>
+              <Label htmlFor="caja-toggle" className="cursor-pointer text-sm font-medium">Cierre de Caja visible para Staff y Recepción</Label>
+              <div className="text-xs text-muted-foreground">
+                Por defecto solo el Admin puede hacer el cierre de caja (la apertura la puede hacer cualquiera). Si lo activás, Staff y Recepción también pueden cerrar.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {savingCajaToggle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Switch id="caja-toggle" checked={staffCanCloseCaja} onCheckedChange={toggleStaffCanCloseCaja} />
           </div>
         </div>
 

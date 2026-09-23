@@ -436,7 +436,7 @@ export const tutorialCategories: TutorialCategory[] = [
     label: "Caja",
     icon: Wallet,
     description: "Apertura del día y, para administradores, el cierre y la reconciliación de efectivo.",
-    note: "Apertura: cualquier miembro del equipo · Cierre: solo Admin · Disponible en los planes Pro y Business.",
+    note: "Apertura: cualquier miembro del equipo · Cierre: Admin, o Staff/Recepción si el admin lo habilita en Configuración → Usuarios · Disponible en los planes Pro y Business.",
     topics: [
       {
         id: "apertura",
@@ -474,7 +474,7 @@ export const tutorialCategories: TutorialCategory[] = [
     label: "Gastos",
     icon: Receipt,
     description: "Repuestos, mercadería, alquiler y cualquier otro gasto del taller o la tienda.",
-    note: "Solo para Admin · Disponible en los planes Pro y Business.",
+    note: "Admin, o Staff/Recepción si el admin lo habilita en Configuración → Usuarios · Disponible en los planes Pro y Business.",
     topics: [
       {
         id: "cargar",
@@ -543,6 +543,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Alta de cuentas para tu equipo, con tres roles posibles: Admin (acceso completo), Staff (técnicos, sin acceso a Configuración ni Reportes) y Recepción (pensado para quien recibe equipos y atiende clientes).",
           "A cada usuario se le asigna una sucursal, y opcionalmente un porcentaje de comisión sobre lo que factura (no disponible en los planes Starter y Retail).",
           "Un admin puede eliminar un usuario cuando alguien deja el taller (el ícono de tacho en su fila). No podés eliminarte a vos mismo ni al único admin de la empresa, y si el usuario tiene órdenes registradas a su nombre (como técnico o quien recepcionó), hay que reasignarlas primero — así no se pierde de quién es cada orden ya entregada o con garantía activa.",
+          "Más abajo hay switches para ajustar qué puede ver el personal sin rol Admin: mostrar el stock disponible, permitir el acceso a Productos, a Gastos, y a hacer el Cierre de Caja (la Apertura de Caja siempre está disponible para cualquiera). Los de Gastos y Cierre de Caja afectan tanto a Staff como a Recepción; todos vienen apagados por defecto salvo Productos.",
         ],
         images: [{ file: "configuracion-usuarios-01.png", alt: "Alta de usuarios y roles" }],
       },

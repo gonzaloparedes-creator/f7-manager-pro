@@ -279,6 +279,8 @@ export type Database = {
           previous_system: string | null
           referral_partner_id: string | null
           service_terms_template: string | null
+          staff_can_close_caja: boolean
+          staff_can_view_gastos: boolean
           staff_can_view_products: boolean
           staff_can_view_stock: boolean
           ticket_width_mm: number
@@ -306,6 +308,8 @@ export type Database = {
           previous_system?: string | null
           referral_partner_id?: string | null
           service_terms_template?: string | null
+          staff_can_close_caja?: boolean
+          staff_can_view_gastos?: boolean
           staff_can_view_products?: boolean
           staff_can_view_stock?: boolean
           ticket_width_mm?: number
@@ -333,6 +337,8 @@ export type Database = {
           previous_system?: string | null
           referral_partner_id?: string | null
           service_terms_template?: string | null
+          staff_can_close_caja?: boolean
+          staff_can_view_gastos?: boolean
           staff_can_view_products?: boolean
           staff_can_view_stock?: boolean
           ticket_width_mm?: number
@@ -1413,6 +1419,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      company_staff_can_close_caja: {
+        Args: { _company_id: string }
+        Returns: boolean
+      }
+      company_staff_can_view_gastos: {
+        Args: { _company_id: string }
+        Returns: boolean
+      }
       generate_order_number: { Args: { _company_id: string }; Returns: string }
       get_history_by_code: {
         Args: { _code: string }

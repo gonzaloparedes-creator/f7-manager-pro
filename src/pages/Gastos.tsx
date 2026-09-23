@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useExpenseCategories } from "@/hooks/useExpenseCategories";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,7 +38,7 @@ const ALL_CATEGORIES = "__all__";
 export default function Gastos() {
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
-  const { isAdmin, loading: roleLoading } = useUserRole();
+  const { canViewGastos, loading: permLoading } = useStaffPermissions();
   const { toast } = useToast();
   const { presets: categories } = useExpenseCategories();
 
@@ -102,7 +102,7 @@ export default function Gastos() {
     load();
   };
 
-  if (!roleLoading && !isAdmin) {
+  if (!permLoading && !canViewGastos) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Card className="max-w-md">
@@ -111,7 +111,7 @@ export default function Gastos() {
               <ShieldAlert className="h-6 w-6" />
             </div>
             <div className="text-lg font-semibold">Acceso Denegado</div>
-            <p className="text-sm text-muted-foreground">Solo los administradores pueden ver y cargar gastos.</p>
+            <p className="text-sm text-muted-foreground">No tenés permiso para ver el apartado de Gastos.</p>
           </CardContent>
         </Card>
       </div>

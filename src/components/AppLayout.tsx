@@ -23,7 +23,7 @@ const baseNav = [
   { to: "/productos", label: "Productos", icon: ShoppingBag, proOnly: false, businessOnly: true, adminOnly: false },
   { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true },
   { to: "/cierre-caja", label: "Caja", icon: Wallet, proOnly: true, businessOnly: false, adminOnly: false },
-  { to: "/gastos", label: "Gastos", icon: Receipt, proOnly: true, businessOnly: false, adminOnly: true },
+  { to: "/gastos", label: "Gastos", icon: Receipt, proOnly: true, businessOnly: false, adminOnly: false },
   { to: "/como-usar", label: "Cómo usar", icon: BookOpen, proOnly: false, businessOnly: false, adminOnly: false },
 ];
 const adminNav = [
@@ -33,7 +33,7 @@ const adminNav = [
 export default function AppLayout() {
   const { user, loading } = useAuth();
   const { isAdmin } = useUserRole();
-  const { canViewProducts } = useStaffPermissions();
+  const { canViewProducts, canViewGastos } = useStaffPermissions();
   const { isSuperAdmin } = useSuperAdmin();
   const { isActive, loading: statusLoading } = useCompanyStatus();
   const { isStarter, isBusiness, isRetail, loading: planLoading } = usePlan();
@@ -44,11 +44,12 @@ export default function AppLayout() {
     const items = isAdmin ? [...baseNav, ...adminNav] : baseNav;
     let filtered = items.filter((i) => !i.adminOnly || isAdmin);
     if (!canViewProducts) filtered = filtered.filter((i) => i.to !== "/productos");
+    if (!canViewGastos) filtered = filtered.filter((i) => i.to !== "/gastos");
     if (isSuperAdmin) {
       filtered.push({ to: "/superadmin", label: "Super Admin", icon: ShieldCheck, proOnly: false, businessOnly: false, adminOnly: false });
     }
     return filtered;
-  }, [isAdmin, isSuperAdmin, canViewProducts]);
+  }, [isAdmin, isSuperAdmin, canViewProducts, canViewGastos]);
 
   // La barra inferior mobile no entra con más de ~5 ítems (peor todavía con
   // el badge de bloqueo PRO/BUSINESS) — Configuración y Super Admin son de
@@ -199,7 +200,7 @@ export default function AppLayout() {
               <Wallet className="h-5 w-5" />
             </Link>
           )}
-          {isAdmin && !isStarter && (
+          {canViewGastos && !isStarter && (
             <Link
               to="/gastos"
               aria-label="Gastos"
