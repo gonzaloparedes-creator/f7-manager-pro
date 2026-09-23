@@ -508,7 +508,7 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "perfil",
         title: "Perfil",
         body: [
-          "Tus datos personales (nombre, teléfono), la identidad del taller que ven tus clientes (nombre del negocio y logo — el que aparece en el link de seguimiento y en los mensajes de WhatsApp), la ubicación (país/departamento/ciudad), y qué notificaciones automáticas de WhatsApp mandar según cada cambio de estado.",
+          "Tus datos personales (nombre, teléfono), la identidad del taller que ven tus clientes (nombre del negocio y logo — el que aparece en el link de seguimiento y en los mensajes de WhatsApp), la ubicación (país/departamento/ciudad), y qué notificaciones automáticas de WhatsApp mandar: al crear la orden o presupuesto (interruptor aparte, \"Avisar al cliente\"), y en cada cambio de estado.",
         ],
         images: [{ file: "configuracion-perfil-01.png", alt: "Tab de Perfil en Configuración" }],
       },

@@ -38,6 +38,7 @@ import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type NotifPrefs = {
+  orden_creada: boolean;
   recibido: boolean;
   en_diagnostico: boolean;
   en_reparacion: boolean;
@@ -47,6 +48,7 @@ type NotifPrefs = {
 };
 
 const DEFAULT_PREFS: NotifPrefs = {
+  orden_creada: true,
   recibido: true, en_diagnostico: false, en_reparacion: false, listo: true, enviado: true, entregado: false,
 };
 
@@ -255,18 +257,30 @@ export default function Settings() {
                 <div className="flex-1">
                   <div className="font-semibold">Notificaciones Automáticas</div>
                   <div className="text-xs text-muted-foreground">
-                    Elegí en qué cambios de estado se envía un mensaje de WhatsApp al cliente.
+                    Elegí cuándo se envía un mensaje de WhatsApp al cliente: al crear la orden/presupuesto, y en cada cambio de estado.
                   </div>
                 </div>
                 {savingPrefs && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
               </div>
-              <div className="divide-y rounded-md border">
-                {STATUS_LABELS.map(({ key, label }) => (
-                  <div key={key} className="flex items-center justify-between px-4 py-3">
-                    <Label htmlFor={`notif-${key}`} className="cursor-pointer text-sm font-medium">{label}</Label>
-                    <Switch id={`notif-${key}`} checked={profile.notification_preferences[key]} onCheckedChange={(v) => togglePref(key, v)} />
+              <div className="space-y-1.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Al crear la orden o presupuesto</div>
+                <div className="divide-y rounded-md border">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <Label htmlFor="notif-orden_creada" className="cursor-pointer text-sm font-medium">Avisar al cliente</Label>
+                    <Switch id="notif-orden_creada" checked={profile.notification_preferences.orden_creada} onCheckedChange={(v) => togglePref("orden_creada", v)} />
                   </div>
-                ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Al cambiar el estado</div>
+                <div className="divide-y rounded-md border">
+                  {STATUS_LABELS.map(({ key, label }) => (
+                    <div key={key} className="flex items-center justify-between px-4 py-3">
+                      <Label htmlFor={`notif-${key}`} className="cursor-pointer text-sm font-medium">{label}</Label>
+                      <Switch id={`notif-${key}`} checked={profile.notification_preferences[key]} onCheckedChange={(v) => togglePref(key, v)} />
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>

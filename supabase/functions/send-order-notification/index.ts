@@ -73,11 +73,20 @@ Deno.serve(async (req) => {
     // en null. Se busca el perfil de la empresa que sí tiene WhatsApp activo.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("evolution_instance_name")
+      .select("evolution_instance_name, notification_preferences")
       .eq("company_id", ownedOrder.company_id)
       .eq("whatsapp_connected", true)
       .limit(1)
       .maybeSingle();
+
+    // "Orden creada" es un evento aparte de los cambios de estado (ver
+    // send-status-notification) — antes no tenía su propio interruptor en
+    // Configuración y este mensaje salía siempre, sin importar lo que el
+    // admin hubiera configurado ahí.
+    const prefs = (profile?.notification_preferences ?? {}) as Record<string, boolean>;
+    if (prefs.orden_creada !== true) {
+      return json({ skipped: true, reason: "notification disabled for order creation" });
+    }
 
     const tracking_url = `${app_origin ?? ""}/tracking/${code}`;
     const message_template = isQuote
