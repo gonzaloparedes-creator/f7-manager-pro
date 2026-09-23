@@ -33,7 +33,7 @@ export default function DeliveryCalendarDialog({ open, onOpenChange, orders, sta
 
   const deliveries = useMemo(() => {
     return orders
-      .filter((o) => o.estimated_delivery_date && o.status !== "entregado" && o.status !== "presupuesto")
+      .filter((o) => o.estimated_delivery_date && o.status !== "entregado" && o.status !== "presupuesto" && o.status !== "retirado_sin_reparar")
       .map((o) => ({ ...o, date: new Date(o.estimated_delivery_date + "T00:00:00") }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [orders]);

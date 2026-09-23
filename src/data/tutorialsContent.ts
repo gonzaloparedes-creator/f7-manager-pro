@@ -58,7 +58,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Buscar y filtrar órdenes",
         body: [
           "El buscador de arriba filtra por nombre del cliente, número de orden, tipo de equipo, IMEI, marca/modelo o teléfono — no hace falta escribir el dato completo, con una parte alcanza.",
-          "Debajo del buscador hay chips de estado (por ejemplo \"Recibido\", \"En reparación\", \"Listo\") que se arman automáticamente según los estados que tenga configurados tu taller en Configuración → Estados. También hay dos chips fijos: \"Activas\" (todo lo que no está entregado ni es un presupuesto) y \"Presupuestos\".",
+          "Debajo del buscador hay chips de estado (por ejemplo \"Recibido\", \"En reparación\", \"Listo\") que se arman automáticamente según los estados que tenga configurados tu taller en Configuración → Estados. También hay dos chips fijos: \"Activas\" (todo lo que no está entregado, retirado sin reparar, ni es un presupuesto) y \"Presupuestos\".",
           "Si tu taller tiene más de una sucursal, los administradores ven además un filtro para mirar una sucursal a la vez o todas juntas.",
         ],
         images: [{ file: "ordenes-buscar-01.png", alt: "Buscador y filtros de estado en el Dashboard" }],
@@ -201,6 +201,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Acá se ve y edita el presupuesto, la seña, el saldo pendiente y los cargos adicionales que se le sumen al trabajo sobre la marcha (por ejemplo, si aparece un problema extra durante la reparación). También se define la fecha estimada de entrega.",
           "Con saldo pendiente aparece el botón \"Registrar pago\": abre un monto ya cargado con el total que falta (por si el cliente paga todo de una vez) y un método de pago para elegir de la lista configurable. Si el cliente va completando de a poco, se cambia el monto por lo que efectivamente paga esa vez — el sistema descuenta eso del saldo y deja el resto pendiente para la próxima visita. Cada pago registrado queda anotado en el Historial de la orden, con fecha y método.",
           "Si el cliente paga con más de un método a la vez (por ejemplo, la mitad en efectivo y la otra mitad por transferencia), tocá \"Agregar otro método\" para sumar una línea de monto + método por cada uno — el sistema valida que la suma de todas las líneas no supere el saldo, y registra cada una por separado para que Reportes y Cierre de Caja reflejen bien de dónde vino cada parte del pago.",
+          "Cuando una línea es en Efectivo, al lado aparece un campo para cargar con cuánto te paga el cliente y calcular el vuelto automáticamente — igual que en el carrito de Productos.",
           "Si el taller necesita hacer un descuento al cobrar (por ejemplo, por pago al contado o como cortesía), en la misma ventana hay un campo de descuento que se puede cargar en porcentaje o en Gs. fijos. El descuento se aplica sobre el saldo pendiente y reduce el presupuesto de la orden de forma permanente, para que el total final quede reflejado correctamente en Reportes.",
           "En \"Documentos (PDF)\" se pueden adjuntar hasta 3 archivos de hasta 10 MB cada uno — útil para guardar una factura, una garantía del fabricante, o cualquier comprobante relacionado con el trabajo.",
         ],
@@ -358,6 +359,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Se van agregando productos al carrito con su cantidad, y al confirmar la venta se descuenta el stock automáticamente.",
           "Si querés aplicarle un descuento a la venta (por porcentaje o por un monto fijo en Gs.), se carga en el campo \"Descuento\" del carrito antes de confirmar — se reparte proporcionalmente entre los productos, así queda reflejado en el precio de venta real y en Reportes.",
+          "Cuando el medio de pago es Efectivo, aparece un campo \"¿Con cuánto te paga?\": cargás el billete que te dio el cliente y el sistema calcula el vuelto automáticamente, tipo caja registradora de supermercado. Si el monto no alcanza, avisa \"Falta\" en vez de \"Vuelto\". Es solo una ayuda para el cálculo — no cambia el monto de la venta que queda registrado.",
         ],
         images: [{ file: "productos-vender-01.png", alt: "Carrito de venta (POS) en Productos" }],
       },

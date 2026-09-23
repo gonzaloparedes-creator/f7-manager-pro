@@ -10,12 +10,12 @@ import { useCompany } from "@/hooks/useCompany";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, logOrderPayment, resolveStatusLabel } from "@/lib/orders";
+import { formatPYG, isCashLabel, logOrderPayment, resolveStatusLabel } from "@/lib/orders";
 import { Wallet, Loader2, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type DiscountUnit = "percent" | "amount";
-interface PayLine { id: string; amount: string; method: string }
+interface PayLine { id: string; amount: string; method: string; received: string }
 
 export interface OrderForPayment {
   id: string;
@@ -76,6 +76,7 @@ export default function RegisterPaymentDialog({
       id: newLineId(),
       amount: saldo > 0 ? String(saldo) : "0",
       method: order.deposit_payment_method || paymentMethodPresets[0]?.label || "",
+      received: "",
     }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order?.id]);
@@ -110,7 +111,7 @@ export default function RegisterPaymentDialog({
     const usedMethods = new Set(payLines.map((l) => l.method));
     const nextMethod = paymentMethodPresets.find((m) => !usedMethods.has(m.label))?.label
       ?? paymentMethodPresets[0]?.label ?? "";
-    setPayLines((prev) => [...prev, { id: newLineId(), amount: "", method: nextMethod }]);
+    setPayLines((prev) => [...prev, { id: newLineId(), amount: "", method: nextMethod, received: "" }]);
   };
   const removeLine = (id: string) => {
     setPayLines((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
@@ -253,39 +254,68 @@ export default function RegisterPaymentDialog({
           <div className="space-y-2">
             <Label>Monto a cobrar y método de pago</Label>
             <div className="space-y-2">
-              {payLines.map((line, idx) => (
-                <div key={line.id} className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={line.amount}
-                    onChange={(e) => updateLine(line.id, { amount: e.target.value })}
-                    placeholder="0"
-                    aria-label={`Monto ${idx + 1}`}
-                  />
-                  <Select value={line.method} onValueChange={(v) => updateLine(line.id, { method: v })}>
-                    <SelectTrigger className="w-40 shrink-0" aria-label={`Método ${idx + 1}`}>
-                      <SelectValue placeholder="Elegí uno" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentMethodPresets.map((m) => (
-                        <SelectItem key={m.id} value={m.label}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="shrink-0"
-                    disabled={payLines.length <= 1}
-                    onClick={() => removeLine(line.id)}
-                    aria-label="Quitar este método"
-                  >
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </div>
-              ))}
+              {payLines.map((line, idx) => {
+                const lineAmount = Math.round(Number(line.amount)) || 0;
+                const receivedNum = Math.round(Number(line.received)) || 0;
+                const showVuelto = isCashLabel(line.method) && line.received.trim() !== "";
+                const vuelto = receivedNum - lineAmount;
+                return (
+                  <div key={line.id} className="space-y-1.5 rounded-md border border-border/60 p-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={line.amount}
+                        onChange={(e) => updateLine(line.id, { amount: e.target.value })}
+                        placeholder="0"
+                        aria-label={`Monto ${idx + 1}`}
+                      />
+                      <Select value={line.method} onValueChange={(v) => updateLine(line.id, { method: v })}>
+                        <SelectTrigger className="w-40 shrink-0" aria-label={`Método ${idx + 1}`}>
+                          <SelectValue placeholder="Elegí uno" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {paymentMethodPresets.map((m) => (
+                            <SelectItem key={m.id} value={m.label}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0"
+                        disabled={payLines.length <= 1}
+                        onClick={() => removeLine(line.id)}
+                        aria-label="Quitar este método"
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                    {isCashLabel(line.method) && (
+                      <div className="flex items-center gap-2 pl-0.5">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={line.received}
+                          onChange={(e) => updateLine(line.id, { received: e.target.value })}
+                          placeholder="¿Con cuánto te paga?"
+                          aria-label={`Recibido en efectivo ${idx + 1}`}
+                          className="h-8 max-w-[200px] text-sm"
+                        />
+                        {showVuelto && (
+                          <span className={cn(
+                            "text-xs font-semibold",
+                            vuelto >= 0 ? "text-secondary" : "text-destructive"
+                          )}>
+                            {vuelto >= 0 ? `Vuelto: ${formatPYG(vuelto)}` : `Falta: ${formatPYG(-vuelto)}`}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-2">
               <Plus className="h-3.5 w-3.5" />

@@ -113,6 +113,13 @@ export function formatPYG(value: number | null | undefined) {
   return `Gs. ${n.toLocaleString("es-PY")}`;
 }
 
+// Usado para saber cuándo tiene sentido calcular vuelto (solo en efectivo)
+// y para el desglose de Cierre de Caja (transferencia/tarjeta ya quedan
+// verificadas por el banco, no hay "vuelto" físico que dar).
+export function isCashLabel(method: string | null | undefined) {
+  return (method || "").trim().toLowerCase() === "efectivo";
+}
+
 // {{garantia_dias}} se reemplaza por renderServiceTerms() con la garantía
 // real elegida en cada orden (WarrantySelector) — así, tanto este texto por
 // defecto como cualquier texto personalizado que un admin escriba desde

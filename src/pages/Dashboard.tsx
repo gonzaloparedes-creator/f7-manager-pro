@@ -176,7 +176,7 @@ export default function Dashboard() {
   }, [branchScoped]);
 
   const filteredByStatus = filter === "todos"
-    ? branchScoped.filter((o) => o.status !== "entregado" && o.status !== "presupuesto")
+    ? branchScoped.filter((o) => o.status !== "entregado" && o.status !== "presupuesto" && o.status !== "retirado_sin_reparar")
     : branchScoped.filter((o) => o.status === filter);
 
   const searchQuery = search.trim().toLowerCase();

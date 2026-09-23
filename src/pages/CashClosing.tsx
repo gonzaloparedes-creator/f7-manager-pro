@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { formatPYG } from "@/lib/orders";
+import { formatPYG, isCashLabel } from "@/lib/orders";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarDays, Wallet, CheckCircle2, AlertTriangle, Loader2, History, RotateCcw, DoorOpen } from "lucide-react";
@@ -52,7 +52,6 @@ function groupByMethod(rows: PaymentRow[]) {
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
 function ymd(d: Date) { return format(d, "yyyy-MM-dd"); }
-function isCashLabel(method: string | null) { return (method || "").trim().toLowerCase() === "efectivo"; }
 
 export default function CashClosing() {
   // Todos los hooks van primero, sin condicionar — el early return de plan

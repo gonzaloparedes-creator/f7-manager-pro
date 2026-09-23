@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2 } from "lucide-react";
-import { formatPYG } from "@/lib/orders";
+import { formatPYG, isCashLabel } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import QuantityStepper from "@/components/QuantityStepper";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
@@ -54,6 +54,7 @@ export default function CartSheet({
   const [completedSale, setCompletedSale] = useState<CompletedCartSale | null>(null);
   const [discountValue, setDiscountValue] = useState("");
   const [discountUnit, setDiscountUnit] = useState<DiscountUnit>("percent");
+  const [receivedCash, setReceivedCash] = useState("");
 
   const lines = Object.entries(cart)
     .map(([id, line]) => ({ id, product: products.find((p) => p.id === id), ...line }))
@@ -70,6 +71,9 @@ export default function CartSheet({
   const discountAmount = Math.min(subtotal, Math.round(discountRaw));
   const discountFraction = subtotal > 0 ? discountAmount / subtotal : 0;
   const total = subtotal - discountAmount;
+  const receivedNum = Math.round(Number(receivedCash)) || 0;
+  const vuelto = receivedNum - total;
+  const showVuelto = isCashLabel(paymentMethod) && receivedCash.trim() !== "";
 
   const setQty = (id: string, qty: number) => {
     setCart((prev) => {
@@ -98,6 +102,7 @@ export default function CartSheet({
     setPaymentMethod("Efectivo");
     setDiscountValue("");
     setDiscountUnit("percent");
+    setReceivedCash("");
   };
 
   const checkout = async () => {
@@ -286,6 +291,30 @@ export default function CartSheet({
                     <span className="text-sm text-muted-foreground">Total</span>
                     <span className="text-xl font-bold text-primary">{formatPYG(total)}</span>
                   </div>
+
+                  {isCashLabel(paymentMethod) && (
+                    <div className="space-y-2">
+                      <Label htmlFor="cart-received">¿Con cuánto te paga? (Gs.)</Label>
+                      <Input
+                        id="cart-received"
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={receivedCash}
+                        onChange={(e) => setReceivedCash(e.target.value)}
+                        placeholder="Ej: 50000"
+                      />
+                      {showVuelto && (
+                        <div className={cn(
+                          "flex items-center justify-between rounded-md border px-4 py-2 text-sm font-semibold",
+                          vuelto >= 0 ? "border-secondary/40 bg-secondary/10 text-secondary" : "border-destructive/40 bg-destructive/10 text-destructive"
+                        )}>
+                          <span>{vuelto >= 0 ? "Vuelto" : "Falta"}</span>
+                          <span className="text-lg">{formatPYG(Math.abs(vuelto))}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <SheetFooter>
                   <Button onClick={checkout} disabled={loading} size="lg" className="w-full">
