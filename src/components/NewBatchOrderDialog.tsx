@@ -16,6 +16,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
+import { resolveClientId } from "@/lib/clients";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -235,34 +236,13 @@ export default function NewBatchOrderDialog({
       let clientId = selectedClientId;
       const cedulaNorm = customerCedula.trim() || null;
       if (!clientId) {
-        const phoneNorm = customerPhone || null;
-        // Evita el error de unique constraint (technician_id, phone): si ya
-        // existe un cliente con este mismo teléfono para este técnico
-        // (cliente recurrente que no se buscó/seleccionó arriba), se
-        // reutiliza en vez de intentar crear un duplicado.
-        if (phoneNorm) {
-          const { data: existing } = await supabase
-            .from("clients")
-            .select("id,cedula")
-            .eq("technician_id", user.id)
-            .eq("phone", phoneNorm)
-            .maybeSingle();
-          if (existing?.id) {
-            clientId = existing.id;
-            if (cedulaNorm && !existing.cedula) {
-              await supabase.from("clients").update({ cedula: cedulaNorm }).eq("id", clientId);
-            }
-          }
-        }
-        if (!clientId) {
-          const { data: created, error: cErr } = await supabase
-            .from("clients")
-            .insert({ company_id: resolvedCompanyId, technician_id: user.id, name: customerName, phone: phoneNorm, cedula: cedulaNorm })
-            .select("id")
-            .single();
-          if (cErr) throw cErr;
-          clientId = created.id;
-        }
+        clientId = await resolveClientId({
+          companyId: resolvedCompanyId,
+          technicianId: user.id,
+          customerName,
+          customerPhone: customerPhone || null,
+          customerCedula: cedulaNorm,
+        });
       }
 
       const createdNumbers: string[] = [];
@@ -511,7 +491,7 @@ export default function NewBatchOrderDialog({
                   value={customerPhone.replace(/^595/, "")}
                   onChange={(e) => {
                     const digits = e.target.value.replace(/\D/g, "");
-                    setCustomerPhone(`595${digits}`);
+                    setCustomerPhone(digits ? `595${digits}` : "");
                     setSelectedClientId(null);
                   }}
                   className="flex-1"

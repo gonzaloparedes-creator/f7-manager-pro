@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
+import { resolveClientId } from "@/lib/clients";
 import { X, Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
@@ -311,38 +312,13 @@ export default function NewOrderDialog({
       let clientId = selectedClientId;
       const cedulaNorm = form.customer_cedula.trim() || null;
       if (!clientId) {
-        const phoneNorm = form.customer_phone || null;
-        if (phoneNorm) {
-          const { data: existing } = await supabase
-            .from("clients")
-            .select("id,cedula")
-            .eq("technician_id", user.id)
-            .eq("phone", phoneNorm)
-            .maybeSingle();
-          if (existing?.id) {
-            clientId = existing.id;
-            // Backfill cedula if newly provided and not already set
-            if (cedulaNorm && !existing.cedula) {
-              await supabase.from("clients").update({ cedula: cedulaNorm }).eq("id", clientId);
-            }
-          } else {
-            const { data: created, error: cErr } = await supabase
-              .from("clients")
-              .insert({ company_id: companyId, technician_id: user.id, name: form.customer_name || "Cliente", phone: phoneNorm, cedula: cedulaNorm })
-              .select("id")
-              .single();
-            if (cErr) throw cErr;
-            clientId = created.id;
-          }
-        } else {
-          const { data: created, error: cErr } = await supabase
-            .from("clients")
-            .insert({ company_id: companyId, technician_id: user.id, name: form.customer_name || "Cliente", phone: null, cedula: cedulaNorm })
-            .select("id")
-            .single();
-          if (cErr) throw cErr;
-          clientId = created.id;
-        }
+        clientId = await resolveClientId({
+          companyId,
+          technicianId: user.id,
+          customerName: form.customer_name,
+          customerPhone: form.customer_phone || null,
+          customerCedula: cedulaNorm,
+        });
       } else if (cedulaNorm) {
         // Selected existing client — update cedula if provided/changed
         await supabase.from("clients").update({ cedula: cedulaNorm }).eq("id", clientId);
@@ -663,7 +639,7 @@ export default function NewOrderDialog({
                     value={form.customer_phone.replace(/^595/, "")}
                     onChange={(e) => {
                       const digits = e.target.value.replace(/\D/g, "");
-                      setForm({ ...form, customer_phone: `595${digits}` });
+                      setForm({ ...form, customer_phone: digits ? `595${digits}` : "" });
                       setSelectedClientId(null);
                     }}
                     className="flex-1"
