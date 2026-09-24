@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
+import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { formatPYG } from "@/lib/orders";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
-type Product = {
+export type Product = {
   id: string;
   name: string;
   category_id: string | null;
@@ -83,6 +84,7 @@ export default function Products() {
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Product | null>(null);
+  const [previewItem, setPreviewItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [stockFilter, setStockFilter] = useState<"all" | "low">("all");
@@ -283,8 +285,9 @@ export default function Products() {
     return (
       <Card
         key={i.id}
+        onClick={() => setPreviewItem(i)}
         className={cn(
-          "group h-full transition-all hover:shadow-elevated",
+          "group h-full cursor-pointer transition-all hover:shadow-elevated",
           outOfStock ? "border-l-4 border-l-destructive" : lowStock ? "border-l-4 border-l-secondary" : "hover:border-primary/50"
         )}
       >
@@ -303,7 +306,7 @@ export default function Products() {
                 <div className="text-sm font-medium text-primary">{formatPYG(i.selling_price)}</div>
               </div>
             </div>
-            <div className="flex shrink-0 items-center">
+            <div className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
               <Button size="icon" variant="ghost" onClick={() => openEdit(i)} aria-label={`Editar ${i.name}`}>
                 <Pencil className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -345,26 +348,28 @@ export default function Products() {
             )}
           </div>
 
-          {cart[i.id] ? (
-            <div className="flex items-center justify-between gap-2">
-              <QuantityStepper
-                value={cart[i.id].quantity}
-                max={i.stock}
-                onChange={(q) => updateCartQty(i, q)}
-              />
-              <span className="text-sm font-semibold text-foreground">
-                {formatPYG(cart[i.id].quantity * cart[i.id].unitPrice)}
-              </span>
-            </div>
-          ) : (
-            <Button
-              className="w-full gap-2"
-              disabled={outOfStock}
-              onClick={() => addToCart(i)}
-            >
-              <ShoppingCart className="h-4 w-4" /> Agregar
-            </Button>
-          )}
+          <div onClick={(e) => e.stopPropagation()}>
+            {cart[i.id] ? (
+              <div className="flex items-center justify-between gap-2">
+                <QuantityStepper
+                  value={cart[i.id].quantity}
+                  max={i.stock}
+                  onChange={(q) => updateCartQty(i, q)}
+                />
+                <span className="text-sm font-semibold text-foreground">
+                  {formatPYG(cart[i.id].quantity * cart[i.id].unitPrice)}
+                </span>
+              </div>
+            ) : (
+              <Button
+                className="w-full gap-2"
+                disabled={outOfStock}
+                onClick={() => addToCart(i)}
+              >
+                <ShoppingCart className="h-4 w-4" /> Agregar
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
@@ -576,6 +581,20 @@ export default function Products() {
       )}
 
       <NewProductDialog open={open} onOpenChange={closeDialog} onCreated={handleSaved} editItem={editItem} />
+      <ProductPreviewDialog
+        product={previewItem}
+        onOpenChange={(o) => !o && setPreviewItem(null)}
+        categoryLabel={previewItem ? categoryName(previewItem.category_id) : null}
+        subcategoryLabel={previewItem ? subcategoryName(previewItem.subcategory_id) : null}
+        branchLabel={hasMultipleBranches && previewItem?.branch_id ? branches.find((b) => b.id === previewItem.branch_id)?.name ?? null : null}
+        canViewStock={canViewStock}
+        canDelete={isAdmin}
+        cartLine={previewItem ? cart[previewItem.id] : undefined}
+        onAddToCart={() => previewItem && addToCart(previewItem)}
+        onUpdateQty={(q) => previewItem && updateCartQty(previewItem, q)}
+        onEdit={() => { if (previewItem) { openEdit(previewItem); setPreviewItem(null); } }}
+        onDelete={() => { if (previewItem) { setPendingDelete(previewItem); setPreviewItem(null); } }}
+      />
       <CartSheet
         open={cartOpen}
         onOpenChange={setCartOpen}

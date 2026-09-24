@@ -353,7 +353,8 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Muestra el total de productos, cuáles están sin stock o con bajo stock, las ventas del día y el valor total del catálogo.",
           "El catálogo (pestaña \"Catálogo\") se agrupa solo por categoría en secciones desplegables — cada una se puede colapsar para no tener que scrollear entre categorías que no estás usando en el momento. Al buscar un producto por nombre, se muestra directo el resultado sin agrupar.",
-          "Para restockear un producto que se agotó (o corregir nombre, precio, imagen, etc.), usá el lápiz de \"Editar\" en su tarjeta — no hace falta eliminarlo y cargarlo de nuevo.",
+          "Tocando la tarjeta de un producto (en cualquier parte que no sea un botón puntual) se abre una previsualización grande: foto ampliada, nombre, precio, stock y categoría, con accesos directos para agregar al carrito, editar o eliminar sin volver al catálogo.",
+          "Para restockear un producto que se agotó (o corregir nombre, precio, imagen, etc.), usá el lápiz de \"Editar\" en su tarjeta o desde la previsualización — no hace falta eliminarlo y cargarlo de nuevo.",
         ],
         images: [{ file: "productos-catalogo-01.png", alt: "Catálogo de productos y estadísticas" }],
       },
