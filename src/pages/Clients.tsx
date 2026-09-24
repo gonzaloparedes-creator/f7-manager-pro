@@ -70,7 +70,9 @@ export default function Clients() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [user, companyId]);
+  // user?.id (no el objeto user): ver Dashboard.tsx — evita reiniciar el
+  // listado por un simple refresh de token al volver de otra pestaña.
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [user?.id, companyId]);
 
   const ordersByClient = useMemo(() => {
     const m = new Map<string, OrderRow[]>();

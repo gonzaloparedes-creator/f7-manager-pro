@@ -120,7 +120,10 @@ export default function Settings() {
       setProfile({ ...(data as any), notification_preferences: prefs });
     }
   };
-  useEffect(() => { load(); }, [user]);
+  // user?.id (no el objeto user): ver Dashboard.tsx — evita pisar campos que
+  // se están editando por un simple refresh de token al volver de otra pestaña.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [user?.id]);
 
   const togglePref = async (key: keyof NotifPrefs, value: boolean) => {
     if (!user || !profile) return;

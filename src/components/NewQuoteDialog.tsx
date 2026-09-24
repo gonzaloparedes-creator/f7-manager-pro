@@ -69,7 +69,8 @@ export default function NewQuoteDialog({
       .eq("company_id", companyId)
       .order("name", { ascending: true })
       .then(({ data }) => setClients((data ?? []) as ClientLite[]));
-  }, [open, user, companyId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user?.id, companyId]);
 
   const reset = () => {
     setCustomerName(""); setCustomerPhone(""); setCustomerCedula("");

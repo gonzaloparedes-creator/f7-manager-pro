@@ -34,7 +34,11 @@ export function useUserRole() {
     return () => {
       active = false;
     };
-  }, [user, authLoading]);
+    // Ver comentario equivalente en useCompany.ts: el objeto `user` cambia de
+    // referencia en cada refresh de token (p. ej. al volver a la pestaña),
+    // aunque sea el mismo usuario — depender del id evita refetchear de más.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading]);
 
   return { 
     role, 

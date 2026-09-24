@@ -144,7 +144,11 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [user, roleLoading, companyId]);
+  // user?.id (no el objeto user): Supabase entrega un `user` con nueva
+  // referencia en cada refresh de token (p. ej. al volver de otra pestaña),
+  // y depender del objeto reiniciaba todo el listado de órdenes de la nada.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [user?.id, roleLoading, companyId]);
 
   // Load branches for admin filter
   useEffect(() => {

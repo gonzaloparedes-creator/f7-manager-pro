@@ -458,7 +458,10 @@ export default function Reports() {
       setLoading(false);
     };
     load();
-  }, [user, companyId, planLoading, hasTaller, hasTienda]);
+    // user?.id (no el objeto user): ver Dashboard.tsx — evita reiniciar el
+    // reporte por un simple refresh de token al volver de otra pestaña.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, companyId, planLoading, hasTaller, hasTienda]);
 
   const { from, to } = useMemo(() => getRange(timeframe, customRange), [timeframe, customRange]);
 

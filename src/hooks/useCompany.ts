@@ -27,7 +27,12 @@ export function useCompany() {
         setLoading(false);
       });
     return () => { active = false; };
-  }, [user, authLoading]);
+    // Supabase emite un evento de auth (con un objeto `user` nuevo, aunque
+    // sea el mismo usuario) cada vez que la pestaña vuelve a estar visible
+    // (auto-refresh de token). Depender del objeto entero re-disparaba este
+    // fetch en cada cambio de pestaña; con el id alcanza y sobra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading]);
 
   return { companyId, loading: loading || authLoading };
 }

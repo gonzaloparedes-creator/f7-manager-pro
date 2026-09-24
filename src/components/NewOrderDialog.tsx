@@ -194,7 +194,8 @@ export default function NewOrderDialog({
       .eq("company_id", companyId)
       .order("name", { ascending: true })
       .then(({ data }) => setClients((data ?? []) as ClientLite[]));
-  }, [open, user, companyId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user?.id, companyId]);
 
   // Auto-save draft to localStorage on every form change
   useEffect(() => {
