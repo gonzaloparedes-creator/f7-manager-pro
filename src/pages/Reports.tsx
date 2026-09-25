@@ -24,11 +24,13 @@ import { useToast } from "@/hooks/use-toast";
 interface CargoAdicional { motivo: string; monto: number }
 interface OrderRow {
   id: string;
+  status: string;
   quote_amount: number | null;
   senia_amount: number | null;
   cargos_adicionales: CargoAdicional[] | null;
   deposit_date: string | null;
   final_payment_date: string | null;
+  delivered_at: string | null;
   current_branch_id: string | null;
   assigned_technician_id: string | null;
   device_type: string | null;
@@ -187,6 +189,41 @@ function revenueByField(
     }
   }
   return map;
+}
+
+/**
+ * Cuenta equipos efectivamente entregados (reparados) en el rango, agrupados
+ * por una clave arbitraria (device_type, marca o modelo) — a diferencia de
+ * revenueByField, esto NO mira cuándo se cobró sino cuándo se entregó
+ * (delivered_at), que es la pregunta operativa "cuántos se repararon", no la
+ * contable "cuánto ingreso se reconoció".
+ */
+function repairCountByField(
+  orders: OrderRow[], from: Date | null, to: Date | null,
+  getKey: (o: OrderRow) => string | null
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const o of orders) {
+    if (o.status !== "entregado" || !inRange(o.delivered_at, from, to)) continue;
+    const key = getKey(o)?.trim() || "Sin especificar";
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+  return map;
+}
+
+type CategoryMargin = { revenue: number; cost: number; count: number };
+
+function withRepairCounts(
+  revenue: Map<string, { revenue: number; cost: number }>,
+  counts: Map<string, number>
+): Map<string, CategoryMargin> {
+  const keys = new Set([...revenue.keys(), ...counts.keys()]);
+  const out = new Map<string, CategoryMargin>();
+  for (const key of keys) {
+    const r = revenue.get(key) ?? { revenue: 0, cost: 0 };
+    out.set(key, { revenue: r.revenue, cost: r.cost, count: counts.get(key) ?? 0 });
+  }
+  return out;
 }
 
 function salesRevenueInRange(sales: SaleRow[], from: Date | null, to: Date | null) {
@@ -400,7 +437,7 @@ export default function Reports() {
         if (!hasTaller) return;
         const { data: o, error: oErr } = await supabase
           .from("orders")
-          .select("id, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, current_branch_id, assigned_technician_id, device_type, marca, modelo")
+          .select("id, status, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, delivered_at, current_branch_id, assigned_technician_id, device_type, marca, modelo")
           .eq("company_id", companyId);
         if (oErr) hadError = true;
         const orderIds = (o ?? []).map((x: any) => x.id);
@@ -484,17 +521,26 @@ export default function Reports() {
     [hasTienda, sales, from, to]
   );
 
-  const gananciaPorEquipo = useMemo(
-    () => (hasTaller && useDeviceClassification) ? revenueByField(orders, parts, from, to, (o) => o.device_type) : new Map<string, { revenue: number; cost: number }>(),
-    [hasTaller, useDeviceClassification, orders, parts, from, to]
-  );
-  const gananciaPorMarca = useMemo(
-    () => (hasTaller && useDeviceClassification) ? revenueByField(orders, parts, from, to, (o) => o.marca) : new Map<string, { revenue: number; cost: number }>(),
-    [hasTaller, useDeviceClassification, orders, parts, from, to]
-  );
+  const gananciaPorEquipo = useMemo(() => {
+    if (!hasTaller || !useDeviceClassification) return new Map<string, CategoryMargin>();
+    return withRepairCounts(
+      revenueByField(orders, parts, from, to, (o) => o.device_type),
+      repairCountByField(orders, from, to, (o) => o.device_type)
+    );
+  }, [hasTaller, useDeviceClassification, orders, parts, from, to]);
+  const gananciaPorMarca = useMemo(() => {
+    if (!hasTaller || !useDeviceClassification) return new Map<string, CategoryMargin>();
+    return withRepairCounts(
+      revenueByField(orders, parts, from, to, (o) => o.marca),
+      repairCountByField(orders, from, to, (o) => o.marca)
+    );
+  }, [hasTaller, useDeviceClassification, orders, parts, from, to]);
   const gananciaPorModeloTop = useMemo(() => {
-    if (!hasTaller || !useDeviceClassification) return new Map<string, { revenue: number; cost: number }>();
-    const full = revenueByField(orders, parts, from, to, (o) => o.modelo);
+    if (!hasTaller || !useDeviceClassification) return new Map<string, CategoryMargin>();
+    const full = withRepairCounts(
+      revenueByField(orders, parts, from, to, (o) => o.modelo),
+      repairCountByField(orders, from, to, (o) => o.modelo)
+    );
     const top = Array.from(full.entries()).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 8);
     return new Map(top);
   }, [hasTaller, useDeviceClassification, orders, parts, from, to]);
@@ -906,7 +952,7 @@ function CostByCategoryCard({ title, rows }: { title: string; rows: Map<string, 
   );
 }
 
-function MarginByCategoryCard({ title, rows, icon = Tags }: { title: string; rows: Map<string, { revenue: number; cost: number }>; icon?: any }) {
+function MarginByCategoryCard({ title, rows, icon = Tags }: { title: string; rows: Map<string, CategoryMargin>; icon?: any }) {
   const sorted = Array.from(rows.entries()).sort((a, b) => b[1].revenue - a[1].revenue);
   return (
     <BreakdownCardShell title={title} icon={icon}>
@@ -915,6 +961,7 @@ function MarginByCategoryCard({ title, rows, icon = Tags }: { title: string; row
           <thead>
             <tr className="text-xs text-muted-foreground">
               <th className="pb-1 text-left font-normal">Categoría</th>
+              <th className="pb-1 text-right font-normal">Reparados</th>
               <th className="pb-1 text-right font-normal">Ingresos</th>
               <th className="pb-1 text-right font-normal">Ganancia</th>
             </tr>
@@ -923,6 +970,7 @@ function MarginByCategoryCard({ title, rows, icon = Tags }: { title: string; row
             {sorted.map(([label, v]) => (
               <tr key={label} className="border-t border-border/50">
                 <td className="py-1.5 text-foreground">{label}</td>
+                <td className="py-1.5 text-right text-muted-foreground">{v.count}</td>
                 <td className="py-1.5 text-right">{formatPYG(v.revenue)}</td>
                 <td className={cn("py-1.5 text-right font-medium", v.revenue - v.cost >= 0 ? "text-primary" : "text-destructive")}>
                   {formatPYG(v.revenue - v.cost)}

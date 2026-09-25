@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { StatusBadge } from "@/components/StatusBadge";
-import { resolveStatusLabel } from "@/lib/orders";
+import { resolveStatusLabel, isClosedOrderStatus } from "@/lib/orders";
 import { CalendarDays, Smartphone, X } from "lucide-react";
 import { isBefore, isSameDay, startOfDay } from "date-fns";
 import { format } from "date-fns";
@@ -33,7 +33,7 @@ export default function DeliveryCalendarDialog({ open, onOpenChange, orders, sta
 
   const deliveries = useMemo(() => {
     return orders
-      .filter((o) => o.estimated_delivery_date && o.status !== "entregado" && o.status !== "presupuesto" && o.status !== "retirado_sin_reparar")
+      .filter((o) => o.estimated_delivery_date && o.status !== "presupuesto" && !isClosedOrderStatus(o.status))
       .map((o) => ({ ...o, date: new Date(o.estimated_delivery_date + "T00:00:00") }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [orders]);

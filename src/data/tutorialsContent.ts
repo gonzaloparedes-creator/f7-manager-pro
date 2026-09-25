@@ -58,7 +58,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Buscar y filtrar órdenes",
         body: [
           "El buscador de arriba filtra por nombre del cliente, número de orden, tipo de equipo, IMEI, marca/modelo o teléfono — no hace falta escribir el dato completo, con una parte alcanza.",
-          "Debajo del buscador hay chips de estado (por ejemplo \"Recibido\", \"En reparación\", \"Listo\") que se arman automáticamente según los estados que tenga configurados tu taller en Configuración → Estados. También hay dos chips fijos: \"Activas\" (todo lo que no está entregado, retirado sin reparar, ni es un presupuesto) y \"Presupuestos\".",
+          "Debajo del buscador hay chips de estado (por ejemplo \"Recibido\", \"En reparación\", \"Listo\") que se arman automáticamente según los estados que tenga configurados tu taller en Configuración → Estados. También hay dos chips fijos: \"Activas\" (todo lo que no está entregado, enviado, retirado sin reparar, ni es un presupuesto) y \"Presupuestos\".",
           "Si tu taller tiene más de una sucursal, los administradores ven además un filtro para mirar una sucursal a la vez o todas juntas.",
         ],
         images: [{ file: "ordenes-buscar-01.png", alt: "Buscador y filtros de estado en el Dashboard" }],
@@ -414,6 +414,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Además del total general, hay tablas que separan la ganancia por categoría de producto (en Tienda) y, si tu taller activó la \"Clasificación por marca/modelo\" en Configuración → Accesorios, por tipo de equipo, por marca y por modelo (esta última limitada a los 8 modelos con más ingresos, para que sea un reporte legible y no una lista interminable).",
           "Esto sirve para saber, por ejemplo, si tu taller gana más reparando celulares Apple o notebooks, sin tener que revisar orden por orden.",
+          "La columna \"Reparados\" cuenta cuántos equipos de cada tipo/marca/modelo se entregaron efectivamente dentro del rango de fechas elegido — es la cantidad de reparaciones completadas, no cuántas órdenes tocan esa categoría en total (una orden todavía en el taller no suma acá hasta que se entrega).",
           "\"Ventas por categoría\" además se puede desplegar: hacé clic en una categoría (por ejemplo \"Cargadores\") para ver qué producto puntual del catálogo se vendió adentro, no solo el total de la categoría.",
         ],
         images: [{ file: "reportes-categorias-01.png", alt: "Ganancia por categoría, tipo de equipo, marca y modelo" }],

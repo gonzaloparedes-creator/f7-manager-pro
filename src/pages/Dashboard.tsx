@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatPYG, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
+import { formatPYG, resolveStatusLabel, isClosedOrderStatus, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
@@ -180,7 +180,7 @@ export default function Dashboard() {
   }, [branchScoped]);
 
   const filteredByStatus = filter === "todos"
-    ? branchScoped.filter((o) => o.status !== "entregado" && o.status !== "presupuesto" && o.status !== "retirado_sin_reparar")
+    ? branchScoped.filter((o) => o.status !== "presupuesto" && !isClosedOrderStatus(o.status))
     : branchScoped.filter((o) => o.status === filter);
 
   const searchQuery = search.trim().toLowerCase();

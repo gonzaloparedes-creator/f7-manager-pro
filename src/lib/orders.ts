@@ -11,6 +11,15 @@ export type OrderStatus =
   | "garantia"
   | "retirado_sin_reparar";
 
+// Estados en los que el equipo ya no está físicamente en el taller (se
+// entregó, se envió, o el cliente lo retiró sin repararlo) — se usan para
+// sacar la orden de "Activas" y del calendario de entregas pendientes.
+const CLOSED_ORDER_STATUSES: readonly string[] = ["entregado", "enviado", "retirado_sin_reparar"];
+
+export function isClosedOrderStatus(status: string): boolean {
+  return CLOSED_ORDER_STATUSES.includes(status);
+}
+
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   presupuesto: "Presupuesto",
   recibido: "Recibido",
