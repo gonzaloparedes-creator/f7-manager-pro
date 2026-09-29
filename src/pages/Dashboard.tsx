@@ -66,6 +66,10 @@ const FIXED_FILTERS: { value: string; label: string }[] = [
   { value: "presupuesto", label: "Presupuestos" },
 ];
 
+// Estados que cuentan como "En proceso" en la tarjeta resumen — se
+// comparten entre el cálculo del número y el filtro que dispara al tocarla.
+const EN_PROCESO_STATUSES = ["recibido", "en_diagnostico", "en_reparacion"];
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -174,13 +178,20 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const real = branchScoped.filter((o) => o.status !== "presupuesto");
     const total = real.length;
-    const pending = real.filter((o) => ["recibido", "en_diagnostico", "en_reparacion"].includes(o.status)).length;
+    const pending = real.filter((o) => EN_PROCESO_STATUSES.includes(o.status)).length;
     const ready = real.filter((o) => o.status === "listo").length;
     return { total, pending, ready };
   }, [branchScoped]);
 
+  // "total" y "en_proceso" son filtros virtuales que solo disparan las
+  // tarjetas resumen de arriba (no tienen chip propio) — representan
+  // exactamente los mismos criterios usados para calcular stats.total/pending.
   const filteredByStatus = filter === "todos"
     ? branchScoped.filter((o) => o.status !== "presupuesto" && !isClosedOrderStatus(o.status))
+    : filter === "total"
+    ? branchScoped.filter((o) => o.status !== "presupuesto")
+    : filter === "en_proceso"
+    ? branchScoped.filter((o) => EN_PROCESO_STATUSES.includes(o.status))
     : branchScoped.filter((o) => o.status === filter);
 
   const searchQuery = search.trim().toLowerCase();
@@ -243,9 +254,18 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard icon={Package} label="Total" value={stats.total} />
-        <StatCard icon={Clock} label="En proceso" value={stats.pending} accent="text-[hsl(var(--status-reparacion))]" />
-        <StatCard icon={CheckCircle2} label="Listas para retirar" value={stats.ready} accent="text-[hsl(var(--status-listo))]" />
+        <StatCard
+          icon={Package} label="Total" value={stats.total}
+          active={filter === "total"} onClick={() => setFilter((f) => (f === "total" ? "todos" : "total"))}
+        />
+        <StatCard
+          icon={Clock} label="En proceso" value={stats.pending} accent="text-[hsl(var(--status-reparacion))]"
+          active={filter === "en_proceso"} onClick={() => setFilter((f) => (f === "en_proceso" ? "todos" : "en_proceso"))}
+        />
+        <StatCard
+          icon={CheckCircle2} label="Listas para retirar" value={stats.ready} accent="text-[hsl(var(--status-listo))]"
+          active={filter === "listo"} onClick={() => setFilter((f) => (f === "listo" ? "todos" : "listo"))}
+        />
       </div>
 
       <div className="relative">
@@ -481,9 +501,27 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: string; value: number; accent?: string }) {
+function StatCard({
+  icon: Icon, label, value, accent, active, onClick,
+}: { icon: any; label: string; value: number; accent?: string; active?: boolean; onClick?: () => void }) {
+  const clickable = !!onClick;
   return (
-    <Card>
+    <Card
+      className={cn(
+        clickable && "cursor-pointer transition-colors hover:border-primary/50",
+        active && "border-primary bg-primary/5"
+      )}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-pressed={clickable ? !!active : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (clickable && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+    >
       <CardContent className="flex items-center justify-between p-4">
         <div>
           <div className="text-sm text-muted-foreground">{label}</div>

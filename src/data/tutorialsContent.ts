@@ -58,6 +58,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Buscar y filtrar órdenes",
         body: [
           "El buscador de arriba filtra por nombre del cliente, número de orden, tipo de equipo, IMEI, marca/modelo o teléfono — no hace falta escribir el dato completo, con una parte alcanza.",
+          "Las tres tarjetas resumen de arriba (\"Total\", \"En proceso\", \"Listas para retirar\") también funcionan como filtro: tocá una para ver solo esas órdenes, y tocala de nuevo para volver a \"Activas\".",
           "Debajo del buscador hay chips de estado (por ejemplo \"Recibido\", \"En reparación\", \"Listo\") que se arman automáticamente según los estados que tenga configurados tu taller en Configuración → Estados. También hay dos chips fijos: \"Activas\" (todo lo que no está entregado, enviado, retirado sin reparar, ni es un presupuesto) y \"Presupuestos\".",
           "Si tu taller tiene más de una sucursal, los administradores ven además un filtro para mirar una sucursal a la vez o todas juntas.",
         ],
