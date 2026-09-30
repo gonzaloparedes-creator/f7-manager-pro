@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt, Cpu } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -24,6 +24,7 @@ const baseNav = [
   { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true },
   { to: "/cierre-caja", label: "Caja", icon: Wallet, proOnly: true, businessOnly: false, adminOnly: false },
   { to: "/gastos", label: "Gastos", icon: Receipt, proOnly: true, businessOnly: false, adminOnly: false },
+  { to: "/panic-full", label: "Panic Full", icon: Cpu, proOnly: true, businessOnly: false, adminOnly: false },
   { to: "/como-usar", label: "Cómo usar", icon: BookOpen, proOnly: false, businessOnly: false, adminOnly: false },
 ];
 const adminNav = [
@@ -57,7 +58,7 @@ export default function AppLayout() {
   // así que en mobile viven como íconos en el header en vez de competir por
   // espacio en la barra inferior. En desktop el sidebar tiene lugar de sobra.
   const mobileNav = useMemo(
-    () => nav.filter((i) => i.to !== "/configuracion" && i.to !== "/superadmin" && i.to !== "/como-usar" && i.to !== "/cierre-caja" && i.to !== "/gastos"),
+    () => nav.filter((i) => i.to !== "/configuracion" && i.to !== "/superadmin" && i.to !== "/como-usar" && i.to !== "/cierre-caja" && i.to !== "/gastos" && i.to !== "/panic-full"),
     [nav]
   );
   useEffect(() => {

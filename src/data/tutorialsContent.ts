@@ -11,6 +11,7 @@ import {
   QrCode,
   Wallet,
   Receipt,
+  Cpu,
 } from "lucide-react";
 
 export interface TutorialImageRef {
@@ -502,6 +503,33 @@ export const tutorialCategories: TutorialCategory[] = [
           "Los gastos pagados en efectivo (tanto de contado como cuotas abonadas en efectivo) se descuentan automáticamente del efectivo esperado en Caja → Cierre — no hace falta anotarlos dos veces.",
         ],
         images: [{ file: "gastos-abonar-01.png", alt: "Abonar una cuota de un gasto a crédito" }],
+      },
+    ],
+  },
+  {
+    id: "panic-full",
+    label: "Panic Full",
+    icon: Cpu,
+    description: "Analizá el registro de un iPhone que se reinicia solo y mirá la falla probable y qué revisar primero.",
+    note: "Todo el equipo · Disponible en los planes Pro y Business.",
+    topics: [
+      {
+        id: "analizar",
+        title: "Analizar un archivo panic-full",
+        body: [
+          "Exportá del iPhone el archivo que empieza con \"panic-full\" (extensión .ips) con 3uTools u otra herramienta, o desde el propio iPhone en Ajustes → Privacidad y seguridad → Analítica y mejoras → Datos de analítica. Después arrastralo a la pantalla Panic Full (o hacé clic para elegirlo). También podés pegar el texto del log.",
+          "El resultado muestra el modelo del equipo, la falla más probable, si parece de hardware o de software, el nivel de confianza, la línea del log que lo respalda, los componentes a revisar y qué verificar. Si hay otras posibilidades menos probables, aparecen plegadas debajo.",
+          "El archivo se analiza en tu navegador: no se sube ni se guarda en ningún servidor.",
+        ],
+      },
+      {
+        id: "interpretar",
+        title: "Cómo interpretar el resultado",
+        body: [
+          "Es un diagnóstico orientativo basado en patrones conocidos: te dice por dónde empezar, pero no reemplaza la revisión del equipo. La confianza \"alta\" significa que el log nombra el componente (por ejemplo un sensor faltante); \"baja\" es un punto de partida.",
+          "Si subís varios logs del mismo equipo a la vez, se marca el patrón que se repite: una misma falla en varios reinicios es una señal mucho más fuerte que un solo log.",
+          "\"Copiar informe\" arma un resumen en texto para pegar en WhatsApp o en las notas de una orden.",
+        ],
       },
     ],
   },
