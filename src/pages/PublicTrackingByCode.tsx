@@ -24,6 +24,7 @@ interface PublicOrder {
   created_at: string;
   updated_at: string;
   quote_amount?: number | null;
+  original_quote_amount?: number | null;
   deposit_amount?: number | null;
   cargos_adicionales?: CargoAdicional[] | null;
   problems?: string[] | null;
@@ -313,6 +314,8 @@ export default function PublicTrackingByCode() {
           const cargos = order.cargos_adicionales ?? [];
           const documents = order.financial_documents ?? [];
           const quote = Number(order.quote_amount ?? 0);
+          const presupuestoInicial = Number(order.original_quote_amount ?? quote);
+          const ajustePrecio = quote - presupuestoInicial;
           const deposit = Number(order.deposit_amount ?? 0);
           const cargosTotal = cargos.reduce((s, c) => s + Number(c.monto || 0), 0);
           const totalAjustado = quote + cargosTotal;
@@ -328,8 +331,16 @@ export default function PublicTrackingByCode() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Presupuesto inicial</span>
-                      <span className="font-medium">{formatPYG(quote)}</span>
+                      <span className="font-medium">{formatPYG(presupuestoInicial)}</span>
                     </div>
+                    {ajustePrecio !== 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Ajuste de precio</span>
+                        <span className="font-medium">
+                          {ajustePrecio < 0 ? "- " : "+ "}{formatPYG(Math.abs(ajustePrecio))}
+                        </span>
+                      </div>
+                    )}
                     {cargos.length > 0 && (
                       <div className="space-y-1.5 rounded-md border border-dashed border-border p-2">
                         <div className="text-xs font-medium text-muted-foreground">Cargos adicionales</div>

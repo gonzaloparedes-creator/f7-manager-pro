@@ -988,6 +988,7 @@ export type Database = {
           marca: string | null
           modelo: string | null
           order_number: string
+          original_quote_amount: number | null
           photos: string[]
           problem_description: string | null
           problem_other: string | null
@@ -1041,6 +1042,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           order_number: string
+          original_quote_amount?: number | null
           photos?: string[]
           problem_description?: string | null
           problem_other?: string | null
@@ -1094,6 +1096,7 @@ export type Database = {
           marca?: string | null
           modelo?: string | null
           order_number?: string
+          original_quote_amount?: number | null
           photos?: string[]
           problem_description?: string | null
           problem_other?: string | null
@@ -1457,6 +1460,7 @@ export type Database = {
           marca: string
           modelo: string
           order_number: string
+          original_quote_amount: number
           photos: string[]
           problem_description: string
           problem_other: string
@@ -1489,6 +1493,7 @@ export type Database = {
           marca: string
           modelo: string
           order_number: string
+          original_quote_amount: number
           photos: string[]
           problem_description: string
           problem_other: string

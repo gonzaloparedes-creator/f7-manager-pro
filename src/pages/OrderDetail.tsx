@@ -44,7 +44,7 @@ interface Order {
   device_type: string; problem_description: string; photos: string[]; status: string;
   technician_notes: string | null; tracking_token: string; created_at: string;
   imei: string | null; marca?: string | null; modelo?: string | null; problems: string[]; problem_other: string | null;
-  quote_amount: number; deposit_amount: number; deposit_payment_method: string | null; estimated_delivery_date: string | null;
+  quote_amount: number; original_quote_amount?: number | null; deposit_amount: number; deposit_payment_method: string | null; estimated_delivery_date: string | null;
   device_pin: string | null; device_pattern: number[] | null; client_signature: string | null;
   cargos_adicionales: CargoAdicional[];
   financial_documents: FinancialDocument[];
@@ -953,6 +953,8 @@ export default function OrderDetail() {
             const cargosTotal = cargos.reduce((s, c) => s + Number(c.monto || 0), 0);
             const totalAjustado = Number(order.quote_amount ?? 0) + cargosTotal;
             const saldo = Math.max(0, totalAjustado - Number(order.deposit_amount ?? 0));
+            const presupuestoInicial = Number(order.original_quote_amount ?? order.quote_amount ?? 0);
+            const ajustePrecio = Number(order.quote_amount ?? 0) - presupuestoInicial;
             return (
             <Card>
               <CardContent className="space-y-3 p-4">
@@ -977,7 +979,7 @@ export default function OrderDetail() {
                 {editingFinance ? (
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-quote" className="text-xs text-muted-foreground">Presupuesto inicial (Gs.)</Label>
+                      <Label htmlFor="edit-quote" className="text-xs text-muted-foreground">Precio del presupuesto (Gs.)</Label>
                       <Input
                         id="edit-quote"
                         type="number"
@@ -986,6 +988,9 @@ export default function OrderDetail() {
                         value={editQuote}
                         onChange={(e) => setEditQuote(e.target.value)}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Si cambiás el precio, el presupuesto inicial original se conserva como registro.
+                      </p>
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="edit-deposit" className="text-xs text-muted-foreground">Seña / Pagado (Gs.)</Label>
@@ -1041,8 +1046,17 @@ export default function OrderDetail() {
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Presupuesto inicial</span>
-                        <span className="font-medium">{formatPYG(order.quote_amount)}</span>
+                        <span className="font-medium">{formatPYG(presupuestoInicial)}</span>
                       </div>
+
+                      {ajustePrecio !== 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Ajuste de precio</span>
+                          <span className={cn("font-medium", ajustePrecio < 0 ? "text-destructive" : "text-foreground")}>
+                            {ajustePrecio < 0 ? "- " : "+ "}{formatPYG(Math.abs(ajustePrecio))}
+                          </span>
+                        </div>
+                      )}
 
                       {cargos.length > 0 && (
                         <div className="space-y-1.5 rounded-md border border-dashed border-border p-2">
