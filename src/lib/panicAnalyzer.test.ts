@@ -126,6 +126,42 @@ describe("reglas", () => {
     expect(analyze(ips('panic(cpu 0): "SEP ROM Boot Panic"')).findings[0].ruleId).toBe("sep-rom");
   });
 
+  describe("SEP monitor error", () => {
+    const line =
+      'panic(cpu 0 caller 0xfffffff03154aaa0): "SEP monitor error: INACCESSIBLE SEP REGISTERS SOC_PERF_STATE_CTL 0x00000333 VOLMAN_SOC_VOLTAGE 0x015f655f" @AppleT8110PlatformErrorHandler.cpp:948\nDebugger message: panic';
+
+    it("iPhone 13: placas apiladas + Face ID", () => {
+      const f = analyze(ips(line, "iPhone14,5", "iPhone OS 26.5 (23F77)")).findings[0];
+      expect(f.ruleId).toBe("sep-monitor-error");
+      expect(f.category).toBe("hardware");
+      const comps = f.components.join(" | ");
+      expect(comps).toMatch(/interposer/);
+      expect(comps).toMatch(/NFC/);
+      expect(comps).toMatch(/Wi-Fi/);
+      expect(comps).toMatch(/Face ID/);
+      expect(f.checks.join(" ")).toMatch(/interposer/);
+    });
+
+    it("iPhone 11: tiene Face ID pero no placas apiladas", () => {
+      const f = analyze(ips(line, "iPhone12,1")).findings[0];
+      const comps = f.components.join(" | ");
+      expect(comps).not.toMatch(/interposer/);
+      expect(comps).toMatch(/Face ID/);
+    });
+
+    it("iPhone 8: ni placas apiladas ni Face ID", () => {
+      const f = analyze(ips(line, "iPhone10,1")).findings[0];
+      const comps = f.components.join(" | ");
+      expect(comps).not.toMatch(/interposer|Face ID/);
+      expect(comps).toMatch(/NFC/);
+    });
+
+    it("no se confunde con el SEP ROM boot panic", () => {
+      const ids = analyze(ips(line)).findings.map((x) => x.ruleId);
+      expect(ids).not.toContain("sep-rom");
+    });
+  });
+
   it("i2c: bus 3 apunta a flex de carga", () => {
     const f = analyze(ips('panic(cpu 0): "AppleARMIIC i2c3 timeout"')).findings[0];
     expect(f.ruleId).toBe("i2c-bus");

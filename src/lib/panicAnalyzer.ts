@@ -253,7 +253,23 @@ interface Rule {
   checks: string[];
   supersededBy?: string[];
   onlyIfNoOther?: boolean;
-  refine?: (match: RegExpExecArray) => Refinement;
+  refine?: (match: RegExpExecArray, device: DeviceInfo) => Refinement;
+}
+
+const STACKED_BOARD_IDS = new Set([
+  "iPhone10,3", "iPhone10,6", "iPhone11,2", "iPhone11,4", "iPhone11,6", "iPhone12,3", "iPhone12,5",
+  "iPhone13,1", "iPhone13,2", "iPhone13,3", "iPhone13,4", "iPhone14,2", "iPhone14,3", "iPhone14,4", "iPhone14,5",
+]);
+
+const NO_FACE_ID_IDS = new Set(["iPhone10,1", "iPhone10,2", "iPhone10,4", "iPhone10,5", "iPhone12,8", "iPhone14,6"]);
+
+function hasStackedBoard(id: string | null): boolean {
+  return id !== null && STACKED_BOARD_IDS.has(id);
+}
+
+function hasFaceId(id: string | null): boolean {
+  const major = id ? Number(/^iPhone(\d+),/.exec(id)?.[1]) : NaN;
+  return Number.isFinite(major) && major >= 10 && !NO_FACE_ID_IDS.has(id as string);
 }
 
 const SENSOR_COMPONENTS: Record<string, string> = {
@@ -386,6 +402,40 @@ const RULES: Rule[] = [
       "Probar restauración en modo DFU.",
       "Si falla con errores de hardware, revisar EEPROM y NAND con micro-soldadura.",
     ],
+  },
+  {
+    id: "sep-monitor-error",
+    title: "Registros del SEP inaccesibles (SEP monitor error)",
+    category: "hardware",
+    confidence: "media",
+    pattern: /sep monitor error|inaccessible sep registers/i,
+    explanation:
+      "El manejador de errores de la plataforma no pudo leer los registros del procesador seguro (SEP). Suele indicar un problema de alimentación o de comunicación en la placa lógica: cortos, falsos contactos en la unión entre placas o un periférico que arrastra la línea.",
+    components: ["Módulo NFC", "Módulo Wi-Fi"],
+    checks: [
+      "Medir caída de tensión en las líneas de alimentación de la zona del CPU para detectar cortos o desconexiones.",
+      "Reballing o cambio del NFC.",
+      "Reballing del módulo Wi-Fi.",
+    ],
+    refine: (_m, device) => {
+      const stacked = hasStackedBoard(device.id);
+      const faceId = hasFaceId(device.id);
+      const components = [
+        ...(stacked ? ["Unión de placas (interposer entre la placa del RF y la del CPU)"] : []),
+        "Módulo NFC",
+        "Módulo Wi-Fi",
+        ...(faceId ? ["Conector del proyector de puntos y de la cámara infrarroja (Face ID)"] : []),
+      ];
+      const checks = [
+        ...(stacked
+          ? ["Medir caída de tensión en todos los pads del interposer de la placa del RF y del CPU para detectar cortos o desconexiones. Si hay problemas, reparar la unión de placas."]
+          : ["Medir caída de tensión en las líneas de alimentación de la zona del CPU para detectar cortos o desconexiones."]),
+        "Reballing o cambio del NFC.",
+        "Reballing del módulo Wi-Fi.",
+        ...(faceId ? ["Medir caída de tensión en el conector del proyector de puntos y de la cámara infrarroja."] : []),
+      ];
+      return { components, checks };
+    },
   },
   {
     id: "i2c-bus",
@@ -666,14 +716,14 @@ function evidenceAround(text: string, index: number): string {
   return `${from > start ? "…" : ""}${line}${to < end ? "…" : ""}`;
 }
 
-function runRules(text: string): Finding[] {
+function runRules(text: string, device: DeviceInfo): Finding[] {
   const hits = new Map<string, { order: number; finding: Finding }>();
 
   RULES.forEach((rule, order) => {
     const haystack = rule.strip ? text.replace(rule.strip, " ") : text;
     const m = rule.pattern.exec(haystack);
     if (!m) return;
-    const r = rule.refine?.(m) ?? {};
+    const r = rule.refine?.(m, device) ?? {};
     hits.set(rule.id, {
       order,
       finding: {
@@ -718,7 +768,7 @@ export function analyzePanicText(raw: string, fileName: string | null = null): A
   }
 
   const text = sanitizeForRules(parsed.panicText);
-  const findings = runRules(text);
+  const findings = runRules(text, parsed.device);
 
   const kextHints: KextHint[] = [];
   for (const kext of extractBacktraceKexts(text)) {
