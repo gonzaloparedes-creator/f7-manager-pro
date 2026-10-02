@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
@@ -11,9 +13,10 @@ import { useCategories } from "@/hooks/useCategories";
 import { useBranches } from "@/hooks/useBranches";
 import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
-import { Loader2, FolderPlus, Camera, Upload, X } from "lucide-react";
+import { Loader2, FolderPlus, Camera, Upload, X, Smartphone } from "lucide-react";
 import { CameraCapture } from "@/components/CameraCapture";
 import { sanitizeFilenameForStorage } from "@/lib/utils";
+import { formatPYG } from "@/lib/orders";
 
 const CREATE_CATEGORY = "__create_category__";
 const CREATE_SUBCATEGORY = "__create_subcategory__";
@@ -30,6 +33,12 @@ export interface EditableProduct {
   cost_price: number;
   selling_price: number;
   image_url: string | null;
+  is_device: boolean;
+  imei: string | null;
+  purchase_cost: number;
+  repair_cost: number;
+  repair_details: string | null;
+  notes: string | null;
 }
 
 export default function NewProductDialog({
@@ -56,6 +65,12 @@ export default function NewProductDialog({
   const [minAlert, setMinAlert] = useState("0");
   const [cost, setCost] = useState("0");
   const [price, setPrice] = useState("0");
+  const [isDevice, setIsDevice] = useState(false);
+  const [imei, setImei] = useState("");
+  const [purchaseCost, setPurchaseCost] = useState("0");
+  const [repairCost, setRepairCost] = useState("0");
+  const [repairDetails, setRepairDetails] = useState("");
+  const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -82,6 +97,16 @@ export default function NewProductDialog({
   const reset = () => {
     setName(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
     setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setFile(null); setPreview(null);
+    setIsDevice(false); setImei(""); setPurchaseCost("0"); setRepairCost("0"); setRepairDetails(""); setNotes("");
+  };
+
+  const toggleDevice = (on: boolean) => {
+    setIsDevice(on);
+    if (!on) return;
+    // Un equipo es una unidad única: arranca con stock 1 y su costo actual
+    // pasa a ser el costo de compra para no tener que volver a tipearlo.
+    if (!(parseInt(stock) > 0)) setStock("1");
+    if (!(parseFloat(purchaseCost) > 0) && parseFloat(cost) > 0) setPurchaseCost(cost);
   };
 
   // Precarga el formulario con el producto a editar cada vez que se abre.
@@ -96,6 +121,12 @@ export default function NewProductDialog({
       setMinAlert(String(editItem.min_stock_alert));
       setCost(String(editItem.cost_price));
       setPrice(String(editItem.selling_price));
+      setIsDevice(!!editItem.is_device);
+      setImei(editItem.imei ?? "");
+      setPurchaseCost(String(editItem.purchase_cost ?? 0));
+      setRepairCost(String(editItem.repair_cost ?? 0));
+      setRepairDetails(editItem.repair_details ?? "");
+      setNotes(editItem.notes ?? "");
       setFile(null);
       setPreview(editItem.image_url);
     } else {
@@ -139,6 +170,9 @@ export default function NewProductDialog({
     setNewSubName(null);
   };
 
+  const deviceTotalCost = (parseFloat(purchaseCost) || 0) + (parseFloat(repairCost) || 0);
+  const deviceProfit = (parseFloat(price) || 0) - deviceTotalCost;
+
   const submit = async () => {
     if (!user || !companyId) return;
     if (!name.trim()) { toast.error("Ingresa un nombre"); return; }
@@ -168,11 +202,28 @@ export default function NewProductDialog({
         category_id: categoryId,
         subcategory_id: subcategoryId,
         stock: parseInt(stock) || 0,
-        min_stock_alert: parseInt(minAlert) || 0,
-        cost_price: parseFloat(cost) || 0,
+        min_stock_alert: isDevice ? 0 : parseInt(minAlert) || 0,
+        cost_price: isDevice ? deviceTotalCost : parseFloat(cost) || 0,
         selling_price: parseFloat(price) || 0,
         image_url,
+        is_device: isDevice,
+        imei: isDevice ? imei.trim() || null : null,
+        purchase_cost: isDevice ? parseFloat(purchaseCost) || 0 : 0,
+        repair_cost: isDevice ? parseFloat(repairCost) || 0 : 0,
+        repair_details: isDevice ? repairDetails.trim() || null : null,
+        notes: isDevice ? notes.trim() || null : null,
       };
+
+      if (isDevice && payload.imei) {
+        const dup = supabase
+          .from("inventory_items")
+          .select("name")
+          .eq("company_id", companyId)
+          .eq("imei", payload.imei)
+          .limit(1);
+        const { data: dupData } = editItem ? await dup.neq("id", editItem.id) : await dup;
+        if (dupData?.length) toast.warning(`Ojo: ya hay otro producto con este IMEI ("${dupData[0].name}").`);
+      }
 
       if (editItem) {
         const { error } = await (supabase as any).from("inventory_items").update(payload).eq("id", editItem.id);
@@ -209,7 +260,7 @@ export default function NewProductDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editItem ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
           <DialogDescription>
@@ -222,8 +273,32 @@ export default function NewProductDialog({
         <div className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="product-name">Nombre</Label>
-            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Funda iPhone 13 transparente" />
+            <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={isDevice ? "Ej: iPhone 13 128GB negro" : "Ej: Funda iPhone 13 transparente"} />
           </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5">
+            <div className="min-w-0">
+              <Label htmlFor="product-is-device" className="flex items-center gap-1.5">
+                <Smartphone className="h-3.5 w-3.5" /> Es un equipo (celular)
+              </Label>
+              <p className="text-xs text-muted-foreground">Unidad única con IMEI, costo de compra, repuestos y notas.</p>
+            </div>
+            <Switch id="product-is-device" checked={isDevice} onCheckedChange={toggleDevice} />
+          </div>
+
+          {isDevice && (
+            <div className="grid gap-2">
+              <Label htmlFor="product-imei">IMEI</Label>
+              <Input
+                id="product-imei"
+                inputMode="numeric"
+                maxLength={20}
+                value={imei}
+                onChange={(e) => setImei(e.target.value)}
+                placeholder="Ej: 356938035643809"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
@@ -303,20 +378,61 @@ export default function NewProductDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="product-min-alert">Alerta mín.</Label>
-              <Input id="product-min-alert" type="number" min={0} value={minAlert} onChange={(e) => setMinAlert(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="product-cost">Costo (Gs.)</Label>
-              <Input id="product-cost" type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="product-price">Precio venta (Gs.)</Label>
-            <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
-          </div>
+          {isDevice ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="product-purchase-cost">Costo de compra (Gs.)</Label>
+                  <Input id="product-purchase-cost" type="number" min={0} step="1" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} placeholder="Gs. 0" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="product-repair-cost">Repuestos (Gs.)</Label>
+                  <Input id="product-repair-cost" type="number" min={0} step="1" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} placeholder="Gs. 0" />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="product-repair-details">Qué repuestos le pusiste (opcional)</Label>
+                <Input id="product-repair-details" value={repairDetails} onChange={(e) => setRepairDetails(e.target.value)} placeholder="Ej: Pantalla original + batería" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="product-price">Precio venta (Gs.)</Label>
+                <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
+              </div>
+              <div className="grid gap-1 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Costo total (compra + repuestos)</span>
+                  <span className="font-medium">{formatPYG(deviceTotalCost)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Ganancia estimada</span>
+                  <span id="device-profit" className={deviceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
+                    {formatPYG(deviceProfit)}
+                  </span>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="product-notes">Notas (opcional)</Label>
+                <Textarea id="product-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Ej: viene con cargador, detalle en el marco, comprado a Juan…" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="product-min-alert">Alerta mín.</Label>
+                  <Input id="product-min-alert" type="number" min={0} value={minAlert} onChange={(e) => setMinAlert(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="product-cost">Costo (Gs.)</Label>
+                  <Input id="product-cost" type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="product-price">Precio venta (Gs.)</Label>
+                <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
+              </div>
+            </>
+          )}
 
           <div className="grid gap-2">
             <Label>Imagen (opcional)</Label>

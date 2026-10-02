@@ -74,6 +74,20 @@ export default function ProductPreviewDialog({
             </div>
           )}
 
+          {product.is_device && (product.imei || product.repair_details || product.notes) && (
+            <div className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
+              {product.imei && (
+                <div><span className="text-muted-foreground">IMEI: </span><span className="font-medium">{product.imei}</span></div>
+              )}
+              {product.repair_details && (
+                <div><span className="text-muted-foreground">Repuestos: </span>{product.repair_details}</div>
+              )}
+              {product.notes && (
+                <div className="whitespace-pre-wrap"><span className="text-muted-foreground">Notas: </span>{product.notes}</div>
+              )}
+            </div>
+          )}
+
           <div>
             {outOfStock ? (
               <Badge variant="destructive" className="gap-1">

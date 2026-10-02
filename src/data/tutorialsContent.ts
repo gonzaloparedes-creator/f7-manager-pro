@@ -362,6 +362,16 @@ export const tutorialCategories: TutorialCategory[] = [
         images: [{ file: "productos-catalogo-01.png", alt: "Catálogo de productos y estadísticas" }],
       },
       {
+        id: "equipos",
+        title: "Vender celulares (equipos con IMEI)",
+        body: [
+          "Al crear un producto, activá el switch \"Es un equipo (celular)\" para cargar un celular usado o reacondicionado como unidad única: el stock arranca en 1 y aparecen los campos IMEI, \"Costo de compra\", \"Repuestos\" (cuánto gastaste en repararlo), \"Qué repuestos le pusiste\", el precio de venta y una caja de notas para cualquier anotación (accesorios incluidos, estado, garantía, etc.).",
+          "Mientras cargás los montos, el sistema suma compra + repuestos como costo total y te muestra la \"Ganancia estimada\" (precio de venta menos costo total), en verde si ganás y en rojo si el precio no cubre el costo.",
+          "El IMEI se puede buscar desde el buscador del catálogo, y el equipo se distingue por la etiqueta \"Equipo\" en su tarjeta. El detalle (IMEI, repuestos y notas) se ve tocando la tarjeta. Si cargás un IMEI que ya existe en otro producto, el sistema te avisa pero te deja guardar (por si recompraste un equipo que habías vendido).",
+          "Se vende igual que cualquier producto, desde el carrito. El costo total queda registrado en la venta, así Reportes calcula la ganancia real del equipo (incluyendo lo que gastaste en repuestos) sin pasos extra.",
+        ],
+      },
+      {
         id: "vender",
         title: "Vender con el carrito (POS)",
         body: [

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
@@ -37,6 +37,12 @@ export type Product = {
   cost_price: number;
   selling_price: number;
   image_url: string | null;
+  is_device: boolean;
+  imei: string | null;
+  purchase_cost: number;
+  repair_cost: number;
+  repair_details: string | null;
+  notes: string | null;
 };
 
 type Sale = {
@@ -149,7 +155,7 @@ export default function Products() {
     const [{ data: productsData, error: pErr }, { data: salesData, error: sErr }] = await Promise.all([
       (supabase as any)
         .from("inventory_items")
-        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url")
+        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, purchase_cost, repair_cost, repair_details, notes")
         .eq("company_id", companyId)
         .eq("is_for_sale", true)
         .order("created_at", { ascending: false }),
@@ -206,7 +212,8 @@ export default function Products() {
   const isLowOrOutOfStock = (i: Product) => i.stock <= 0 || i.stock <= i.min_stock_alert;
 
   const filtered = items.filter((i) => {
-    const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchesSearch = i.name.toLowerCase().includes(q) || (!!i.imei && i.imei.includes(search.trim()));
     const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
     const matchesStock = stockFilter === "all" || isLowOrOutOfStock(i);
     return matchesSearch && matchesBranch && matchesStock;
@@ -304,6 +311,9 @@ export default function Products() {
               <div>
                 <div className="font-semibold text-foreground">{i.name}</div>
                 <div className="text-sm font-medium text-primary">{formatPYG(i.selling_price)}</div>
+                {i.is_device && i.imei && (
+                  <div className="text-[11px] text-muted-foreground">IMEI {i.imei}</div>
+                )}
               </div>
             </div>
             <div className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
@@ -318,8 +328,13 @@ export default function Products() {
             </div>
           </div>
 
-          {(cat || i.branch_id) && (
+          {(cat || i.branch_id || i.is_device) && (
             <div className="flex flex-wrap items-center gap-1">
+              {i.is_device && (
+                <Badge variant="outline" className="gap-1 border-primary/40 text-[11px] text-primary">
+                  <Smartphone className="h-3 w-3" /> Equipo
+                </Badge>
+              )}
               {cat && <Badge variant="outline" className="text-[11px]">{cat}</Badge>}
               {sub && <Badge variant="secondary" className="text-[10px]">{sub}</Badge>}
               {hasMultipleBranches && i.branch_id && (

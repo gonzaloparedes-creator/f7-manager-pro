@@ -576,10 +576,16 @@ export type Database = {
           created_by: string | null
           id: string
           image_url: string | null
+          imei: string | null
+          is_device: boolean
           is_for_repair: boolean
           is_for_sale: boolean
           min_stock_alert: number
           name: string
+          notes: string | null
+          purchase_cost: number
+          repair_cost: number
+          repair_details: string | null
           selling_price: number
           stock: number
           subcategory_id: string | null
@@ -594,10 +600,16 @@ export type Database = {
           created_by?: string | null
           id?: string
           image_url?: string | null
+          imei?: string | null
+          is_device?: boolean
           is_for_repair?: boolean
           is_for_sale?: boolean
           min_stock_alert?: number
           name: string
+          notes?: string | null
+          purchase_cost?: number
+          repair_cost?: number
+          repair_details?: string | null
           selling_price?: number
           stock?: number
           subcategory_id?: string | null
@@ -612,10 +624,16 @@ export type Database = {
           created_by?: string | null
           id?: string
           image_url?: string | null
+          imei?: string | null
+          is_device?: boolean
           is_for_repair?: boolean
           is_for_sale?: boolean
           min_stock_alert?: number
           name?: string
+          notes?: string | null
+          purchase_cost?: number
+          repair_cost?: number
+          repair_details?: string | null
           selling_price?: number
           stock?: number
           subcategory_id?: string | null
