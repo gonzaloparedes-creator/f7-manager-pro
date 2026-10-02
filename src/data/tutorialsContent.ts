@@ -467,6 +467,16 @@ export const tutorialCategories: TutorialCategory[] = [
         images: [{ file: "cierre-caja-comparar-01.png", alt: "Comparación de efectivo esperado vs contado" }],
       },
       {
+        id: "caja-virtual",
+        title: "Caja física y caja virtual (banco)",
+        body: [
+          "Si además de la caja con efectivo también manejás plata en el banco, activá \"Usar caja virtual (banco) además de la caja física\" en Configuración → Usuarios. Es opcional: apagado, Caja funciona exactamente igual que antes.",
+          "Con el switch activo, F7 separa el dinero en dos cajas sin que tengas que configurar nada: lo cobrado o pagado en Efectivo va a la caja física, y cualquier otro medio (transferencia, tarjeta, QR, etc.) va a la caja virtual. En el desglose cada medio de pago muestra a qué caja pertenece.",
+          "En la Apertura cargás los dos saldos: el efectivo con el que arrancás y el saldo que tenés en el banco (poné 0 si hoy no abrís con saldo en el banco). En el Cierre, cada caja se reconcilia por separado: apertura + ingresos - gastos de esa caja = lo esperado. El efectivo se cuenta a mano; el saldo real del banco es opcional — si lo cargás, F7 lo compara con lo esperado y te dice si sobró, faltó o cuadró; si lo dejás vacío, no se compara. Ojo: el saldo del banco puede incluir movimientos que no pasaron por F7, así que una diferencia ahí no siempre es un error.",
+          "Al final del Cierre ves el total esperado del día sumando ambas cajas, y el historial muestra las columnas de cada una para saber, día por día, cómo se cerró cada caja.",
+        ],
+      },
+      {
         id: "historial",
         title: "Volver a cerrar e historial",
         badge: { label: "Solo Admin" },
@@ -580,6 +590,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "A cada usuario se le asigna una sucursal, y opcionalmente un porcentaje de comisión sobre lo que factura (no disponible en los planes Starter y Retail).",
           "Un admin puede eliminar un usuario cuando alguien deja el taller (el ícono de tacho en su fila). No podés eliminarte a vos mismo ni al único admin de la empresa, y si el usuario tiene órdenes registradas a su nombre (como técnico o quien recepcionó), hay que reasignarlas primero — así no se pierde de quién es cada orden ya entregada o con garantía activa.",
           "Más abajo hay switches para ajustar qué puede ver el personal sin rol Admin: mostrar el stock disponible, permitir el acceso a Productos, a Gastos, y a hacer el Cierre de Caja (la Apertura de Caja siempre está disponible para cualquiera). Los de Gastos y Cierre de Caja afectan tanto a Staff como a Recepción; todos vienen apagados por defecto salvo Productos.",
+          "Ahí mismo está el switch \"Usar caja virtual (banco) además de la caja física\": si lo activás, la Apertura y el Cierre de Caja separan el dinero en efectivo del dinero en el banco (transferencias, tarjeta, etc.). Viene apagado por defecto.",
         ],
         images: [{ file: "configuracion-usuarios-01.png", alt: "Alta de usuarios y roles" }],
       },

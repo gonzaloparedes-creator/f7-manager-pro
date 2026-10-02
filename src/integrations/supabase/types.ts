@@ -102,9 +102,12 @@ export type Database = {
           closing_date: string
           company_id: string
           counted_cash: number
+          counted_virtual: number | null
           created_at: string
           difference: number
+          difference_virtual: number | null
           expected_cash: number
+          expected_virtual: number | null
           id: string
           notes: string | null
         }
@@ -114,9 +117,12 @@ export type Database = {
           closing_date: string
           company_id: string
           counted_cash: number
+          counted_virtual?: number | null
           created_at?: string
           difference: number
+          difference_virtual?: number | null
           expected_cash?: number
+          expected_virtual?: number | null
           id?: string
           notes?: string | null
         }
@@ -126,9 +132,12 @@ export type Database = {
           closing_date?: string
           company_id?: string
           counted_cash?: number
+          counted_virtual?: number | null
           created_at?: string
           difference?: number
+          difference_virtual?: number | null
           expected_cash?: number
+          expected_virtual?: number | null
           id?: string
           notes?: string | null
         }
@@ -158,6 +167,7 @@ export type Database = {
           opened_by: string | null
           opening_cash: number
           opening_date: string
+          opening_virtual: number
         }
         Insert: {
           company_id: string
@@ -167,6 +177,7 @@ export type Database = {
           opened_by?: string | null
           opening_cash?: number
           opening_date: string
+          opening_virtual?: number
         }
         Update: {
           company_id?: string
@@ -176,6 +187,7 @@ export type Database = {
           opened_by?: string | null
           opening_cash?: number
           opening_date?: string
+          opening_virtual?: number
         }
         Relationships: [
           {
@@ -287,6 +299,7 @@ export type Database = {
           updated_at: string
           use_device_classification: boolean
           use_device_type_presets: boolean
+          virtual_cash_enabled: boolean
           weekly_repairs_estimate: string | null
         }
         Insert: {
@@ -316,6 +329,7 @@ export type Database = {
           updated_at?: string
           use_device_classification?: boolean
           use_device_type_presets?: boolean
+          virtual_cash_enabled?: boolean
           weekly_repairs_estimate?: string | null
         }
         Update: {
@@ -345,6 +359,7 @@ export type Database = {
           updated_at?: string
           use_device_classification?: boolean
           use_device_type_presets?: boolean
+          virtual_cash_enabled?: boolean
           weekly_repairs_estimate?: string | null
         }
         Relationships: [
