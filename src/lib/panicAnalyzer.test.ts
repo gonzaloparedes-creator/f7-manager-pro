@@ -162,6 +162,38 @@ describe("reglas", () => {
     });
   });
 
+  describe("SMC: máscara de sensores", () => {
+    const smcLine = (sensors: string) =>
+      "panic(cpu 0 caller 0xfffffff039eeae08): SMC PANIC - ASSERT: target/d27/target.cpp:321: 0, SMC BSC failure, TAOC ----\n" +
+      `spreadsheet ver(*10) 40\n${sensors}\nF.sensor array 0 - 1 is 0\n\n - Misc(2) OUTBOX1 not ready\n` +
+      "ASSERT: target/d27/target.cpp:321: 0, SMC BSC failure, TAOC ----\nRTKit: RTKit-3255.120.11.release - Client: AppleSMCFirmware_H14-6164.120.29.d27.REL";
+    const real = smcLine("S.sensor array 0 - 5 is 0, 2097152, 0, 0, 0");
+
+    it("iPhone 14 con el bit 0x200000: nombra el flex de proximidad (caso real)", () => {
+      const f = analyze(ips(real, "iPhone14,7", "iPhone OS 26.5.2 (23F84)")).findings[0];
+      expect(f.ruleId).toBe("smc");
+      expect(f.title).toMatch(/proximidad/);
+      expect(f.confidence).toBe("media");
+      expect(f.components[0]).toMatch(/proximidad/);
+      expect(f.components.join(" ")).not.toMatch(/Batería/);
+    });
+
+    it("otro modelo con la misma máscara: no inventa el sensor, muestra la máscara", () => {
+      const f = analyze(ips(real, "iPhone15,2")).findings[0];
+      expect(f.ruleId).toBe("smc");
+      expect(f.confidence).toBe("baja");
+      expect(f.title).not.toMatch(/proximidad/);
+      expect(f.explanation).toContain("0x200000");
+    });
+
+    it("sin máscara de sensores o toda en cero: queda la regla general del SMC", () => {
+      const sinMascara = analyze(ips("panic(cpu 0): SMC PANIC - ASSERT: x.cpp:1, SMC BSC failure", "iPhone14,7")).findings[0];
+      expect(sinMascara.title).toMatch(/Falla del SMC/);
+      const enCero = analyze(ips(smcLine("S.sensor array 0 - 5 is 0, 0, 0, 0, 0"), "iPhone14,7")).findings[0];
+      expect(enCero.title).toMatch(/Falla del SMC/);
+    });
+  });
+
   it("i2c: bus 3 apunta a flex de carga", () => {
     const f = analyze(ips('panic(cpu 0): "AppleARMIIC i2c3 timeout"')).findings[0];
     expect(f.ruleId).toBe("i2c-bus");

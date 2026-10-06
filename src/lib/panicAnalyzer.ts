@@ -253,7 +253,7 @@ interface Rule {
   checks: string[];
   supersededBy?: string[];
   onlyIfNoOther?: boolean;
-  refine?: (match: RegExpExecArray, device: DeviceInfo) => Refinement;
+  refine?: (match: RegExpExecArray, device: DeviceInfo, text: string) => Refinement;
 }
 
 const STACKED_BOARD_IDS = new Set([
@@ -286,6 +286,36 @@ const I2C_BUSES: Record<number, { components: string[]; confidence: Confidence }
   4: { components: ["EEPROM de la placa lógica (micro-soldadura)"], confidence: "media" },
   5: { components: ["EEPROM de la placa lógica (micro-soldadura)"], confidence: "media" },
 };
+
+// El SMC vuelca una máscara de sensores ("S.sensor array 0 - 5 is 0, 2097152, ...") donde cada bit
+// encendido es un sensor que no respondió. Qué sensor es cada bit depende del modelo: solo se nombran
+// los casos confirmados en reparaciones reales; el resto se muestra como máscara cruda.
+const SMC_SENSOR_BITS: Array<{ ids: string[]; word: number; bit: number; sensor: string; components: string[]; checks: string[] }> = [
+  {
+    ids: ["iPhone14,7"],
+    word: 1,
+    bit: 21,
+    sensor: "proximidad",
+    components: ["Flex del sensor de proximidad (ausente, mal conectado o dañado)", "Conector BTB del flex de proximidad"],
+    checks: [
+      "Verificar que el flex de proximidad esté instalado y bien asentado: si falta, el equipo reinicia solo.",
+      "Probar con un flex de proximidad de prueba.",
+      "Si persiste, revisar el conector BTB y la placa lógica.",
+    ],
+  },
+];
+
+function smcSensorMask(text: string): Array<{ word: number; bit: number; value: number }> {
+  const m = /^[ \t]*S\.sensor array[^\n]*?\bis\s+([\d,\s]+)$/im.exec(text);
+  if (!m) return [];
+  const bits: Array<{ word: number; bit: number; value: number }> = [];
+  m[1].split(",").forEach((raw, word) => {
+    const value = Number(raw.trim());
+    if (!Number.isFinite(value) || value <= 0) return;
+    for (let bit = 0; bit < 53; bit++) if (Math.floor(value / 2 ** bit) % 2 === 1) bits.push({ word, bit, value });
+  });
+  return bits;
+}
 
 const SOFTWARE_CHECKS = [
   "Restaurar iOS desde cero (sin restaurar backup) para descartar software.",
@@ -569,6 +599,35 @@ const RULES: Rule[] = [
       "El SMC, que gestiona batería, carga y sensores, reportó un error. La causa exacta varía según el modelo; es un punto de partida, no un veredicto.",
     components: ["Batería / flex de carga", "Sensores gestionados por el SMC", "Placa lógica (si persiste)"],
     checks: ["Probar con batería y flex de carga de prueba.", "Si persiste, revisar la placa lógica."],
+    refine: (_m, device, text) => {
+      const mask = smcSensorMask(text);
+      if (mask.length === 0) return {};
+      const known = mask
+        .map((b) => SMC_SENSOR_BITS.find((k) => k.word === b.word && k.bit === b.bit && !!device.id && k.ids.includes(device.id)))
+        .filter((k): k is (typeof SMC_SENSOR_BITS)[number] => !!k);
+      if (known.length > 0) {
+        return {
+          title: `Sensor sin respuesta para el SMC: ${[...new Set(known.map((k) => k.sensor))].join(", ")}`,
+          confidence: "media",
+          explanation:
+            "El SMC dejó de recibir respuesta de un sensor y se reinició por seguridad. El propio log lo indica en su máscara de sensores (\"sensor array\"), y para este modelo ese bit corresponde al sensor señalado.",
+          components: [...new Set(known.flatMap((k) => k.components))],
+          checks: [...new Set(known.flatMap((k) => k.checks))],
+        };
+      }
+      const hex = mask.map((b) => `0x${b.value.toString(16)}`);
+      return {
+        title: "Un sensor no respondió al SMC",
+        explanation: `El SMC reportó que un sensor dejó de responder (máscara de sensores ${[...new Set(hex)].join(", ")}). Para este modelo todavía no sabemos qué sensor corresponde a ese valor: empezá verificando que estén todos los flexes de sensores conectados.`,
+        components: ["Flexes de sensores (proximidad, luz ambiente, cámara frontal)", "Batería / flex de carga", "Placa lógica (si persiste)"],
+        checks: [
+          "Verificar que no falte ningún flex y que todos estén bien asentados.",
+          "Desconectar los flexes de sensores uno por uno y probar si el equipo deja de reiniciar.",
+          "Probar con batería y flex de carga de prueba.",
+          "Si persiste, revisar la placa lógica.",
+        ],
+      };
+    },
   },
   {
     id: "undefined-instruction",
@@ -723,7 +782,7 @@ function runRules(text: string, device: DeviceInfo): Finding[] {
     const haystack = rule.strip ? text.replace(rule.strip, " ") : text;
     const m = rule.pattern.exec(haystack);
     if (!m) return;
-    const r = rule.refine?.(m, device) ?? {};
+    const r = rule.refine?.(m, device, haystack) ?? {};
     hits.set(rule.id, {
       order,
       finding: {
