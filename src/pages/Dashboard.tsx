@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompany } from "@/hooks/useCompany";
+import { useBranchRestriction } from "@/hooks/useBranchRestriction";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +75,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const { companyId } = useCompany();
+  const { restricted: branchRestricted, loading: restrictionLoading } = useBranchRestriction();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<string>("todos");
@@ -154,13 +156,14 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [user?.id, roleLoading, companyId]);
 
-  // Load branches for admin filter
+  // Load branches for admin filter (un encargado "solo su sucursal" no filtra: la RLS ya le recorta todo)
+  const showBranchFilter = isAdmin && !restrictionLoading && !branchRestricted;
   useEffect(() => {
-    if (!isAdmin || !companyId) return;
+    if (!showBranchFilter || !companyId) return;
     supabase.from("branches").select("id, name").eq("company_id", companyId).order("name").then(({ data }) => {
       setBranches((data ?? []) as Branch[]);
     });
-  }, [isAdmin, companyId]);
+  }, [showBranchFilter, companyId]);
 
   const openPayDialog = (e: React.MouseEvent, order: Order) => {
     e.preventDefault();
@@ -218,7 +221,7 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground">Gestioná todas tus reparaciones desde un solo lugar.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isAdmin && (
+          {showBranchFilter && (
             <Select value={branchFilter} onValueChange={setBranchFilter}>
               <SelectTrigger className="w-[160px] sm:w-[200px]">
                 <SelectValue placeholder="Sucursal" />

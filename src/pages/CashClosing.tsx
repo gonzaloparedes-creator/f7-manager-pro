@@ -163,7 +163,7 @@ export default function CashClosing() {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
-  const { canCloseCaja, loading: permLoading } = useStaffPermissions();
+  const { canCloseCaja, canViewCaja, loading: permLoading } = useStaffPermissions();
   const { toast } = useToast();
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
@@ -430,6 +430,7 @@ export default function CashClosing() {
   };
 
   if (!planLoading && isStarter) return <Navigate to="/dashboard" replace />;
+  if (!permLoading && !canViewCaja) return <Navigate to="/dashboard" replace />;
 
   const showClosingForm = !existingClosing || redoing;
   const showOpeningForm = !existingOpening || redoingOpening;

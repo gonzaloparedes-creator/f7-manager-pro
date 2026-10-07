@@ -1331,6 +1331,7 @@ export type Database = {
           is_super_admin: boolean
           notification_preferences: Json
           phone: string | null
+          restrict_to_branch: boolean
           whatsapp_connected: boolean
           whatsapp_phone: string | null
         }
@@ -1346,6 +1347,7 @@ export type Database = {
           is_super_admin?: boolean
           notification_preferences?: Json
           phone?: string | null
+          restrict_to_branch?: boolean
           whatsapp_connected?: boolean
           whatsapp_phone?: string | null
         }
@@ -1361,6 +1363,7 @@ export type Database = {
           is_super_admin?: boolean
           notification_preferences?: Json
           phone?: string | null
+          restrict_to_branch?: boolean
           whatsapp_connected?: boolean
           whatsapp_phone?: string | null
         }
@@ -1579,6 +1582,11 @@ export type Database = {
         }[]
       }
       get_user_branch: { Args: { _user_id: string }; Returns: string }
+      is_branch_restricted: { Args: { _user_id: string }; Returns: boolean }
+      transfer_order_to_branch: {
+        Args: { _branch_id: string; _order_id: string }
+        Returns: undefined
+      }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

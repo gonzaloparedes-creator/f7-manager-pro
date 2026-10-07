@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useBranchRestriction } from "@/hooks/useBranchRestriction";
 
 interface StaffFlags {
   staff_can_view_stock: boolean;
@@ -27,6 +28,10 @@ const DEFAULT_FLAGS: StaffFlags = {
  * cambio, restringen tanto a "staff" como a "recepcion" (pedido explícito:
  * ambos roles quedan ocultos hasta que el admin los habilita).
  *
+ * Un usuario con "Solo ve su sucursal" (encargado de sucursal) pierde Gastos,
+ * Caja y la administración de la empresa, sea cual sea su rol — esos datos
+ * no tienen sucursal y no se pueden recortar.
+ *
  * Mientras no sepamos con certeza el rol o los flags de la empresa, todo
  * queda en su estado más restrictivo ("fail closed") — con role=null sin
  * resolver todavía, tratarlo como "no es staff" mostraba datos un instante
@@ -35,6 +40,7 @@ const DEFAULT_FLAGS: StaffFlags = {
 export function useStaffPermissions() {
   const { companyId, loading: companyLoading } = useCompany();
   const { role, loading: roleLoading } = useUserRole();
+  const { restricted: branchRestricted, loading: restrictionLoading } = useBranchRestriction();
   const [flags, setFlags] = useState<StaffFlags>(DEFAULT_FLAGS);
   const [loading, setLoading] = useState(true);
 
@@ -65,14 +71,20 @@ export function useStaffPermissions() {
     return () => { active = false; };
   }, [companyId, companyLoading]);
 
-  const stillLoading = loading || roleLoading || companyLoading;
+  const stillLoading = loading || roleLoading || companyLoading || restrictionLoading;
   const isStaff = role === "staff";
   const isStaffOrRecepcion = role === "staff" || role === "recepcion";
+  // Gastos, Caja y la administración de la empresa no tienen sucursal: un
+  // usuario restringido a su sucursal no los ve (la RLS también los bloquea).
+  const notBranchRestricted = !stillLoading && !branchRestricted;
   return {
     canViewStock: !stillLoading && (!isStaff || flags.staff_can_view_stock),
     canViewProducts: !stillLoading && (!isStaff || flags.staff_can_view_products),
-    canViewGastos: !stillLoading && (!isStaffOrRecepcion || flags.staff_can_view_gastos),
-    canCloseCaja: !stillLoading && (!isStaffOrRecepcion || flags.staff_can_close_caja),
+    canViewGastos: notBranchRestricted && (!isStaffOrRecepcion || flags.staff_can_view_gastos),
+    canCloseCaja: notBranchRestricted && (!isStaffOrRecepcion || flags.staff_can_close_caja),
+    canViewCaja: notBranchRestricted,
+    canManageCompany: notBranchRestricted,
+    branchRestricted,
     loading: stillLoading,
   };
 }

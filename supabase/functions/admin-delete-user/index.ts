@@ -29,6 +29,11 @@ Deno.serve(async (req) => {
     if (roleErr) return json({ error: roleErr.message }, 500);
     if (!isAdmin) return json({ error: "Solo administradores pueden eliminar usuarios" }, 403);
 
+    // Un encargado "solo ve su sucursal" no administra el equipo de la empresa.
+    const { data: isRestricted, error: restrictErr } = await userClient.rpc("is_branch_restricted", { _user_id: user.id });
+    if (restrictErr) return json({ error: restrictErr.message }, 500);
+    if (isRestricted) return json({ error: "Tu usuario solo ve su sucursal y no puede eliminar usuarios" }, 403);
+
     const body = await req.json().catch(() => ({}));
     const { user_id } = body ?? {};
     if (!user_id) return json({ error: "Falta user_id" }, 400);

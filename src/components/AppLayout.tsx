@@ -34,7 +34,7 @@ const adminNav = [
 export default function AppLayout() {
   const { user, loading } = useAuth();
   const { isAdmin } = useUserRole();
-  const { canViewProducts, canViewGastos } = useStaffPermissions();
+  const { canViewProducts, canViewGastos, canViewCaja, canManageCompany } = useStaffPermissions();
   const { isSuperAdmin } = useSuperAdmin();
   const { isActive, loading: statusLoading } = useCompanyStatus();
   const { isStarter, isBusiness, isRetail, loading: planLoading } = usePlan();
@@ -46,11 +46,13 @@ export default function AppLayout() {
     let filtered = items.filter((i) => !i.adminOnly || isAdmin);
     if (!canViewProducts) filtered = filtered.filter((i) => i.to !== "/productos");
     if (!canViewGastos) filtered = filtered.filter((i) => i.to !== "/gastos");
+    if (!canViewCaja) filtered = filtered.filter((i) => i.to !== "/cierre-caja");
+    if (!canManageCompany) filtered = filtered.filter((i) => i.to !== "/configuracion");
     if (isSuperAdmin) {
       filtered.push({ to: "/superadmin", label: "Super Admin", icon: ShieldCheck, proOnly: false, businessOnly: false, adminOnly: false });
     }
     return filtered;
-  }, [isAdmin, isSuperAdmin, canViewProducts, canViewGastos]);
+  }, [isAdmin, isSuperAdmin, canViewProducts, canViewGastos, canViewCaja, canManageCompany]);
 
   // La barra inferior mobile no entra con más de ~5 ítems (peor todavía con
   // el badge de bloqueo PRO/BUSINESS) — Configuración y Super Admin son de
@@ -192,7 +194,7 @@ export default function AppLayout() {
               <ShieldCheck className="h-5 w-5" />
             </Link>
           )}
-          {!isStarter && (
+          {!isStarter && canViewCaja && (
             <Link
               to="/cierre-caja"
               aria-label="Caja"
@@ -210,7 +212,7 @@ export default function AppLayout() {
               <Receipt className="h-5 w-5" />
             </Link>
           )}
-          {isAdmin && (
+          {isAdmin && canManageCompany && (
             <Link
               to="/configuracion"
               aria-label="Configuración"

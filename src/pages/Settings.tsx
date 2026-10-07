@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useCompany } from "@/hooks/useCompany";
 import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ type UserRow = {
   id: string; full_name: string | null; phone: string | null; branch_id: string | null;
   role: "admin" | "staff" | "recepcion" | null;
   commission_rate: number;
+  restrict_to_branch: boolean;
 };
 
 // supabase-js no parsea el cuerpo de la respuesta cuando una Edge Function
@@ -95,6 +97,7 @@ async function edgeFunctionErrorMessage(error: unknown, fallback: string): Promi
 export default function Settings() {
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
+  const { canManageCompany, loading: permLoading } = useStaffPermissions();
   const { isStarter: isStarterPlan } = usePlan();
   const { toast } = useToast();
 
@@ -190,7 +193,7 @@ export default function Settings() {
     load();
   };
 
-  if (roleLoading || !profile) {
+  if (roleLoading || permLoading || !profile) {
     return (
       <div className="flex justify-center py-12">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -198,8 +201,8 @@ export default function Settings() {
     );
   }
 
-  // ADMIN-ONLY route
-  if (!isAdmin) {
+  // ADMIN-ONLY route (y un encargado de sucursal con "Solo ve su sucursal" tampoco entra)
+  if (!isAdmin || !canManageCompany) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -992,13 +995,14 @@ function UsersTab() {
     email: "", password: "", full_name: "", phone: "",
     role: "staff" as "admin" | "staff" | "recepcion",
     branch_id: "" as string,
+    restrict_to_branch: false,
   });
 
   const load = async () => {
     if (!companyId) return;
     setLoading(true);
     const [{ data: profs }, { data: brs }, { data: company }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, phone, branch_id, commission_rate").eq("company_id", companyId),
+      supabase.from("profiles").select("id, full_name, phone, branch_id, commission_rate, restrict_to_branch").eq("company_id", companyId),
       supabase.from("branches").select("id, name, address").eq("company_id", companyId).order("name"),
       supabase.from("companies").select("commission_enabled, staff_can_view_stock, staff_can_view_products, staff_can_view_gastos, staff_can_close_caja, virtual_cash_enabled").eq("id", companyId).maybeSingle(),
     ]);
@@ -1113,6 +1117,13 @@ function UsersTab() {
 
   const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? "—";
 
+  const restrictHint = (u: UserRow) => {
+    if (u.restrict_to_branch) return `Solo ve y carga datos de ${branchName(u.branch_id)}. Sin Caja, Gastos ni Configuración.`;
+    if (u.id === currentUser?.id) return "No podés restringirte a vos mismo.";
+    if (!u.branch_id) return "Asignale una sucursal primero.";
+    return "Ve todas las sucursales.";
+  };
+
   const createUser = async () => {
     if (!form.email || !form.password) {
       return toast({ title: "Faltan datos", description: "Email y contraseña son obligatorios.", variant: "destructive" });
@@ -1126,6 +1137,7 @@ function UsersTab() {
         phone: form.phone,
         role: form.role,
         branch_id: form.branch_id || null,
+        restrict_to_branch: !!form.branch_id && form.restrict_to_branch,
       },
     });
     setCreating(false);
@@ -1135,7 +1147,7 @@ function UsersTab() {
     }
     toast({ title: "Usuario creado" });
     setOpen(false);
-    setForm({ email: "", password: "", full_name: "", phone: "", role: "staff", branch_id: "" });
+    setForm({ email: "", password: "", full_name: "", phone: "", role: "staff", branch_id: "", restrict_to_branch: false });
     load();
   };
 
@@ -1156,12 +1168,26 @@ function UsersTab() {
   };
 
   const updateUserBranch = async (userId: string, branch_id: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.restrict_to_branch && !branch_id) {
+      return toast({ title: "Primero desactivá \"Solo ve su sucursal\"", description: "Un usuario restringido tiene que tener una sucursal asignada.", variant: "destructive" });
+    }
     const { error } = await supabase.from("profiles")
       .update({ branch_id: branch_id || null })
       .eq("id", userId);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
     toast({ title: "Sucursal actualizada" });
     load();
+  };
+
+  const toggleBranchRestriction = async (userId: string, value: boolean) => {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, restrict_to_branch: value } : u)));
+    const { error } = await supabase.from("profiles").update({ restrict_to_branch: value }).eq("id", userId);
+    if (error) {
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, restrict_to_branch: !value } : u)));
+      return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    toast({ title: value ? "Ahora solo ve su sucursal" : "Ahora ve todas las sucursales" });
   };
 
   const deleteUser = async (targetUser: UserRow) => {
@@ -1349,6 +1375,18 @@ function UsersTab() {
                       </Select>
                     </div>
                   </div>
+                  <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
+                    <div>
+                      <Label htmlFor={`restrict-m-${u.id}`} className="text-xs font-medium">Solo ve su sucursal</Label>
+                      <div className="text-[11px] text-muted-foreground">{restrictHint(u)}</div>
+                    </div>
+                    <Switch
+                      id={`restrict-m-${u.id}`}
+                      checked={u.restrict_to_branch}
+                      disabled={!u.restrict_to_branch && (!u.branch_id || u.id === currentUser?.id)}
+                      onCheckedChange={(v) => toggleBranchRestriction(u.id, v)}
+                    />
+                  </div>
                   {commissionEnabled && canUseCommissions && (
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Comisión</Label>
@@ -1383,6 +1421,7 @@ function UsersTab() {
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Sucursal</TableHead>
+                    <TableHead>Solo su sucursal</TableHead>
                     {commissionEnabled && canUseCommissions && <TableHead>Comisión</TableHead>}
                     <TableHead className="w-12 text-right">Acciones</TableHead>
                   </TableRow>
@@ -1415,6 +1454,16 @@ function UsersTab() {
                             {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2" title={restrictHint(u)}>
+                          <Switch
+                            checked={u.restrict_to_branch}
+                            disabled={!u.restrict_to_branch && (!u.branch_id || u.id === currentUser?.id)}
+                            onCheckedChange={(v) => toggleBranchRestriction(u.id, v)}
+                            aria-label={`Solo ve su sucursal: ${u.full_name || "usuario"}`}
+                          />
+                        </div>
                       </TableCell>
                       {commissionEnabled && canUseCommissions && (
                         <TableCell>
@@ -1516,6 +1565,18 @@ function UsersTab() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
+                <div>
+                  <Label htmlFor="new-user-restrict" className="text-sm font-medium">Solo ve su sucursal</Label>
+                  <div className="text-xs text-muted-foreground">Para encargados de sucursal: ve y carga solo lo de su sucursal. Necesita una sucursal asignada.</div>
+                </div>
+                <Switch
+                  id="new-user-restrict"
+                  checked={form.restrict_to_branch && !!form.branch_id}
+                  disabled={!form.branch_id}
+                  onCheckedChange={(v) => setForm({ ...form, restrict_to_branch: v })}
+                />
               </div>
             </div>
             <DialogFooter>

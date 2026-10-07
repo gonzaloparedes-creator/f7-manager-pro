@@ -10,6 +10,7 @@ export function useBranches() {
   const { companyId } = useCompany();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [userBranchId, setUserBranchId] = useState<string | null>(null);
+  const [restrictToBranch, setRestrictToBranch] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,11 +20,12 @@ export function useBranches() {
       setLoading(true);
       const [{ data: brs }, { data: prof }] = await Promise.all([
         supabase.from("branches").select("id, name, address").eq("company_id", companyId).order("name"),
-        supabase.from("profiles").select("branch_id").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("branch_id, restrict_to_branch").eq("id", user.id).maybeSingle(),
       ]);
       if (!active) return;
       setBranches((brs ?? []) as Branch[]);
       setUserBranchId(prof?.branch_id ?? null);
+      setRestrictToBranch(!!prof?.restrict_to_branch);
       setLoading(false);
     };
     load();
@@ -34,5 +36,14 @@ export function useBranches() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, companyId]);
 
-  return { branches, userBranchId, hasMultipleBranches: branches.length > 1, loading };
+  // Un usuario restringido a su sucursal solo conoce la suya: así no aparecen
+  // selectores ni filtros de "otra sucursal" (la RLS igual no le dejaría ver
+  // ni cargar nada de las demás).
+  const visibleBranches = restrictToBranch ? branches.filter((b) => b.id === userBranchId) : branches;
+  const hasMultipleBranches = visibleBranches.length > 1;
+  // Sucursal que se guarda por defecto en un alta nueva. Con una sola
+  // sucursal no hace falta atribuir (queda sin sucursal, como siempre).
+  const defaultBranchId = hasMultipleBranches || restrictToBranch ? userBranchId : null;
+
+  return { branches: visibleBranches, userBranchId, restrictToBranch, defaultBranchId, hasMultipleBranches, loading };
 }

@@ -47,11 +47,13 @@ export default function NewInventoryItemDialog({
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { categories, subcategoriesFor, reload: reloadCategories } = useCategories();
-  const { branches, userBranchId, hasMultipleBranches } = useBranches();
+  const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string | null>(null);
+  // El selector muestra la sucursal del usuario como valor por defecto; lo que se guarda tiene que ser lo mismo que se ve.
+  const effectiveBranchId = editItem ? branchId : (branchId ?? defaultBranchId);
   const [stock, setStock] = useState("0");
   const [minAlert, setMinAlert] = useState("0");
   const [cost, setCost] = useState("0");
@@ -163,7 +165,7 @@ export default function NewInventoryItemDialog({
       }
 
       const payload = {
-        branch_id: branchId,
+        branch_id: effectiveBranchId,
         name: name.trim(),
         category_id: categoryId,
         subcategory_id: subcategoryId,
@@ -292,7 +294,7 @@ export default function NewInventoryItemDialog({
           {hasMultipleBranches && (
             <div className="grid gap-2">
               <Label>Sucursal</Label>
-              <Select value={branchId ?? userBranchId ?? ""} onValueChange={(v) => setBranchId(v || null)}>
+              <Select value={effectiveBranchId ?? ""} onValueChange={(v) => setBranchId(v || null)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar sucursal" /></SelectTrigger>
                 <SelectContent>
                   {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}

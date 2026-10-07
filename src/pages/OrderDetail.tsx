@@ -27,6 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useBranchRestriction } from "@/hooks/useBranchRestriction";
 import { toast as sonnerToast } from "sonner";
 import { OrderQRCode } from "@/components/OrderQRCode";
 import { PrintReceipt } from "@/components/PrintReceipt";
@@ -79,6 +80,7 @@ export default function OrderDetail() {
   const { presets: statusPresets } = useOrderStatusPresets();
   const photoLimit = limits.photos;
   const { isAdmin } = useUserRole();
+  const { restricted: branchRestricted } = useBranchRestriction();
   const [editingFinance, setEditingFinance] = useState(false);
   const [editQuote, setEditQuote] = useState<string>("");
   const [editDeposit, setEditDeposit] = useState<string>("");
@@ -314,17 +316,21 @@ export default function OrderDetail() {
     }
     setTransferring(true);
     try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ current_branch_id: transferTargetId })
-        .eq("id", order.id);
-      if (error) throw error;
       const branchName = branches.find((b) => b.id === transferTargetId)?.name || "otra sucursal";
-      await logSystemHistory(order.id, order.status, `Equipo derivado a ${branchName}`);
-      setOrder({ ...order, current_branch_id: transferTargetId });
+      // La RPC cambia la sucursal y anota el historial en una sola transacción.
+      const { error } = await supabase.rpc("transfer_order_to_branch", {
+        _order_id: order.id,
+        _branch_id: transferTargetId,
+      });
+      if (error) throw error;
       toast({ title: "Derivación realizada", description: `Equipo enviado a ${branchName}.` });
       setTransferOpen(false);
       setTransferTargetId("");
+      if (branchRestricted) {
+        navigate("/dashboard");
+        return;
+      }
+      setOrder({ ...order, current_branch_id: transferTargetId });
       load();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });

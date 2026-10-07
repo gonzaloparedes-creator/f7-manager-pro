@@ -30,12 +30,18 @@ Deno.serve(async (req) => {
     if (roleErr) return json({ error: roleErr.message }, 500);
     if (!isAdmin) return json({ error: "Solo administradores pueden crear usuarios" }, 403);
 
+    // Un encargado "solo ve su sucursal" no administra el equipo de la empresa.
+    const { data: isRestricted, error: restrictErr } = await userClient.rpc("is_branch_restricted", { _user_id: user.id });
+    if (restrictErr) return json({ error: restrictErr.message }, 500);
+    if (isRestricted) return json({ error: "Tu usuario solo ve su sucursal y no puede crear usuarios" }, 403);
+
     const body = await req.json().catch(() => ({}));
-    const { email, password, full_name, phone, role, branch_id } = body ?? {};
+    const { email, password, full_name, phone, role, branch_id, restrict_to_branch } = body ?? {};
 
     if (!email || !password) return json({ error: "Email y contraseña son obligatorios" }, 400);
     if (!["admin", "staff", "recepcion"].includes(role)) return json({ error: "Rol inválido" }, 400);
     if (String(password).length < 6) return json({ error: "La contraseña debe tener al menos 6 caracteres" }, 400);
+    if (restrict_to_branch && !branch_id) return json({ error: "Para que solo vea su sucursal hay que asignarle una sucursal" }, 400);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -67,7 +73,7 @@ Deno.serve(async (req) => {
     // handle_new_user trigger creates the profile row; ensure branch + company are set
     const { error: profErr } = await admin
       .from("profiles")
-      .update({ branch_id: branch_id ?? null, full_name: full_name ?? "", phone: phone ?? "", company_id })
+      .update({ branch_id: branch_id ?? null, restrict_to_branch: !!restrict_to_branch, full_name: full_name ?? "", phone: phone ?? "", company_id })
       .eq("id", newId);
     if (profErr) {
       // try insert as fallback
@@ -76,6 +82,7 @@ Deno.serve(async (req) => {
         full_name: full_name ?? "",
         phone: phone ?? "",
         branch_id: branch_id ?? null,
+        restrict_to_branch: !!restrict_to_branch,
         company_id,
       });
     }
