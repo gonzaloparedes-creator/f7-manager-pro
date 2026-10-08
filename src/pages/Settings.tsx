@@ -1118,7 +1118,7 @@ function UsersTab() {
   const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? "—";
 
   const restrictHint = (u: UserRow) => {
-    if (u.restrict_to_branch) return `Solo ve y carga datos de ${branchName(u.branch_id)}. Sin Caja, Gastos ni Configuración.`;
+    if (u.restrict_to_branch) return `Solo ve y carga datos de ${branchName(u.branch_id)}. Caja y Gastos solo de su sucursal; sin Configuración.`;
     if (u.id === currentUser?.id) return "No podés restringirte a vos mismo.";
     if (!u.branch_id) return "Asignale una sucursal primero.";
     return "Ve todas las sucursales.";

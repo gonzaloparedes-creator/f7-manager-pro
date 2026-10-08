@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { useExpenseCategories } from "@/hooks/useExpenseCategories";
+import { useBranches } from "@/hooks/useBranches";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useToast } from "@/hooks/use-toast";
 import { logExpensePayment } from "@/lib/expenses";
@@ -20,6 +21,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 const CREATE_CATEGORY = "__create_category__";
+const GENERAL_BRANCH = "__general__";
 type PaymentType = "contado" | "credito";
 
 export interface EditableExpense {
@@ -48,6 +50,7 @@ export default function NewExpenseDialog({
   const { companyId } = useCompany();
   const { presets: categories, reload: reloadCategories } = useExpenseCategories();
   const { presets: paymentMethodPresets } = usePaymentMethodPresets();
+  const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
   const { toast } = useToast();
 
   const [category, setCategory] = useState("");
@@ -62,12 +65,16 @@ export default function NewExpenseDialog({
   const [installmentsTotal, setInstallmentsTotal] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  // null = no tocó el selector todavía → rige la sucursal del usuario.
+  const [branchChoice, setBranchChoice] = useState<string | null>(null);
 
   const isEdit = !!editItem;
+  const effectiveBranchId = branchChoice === null ? defaultBranchId : branchChoice === GENERAL_BRANCH ? null : branchChoice;
 
   useEffect(() => {
     if (!open) return;
     setNewCatName(null);
+    setBranchChoice(null);
     if (editItem) {
       setCategory(editItem.category);
       setDescription(editItem.description ?? "");
@@ -140,6 +147,7 @@ export default function NewExpenseDialog({
         .from("expenses")
         .insert({
           company_id: companyId,
+          branch_id: effectiveBranchId,
           category: category.trim(),
           description: description.trim() || null,
           amount: amountNum,
@@ -155,7 +163,7 @@ export default function NewExpenseDialog({
       if (error) throw error;
 
       if (paymentType === "contado") {
-        logExpensePayment({ expenseId: created.id, companyId, amount: amountNum, method: paymentMethod, userId: user.id });
+        logExpensePayment({ expenseId: created.id, companyId, branchId: effectiveBranchId, amount: amountNum, method: paymentMethod, userId: user.id });
       }
 
       toast({ title: "Gasto registrado" });
@@ -226,6 +234,19 @@ export default function NewExpenseDialog({
               </Popover>
             </div>
           </div>
+
+          {hasMultipleBranches && !isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="expense-branch">Sucursal</Label>
+              <Select value={effectiveBranchId ?? GENERAL_BRANCH} onValueChange={setBranchChoice}>
+                <SelectTrigger id="expense-branch"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={GENERAL_BRANCH}>General (toda la empresa)</SelectItem>
+                  {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="expense-description">Descripción (opcional)</Label>

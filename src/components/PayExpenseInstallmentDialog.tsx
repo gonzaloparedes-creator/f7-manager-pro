@@ -20,6 +20,7 @@ export interface ExpenseForInstallment {
   amount_paid: number;
   installments_total: number | null;
   installments_paid: number;
+  branch_id: string | null;
 }
 
 export default function PayExpenseInstallmentDialog({
@@ -75,7 +76,7 @@ export default function PayExpenseInstallmentDialog({
         .eq("id", expense.id);
       if (error) throw error;
 
-      logExpensePayment({ expenseId: expense.id, companyId, amount: amountNum, method, userId: user.id });
+      logExpensePayment({ expenseId: expense.id, companyId, branchId: expense.branch_id, amount: amountNum, method, userId: user.id });
 
       toast({
         title: "Cuota registrada",

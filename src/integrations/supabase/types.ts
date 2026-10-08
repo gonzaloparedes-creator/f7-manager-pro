@@ -97,6 +97,7 @@ export type Database = {
       }
       cash_closings: {
         Row: {
+          branch_id: string | null
           breakdown: Json
           closed_by: string | null
           closing_date: string
@@ -112,6 +113,7 @@ export type Database = {
           notes: string | null
         }
         Insert: {
+          branch_id?: string | null
           breakdown?: Json
           closed_by?: string | null
           closing_date: string
@@ -127,6 +129,7 @@ export type Database = {
           notes?: string | null
         }
         Update: {
+          branch_id?: string | null
           breakdown?: Json
           closed_by?: string | null
           closing_date?: string
@@ -142,6 +145,13 @@ export type Database = {
           notes?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cash_closings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cash_closings_closed_by_fkey"
             columns: ["closed_by"]
@@ -160,6 +170,7 @@ export type Database = {
       }
       cash_openings: {
         Row: {
+          branch_id: string | null
           company_id: string
           created_at: string
           id: string
@@ -170,6 +181,7 @@ export type Database = {
           opening_virtual: number
         }
         Insert: {
+          branch_id?: string | null
           company_id: string
           created_at?: string
           id?: string
@@ -180,6 +192,7 @@ export type Database = {
           opening_virtual?: number
         }
         Update: {
+          branch_id?: string | null
           company_id?: string
           created_at?: string
           id?: string
@@ -190,6 +203,13 @@ export type Database = {
           opening_virtual?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "cash_openings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cash_openings_company_id_fkey"
             columns: ["company_id"]
@@ -425,6 +445,7 @@ export type Database = {
       expense_payments: {
         Row: {
           amount: number
+          branch_id: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -434,6 +455,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          branch_id?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -443,6 +465,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          branch_id?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -451,6 +474,13 @@ export type Database = {
           payment_method?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "expense_payments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expense_payments_company_id_fkey"
             columns: ["company_id"]
@@ -478,6 +508,7 @@ export type Database = {
         Row: {
           amount: number
           amount_paid: number
+          branch_id: string | null
           category: string
           company_id: string
           created_at: string
@@ -493,6 +524,7 @@ export type Database = {
         Insert: {
           amount: number
           amount_paid?: number
+          branch_id?: string | null
           category: string
           company_id: string
           created_at?: string
@@ -508,6 +540,7 @@ export type Database = {
         Update: {
           amount?: number
           amount_paid?: number
+          branch_id?: string | null
           category?: string
           company_id?: string
           created_at?: string
@@ -521,6 +554,13 @@ export type Database = {
           payment_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_company_id_fkey"
             columns: ["company_id"]

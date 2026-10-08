@@ -12,12 +12,13 @@ import { supabase } from "@/integrations/supabase/client";
  * principal falló — solo se pierde precisión en el Cierre de Caja.
  */
 export async function logExpensePayment(
-  params: { expenseId: string; companyId: string; amount: number; method: string | null; userId: string }
+  params: { expenseId: string; companyId: string; branchId: string | null; amount: number; method: string | null; userId: string }
 ) {
   if (params.amount <= 0) return;
   const { error } = await (supabase as any).from("expense_payments").insert({
     expense_id: params.expenseId,
     company_id: params.companyId,
+    branch_id: params.branchId,
     amount: params.amount,
     payment_method: params.method,
     created_by: params.userId,

@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
+import { useBranches } from "@/hooks/useBranches";
 import { Navigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatPYG, isCashLabel } from "@/lib/orders";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarDays, Wallet, CheckCircle2, AlertTriangle, Loader2, History, RotateCcw, DoorOpen, Landmark } from "lucide-react";
+import { CalendarDays, Wallet, CheckCircle2, AlertTriangle, Loader2, History, RotateCcw, DoorOpen, Landmark, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,8 @@ interface OpeningRow {
   notes: string | null;
   created_at: string;
 }
+
+const ALL_BRANCHES = "__all_branches__";
 
 const CLOSING_COLUMNS = "id, closing_date, expected_cash, counted_cash, difference, expected_virtual, counted_virtual, difference_virtual, breakdown, notes, created_at";
 const OPENING_COLUMNS = "id, opening_date, opening_cash, opening_virtual, notes, created_at";
@@ -164,10 +168,12 @@ export default function CashClosing() {
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
   const { canCloseCaja, canViewCaja, loading: permLoading } = useStaffPermissions();
+  const { branches, userBranchId, restrictToBranch, hasMultipleBranches, loading: branchesLoading } = useBranches();
   const { toast } = useToast();
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [dateOpen, setDateOpen] = useState(false);
+  const [branchPick, setBranchPick] = useState(ALL_BRANCHES);
   const [loading, setLoading] = useState(true);
   const [virtualEnabled, setVirtualEnabled] = useState(false);
 
@@ -191,28 +197,38 @@ export default function CashClosing() {
   const [savingOpening, setSavingOpening] = useState(false);
   const [redoingOpening, setRedoingOpening] = useState(false);
 
+  // Alcance de la caja: un usuario restringido trabaja siempre en su sucursal;
+  // el resto elige una sucursal o "Toda la empresa" (branch_id NULL, lo general de siempre).
+  const scopeBranchId = restrictToBranch ? userBranchId : (hasMultipleBranches && branchPick !== ALL_BRANCHES ? branchPick : null);
+  const scopeBranchName = scopeBranchId ? (branches.find((b) => b.id === scopeBranchId)?.name ?? null) : null;
+
   useEffect(() => {
     const load = async () => {
-      if (!companyId || permLoading) return;
+      if (!companyId || permLoading || branchesLoading) return;
       setLoading(true);
+      const byBranch = (q: any) => (scopeBranchId ? q.eq("branch_id", scopeBranchId) : q.is("branch_id", null));
       const from = startOfDay(selectedDate).toISOString();
       const to = endOfDay(selectedDate).toISOString();
       const dateKey = ymd(selectedDate);
 
       const openingQueries = [
         supabase.from("companies").select("virtual_cash_enabled").eq("id", companyId).maybeSingle(),
-        (supabase as any)
-          .from("cash_openings")
-          .select(OPENING_COLUMNS)
-          .eq("company_id", companyId)
-          .eq("opening_date", dateKey)
+        byBranch(
+          (supabase as any)
+            .from("cash_openings")
+            .select(OPENING_COLUMNS)
+            .eq("company_id", companyId)
+            .eq("opening_date", dateKey)
+        )
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
-        (supabase as any)
-          .from("cash_openings")
-          .select(OPENING_COLUMNS)
-          .eq("company_id", companyId)
+        byBranch(
+          (supabase as any)
+            .from("cash_openings")
+            .select(OPENING_COLUMNS)
+            .eq("company_id", companyId)
+        )
           .order("opening_date", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(30),
@@ -222,36 +238,44 @@ export default function CashClosing() {
       // la bloquearía igual si no tiene el permiso habilitado.
       const adminQueries = canCloseCaja
         ? [
-            (supabase as any)
-              .from("order_payments")
-              .select("amount, payment_method")
+            // Los pagos de órdenes no guardan sucursal propia: heredan la de la orden.
+            (scopeBranchId
+              ? (supabase as any)
+                  .from("order_payments")
+                  .select("amount, payment_method, orders!inner(current_branch_id)")
+                  .eq("orders.current_branch_id", scopeBranchId)
+              : (supabase as any).from("order_payments").select("amount, payment_method"))
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
-            (supabase as any)
-              .from("product_sales")
-              .select("quantity, unit_price, payment_method")
+            (scopeBranchId
+              ? (supabase as any).from("product_sales").select("quantity, unit_price, payment_method").eq("branch_id", scopeBranchId)
+              : (supabase as any).from("product_sales").select("quantity, unit_price, payment_method"))
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
-            (supabase as any)
-              .from("expense_payments")
-              .select("amount, payment_method")
+            (scopeBranchId
+              ? (supabase as any).from("expense_payments").select("amount, payment_method").eq("branch_id", scopeBranchId)
+              : (supabase as any).from("expense_payments").select("amount, payment_method"))
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
-            (supabase as any)
-              .from("cash_closings")
-              .select(CLOSING_COLUMNS)
-              .eq("company_id", companyId)
-              .eq("closing_date", dateKey)
+            byBranch(
+              (supabase as any)
+                .from("cash_closings")
+                .select(CLOSING_COLUMNS)
+                .eq("company_id", companyId)
+                .eq("closing_date", dateKey)
+            )
               .order("created_at", { ascending: false })
               .limit(1)
               .maybeSingle(),
-            (supabase as any)
-              .from("cash_closings")
-              .select(CLOSING_COLUMNS)
-              .eq("company_id", companyId)
+            byBranch(
+              (supabase as any)
+                .from("cash_closings")
+                .select(CLOSING_COLUMNS)
+                .eq("company_id", companyId)
+            )
               .order("closing_date", { ascending: false })
               .order("created_at", { ascending: false })
               .limit(30),
@@ -297,7 +321,7 @@ export default function CashClosing() {
       setLoading(false);
     };
     load();
-  }, [companyId, selectedDate, canCloseCaja, permLoading]);
+  }, [companyId, selectedDate, canCloseCaja, permLoading, branchesLoading, scopeBranchId]);
 
   const breakdown = useMemo(() => groupByMethod(breakdownRows), [breakdownRows]);
   const breakdownByOrdenes = useMemo(
@@ -348,6 +372,7 @@ export default function CashClosing() {
     const openingVirtual = virtualEnabled ? Math.round(Number(openingVirtualInput) || 0) : 0;
     const { error } = await (supabase as any).from("cash_openings").insert({
       company_id: companyId,
+      branch_id: scopeBranchId,
       opening_date: ymd(selectedDate),
       opening_cash: openingCash,
       opening_virtual: openingVirtual,
@@ -393,6 +418,7 @@ export default function CashClosing() {
       : { expected_virtual: null, counted_virtual: null, difference_virtual: null };
     const { error } = await (supabase as any).from("cash_closings").insert({
       company_id: companyId,
+      branch_id: scopeBranchId,
       closing_date: ymd(selectedDate),
       expected_cash: expectedCash,
       counted_cash: counted,
@@ -445,10 +471,27 @@ export default function CashClosing() {
           </h1>
           <p className="text-sm text-muted-foreground">
             {virtualEnabled
-              ? "Apertura del día y, para administradores, el cierre y la reconciliación de la caja física (efectivo) y la caja virtual (banco)."
-              : "Apertura del día y, para administradores, el cierre y la reconciliación de efectivo."}
+              ? "Apertura del día y, para quien tenga el permiso, el cierre y la reconciliación de la caja física (efectivo) y la caja virtual (banco)."
+              : "Apertura del día y, para quien tenga el permiso, el cierre y la reconciliación de efectivo."}
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        {restrictToBranch && scopeBranchName && (
+          <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <Store className="h-4 w-4" /> {scopeBranchName}
+          </div>
+        )}
+        {hasMultipleBranches && !restrictToBranch && (
+          <Select value={branchPick} onValueChange={setBranchPick}>
+            <SelectTrigger className="w-48 gap-2" aria-label="Sucursal de la caja">
+              <Store className="h-4 w-4 shrink-0" /><SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_BRANCHES}>Toda la empresa</SelectItem>
+              {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Popover open={dateOpen} onOpenChange={setDateOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="gap-2">
@@ -467,6 +510,7 @@ export default function CashClosing() {
             />
           </PopoverContent>
         </Popover>
+        </div>
       </div>
 
       {loading ? (

@@ -28,9 +28,10 @@ const DEFAULT_FLAGS: StaffFlags = {
  * cambio, restringen tanto a "staff" como a "recepcion" (pedido explícito:
  * ambos roles quedan ocultos hasta que el admin los habilita).
  *
- * Un usuario con "Solo ve su sucursal" (encargado de sucursal) pierde Gastos,
- * Caja y la administración de la empresa, sea cual sea su rol — esos datos
- * no tienen sucursal y no se pueden recortar.
+ * Un usuario con "Solo ve su sucursal" (encargado de sucursal) pierde la
+ * administración de la empresa (Configuración), sea cual sea su rol. Caja y
+ * Gastos los conserva, pero recortados a su sucursal (esas tablas tienen
+ * branch_id; lo impone la RLS y lo respetan las pantallas).
  *
  * Mientras no sepamos con certeza el rol o los flags de la empresa, todo
  * queda en su estado más restrictivo ("fail closed") — con role=null sin
@@ -74,15 +75,15 @@ export function useStaffPermissions() {
   const stillLoading = loading || roleLoading || companyLoading || restrictionLoading;
   const isStaff = role === "staff";
   const isStaffOrRecepcion = role === "staff" || role === "recepcion";
-  // Gastos, Caja y la administración de la empresa no tienen sucursal: un
-  // usuario restringido a su sucursal no los ve (la RLS también los bloquea).
+  // La administración de la empresa (usuarios, sucursales, planes) no se puede
+  // recortar por sucursal: un usuario restringido no la ve (la RLS también la bloquea).
   const notBranchRestricted = !stillLoading && !branchRestricted;
   return {
     canViewStock: !stillLoading && (!isStaff || flags.staff_can_view_stock),
     canViewProducts: !stillLoading && (!isStaff || flags.staff_can_view_products),
-    canViewGastos: notBranchRestricted && (!isStaffOrRecepcion || flags.staff_can_view_gastos),
-    canCloseCaja: notBranchRestricted && (!isStaffOrRecepcion || flags.staff_can_close_caja),
-    canViewCaja: notBranchRestricted,
+    canViewGastos: !stillLoading && (!isStaffOrRecepcion || flags.staff_can_view_gastos),
+    canCloseCaja: !stillLoading && (!isStaffOrRecepcion || flags.staff_can_close_caja),
+    canViewCaja: !stillLoading,
     canManageCompany: notBranchRestricted,
     branchRestricted,
     loading: stillLoading,

@@ -5,6 +5,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useExpenseCategories } from "@/hooks/useExpenseCategories";
+import { useBranches } from "@/hooks/useBranches";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,9 +32,12 @@ interface Expense {
   installments_paid: number;
   expense_date: string;
   notes: string | null;
+  branch_id: string | null;
 }
 
 const ALL_CATEGORIES = "__all__";
+const ALL_BRANCHES = "__all_branches__";
+const GENERAL_BRANCH = "__general__";
 
 export default function Gastos() {
   const { companyId } = useCompany();
@@ -41,11 +45,13 @@ export default function Gastos() {
   const { canViewGastos, loading: permLoading } = useStaffPermissions();
   const { toast } = useToast();
   const { presets: categories } = useExpenseCategories();
+  const { branches, hasMultipleBranches } = useBranches();
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthOffset, setMonthOffset] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
+  const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Expense | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Expense | null>(null);
@@ -63,7 +69,7 @@ export default function Gastos() {
     const to = format(endOfMonth(viewMonth), "yyyy-MM-dd");
     const { data, error } = await supabase
       .from("expenses")
-      .select("id, category, description, amount, payment_type, amount_paid, installments_total, installments_paid, expense_date, notes")
+      .select("id, category, description, amount, payment_type, amount_paid, installments_total, installments_paid, expense_date, notes, branch_id")
       .eq("company_id", companyId)
       .gte("expense_date", from)
       .lte("expense_date", to)
@@ -74,19 +80,26 @@ export default function Gastos() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [companyId, monthOffset]);
 
+  // El filtro de sucursal también define los totales de arriba; el de categoría solo la lista.
+  const scoped = useMemo(() => {
+    if (branchFilter === ALL_BRANCHES) return expenses;
+    if (branchFilter === GENERAL_BRANCH) return expenses.filter((e) => !e.branch_id);
+    return expenses.filter((e) => e.branch_id === branchFilter);
+  }, [expenses, branchFilter]);
   const filtered = useMemo(
-    () => (categoryFilter === ALL_CATEGORIES ? expenses : expenses.filter((e) => e.category === categoryFilter)),
-    [expenses, categoryFilter]
+    () => (categoryFilter === ALL_CATEGORIES ? scoped : scoped.filter((e) => e.category === categoryFilter)),
+    [scoped, categoryFilter]
   );
+  const branchName = (id: string | null) => (id ? (branches.find((b) => b.id === id)?.name ?? "Sucursal") : "General");
 
-  const totalMonth = useMemo(() => expenses.reduce((s, e) => s + Number(e.amount), 0), [expenses]);
+  const totalMonth = useMemo(() => scoped.reduce((s, e) => s + Number(e.amount), 0), [scoped]);
   const totalToday = useMemo(() => {
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    return expenses.filter((e) => e.expense_date === todayStr).reduce((s, e) => s + Number(e.amount), 0);
-  }, [expenses]);
+    return scoped.filter((e) => e.expense_date === todayStr).reduce((s, e) => s + Number(e.amount), 0);
+  }, [scoped]);
   const totalPending = useMemo(
-    () => expenses.reduce((s, e) => s + Math.max(0, Number(e.amount) - Number(e.amount_paid)), 0),
-    [expenses]
+    () => scoped.reduce((s, e) => s + Math.max(0, Number(e.amount) - Number(e.amount_paid)), 0),
+    [scoped]
   );
 
   const openCreate = () => { setEditItem(null); setOpen(true); };
@@ -160,13 +173,25 @@ export default function Gastos() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-full sm:w-56"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_CATEGORIES}>Todas las categorías</SelectItem>
-            {categories.map((c) => <SelectItem key={c.id} value={c.label}>{c.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {hasMultipleBranches && (
+            <Select value={branchFilter} onValueChange={setBranchFilter}>
+              <SelectTrigger className="w-full sm:w-56" aria-label="Filtrar por sucursal"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_BRANCHES}>Todas las sucursales</SelectItem>
+                <SelectItem value={GENERAL_BRANCH}>General (sin sucursal)</SelectItem>
+                {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full sm:w-56" aria-label="Filtrar por categoría"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CATEGORIES}>Todas las categorías</SelectItem>
+              {categories.map((c) => <SelectItem key={c.id} value={c.label}>{c.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card>
@@ -185,6 +210,7 @@ export default function Gastos() {
                   <TableRow>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Categoría</TableHead>
+                    {hasMultipleBranches && <TableHead>Sucursal</TableHead>}
                     <TableHead>Descripción</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
                     <TableHead>Forma de pago</TableHead>
@@ -200,6 +226,7 @@ export default function Gastos() {
                           {format(new Date(`${e.expense_date}T00:00:00`), "d MMM yyyy", { locale: es })}
                         </TableCell>
                         <TableCell><Badge variant="outline">{e.category}</Badge></TableCell>
+                        {hasMultipleBranches && <TableCell className="whitespace-nowrap text-muted-foreground">{branchName(e.branch_id)}</TableCell>}
                         <TableCell className="max-w-[220px] truncate text-muted-foreground">{e.description ?? "—"}</TableCell>
                         <TableCell className="text-right font-medium">{formatPYG(e.amount)}</TableCell>
                         <TableCell>
