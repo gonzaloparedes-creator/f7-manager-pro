@@ -42,7 +42,13 @@ export function renderMessage(template: string, vars: Partial<MessageVars>): str
   );
 }
 
-export type MessageEventKey = "orden_creada" | "presupuesto_creado" | "seguimiento";
+export type MessageEventKey =
+  | "orden_creada"
+  | "presupuesto_creado"
+  | "seguimiento"
+  | "presupuesto_aceptado"
+  | "presupuesto_rechazado"
+  | "presupuesto_cambios";
 
 export const MESSAGE_EVENTS: Record<MessageEventKey, { label: string; defaultBody: string }> = {
   orden_creada: {
@@ -60,7 +66,26 @@ export const MESSAGE_EVENTS: Record<MessageEventKey, { label: string; defaultBod
     defaultBody:
       "¡Hola {{cliente}}! Podés seguir el estado de tu {{equipo}} (Orden *{{orden}}*) acá: {{link}} 🔧",
   },
+  presupuesto_aceptado: {
+    label: "Presupuesto aceptado",
+    defaultBody:
+      "¡Hola {{cliente}}! Vimos que aceptaste el presupuesto de tu {{equipo}}, ¡perfecto! En breve nos ponemos en contacto con vos. 🔧",
+  },
+  presupuesto_rechazado: {
+    label: "Presupuesto rechazado",
+    defaultBody:
+      "¡Hola {{cliente}}! Vimos que rechazaste el presupuesto de tu {{equipo}}. Cualquier consulta, escribinos y lo revisamos juntos. 🔧",
+  },
+  presupuesto_cambios: {
+    label: "Cambios al presupuesto",
+    defaultBody:
+      "¡Hola {{cliente}}! Recibimos tu pedido de cambios sobre el presupuesto de tu {{equipo}}. Lo revisamos y te contactamos a la brevedad. 🔧",
+  },
 };
+
+export function isMessageEventKey(key: string): key is MessageEventKey {
+  return Object.prototype.hasOwnProperty.call(MESSAGE_EVENTS, key);
+}
 
 export type TemplateOverrides = Partial<Record<string, string>>;
 
@@ -147,27 +172,42 @@ export function buildBatchCreatedMessage(
 
 export type MessageAction = "opened" | "copied" | "dismissed";
 
+// Avisa a la cola de pendientes (menú + página) que hay un registro nuevo,
+// sin esperar al próximo refresco automático.
+export const MESSAGE_LOG_EVENT = "f7:message-log";
+
+export function notifyMessageQueueChanged() {
+  window.dispatchEvent(new Event(MESSAGE_LOG_EVENT));
+}
+
 // Best effort, igual que logOrderPayment: el mensaje ya se abrió/copió,
 // un fallo al registrarlo no debe frenar ni confundir al usuario. "opened"
 // significa que se abrió WhatsApp con el texto cargado — no que el cliente
-// lo recibió.
+// lo recibió. Con `orderIds` (mensaje combinado de un lote) se escribe un
+// registro por orden, así ninguna de ellas queda como pendiente.
 export async function logCustomerMessage(params: {
   companyId: string;
   userId: string;
   orderId: string | null;
+  orderIds?: string[];
   eventKey: string;
   action: MessageAction;
   phone: string | null;
   message: string | null;
 }) {
-  const { error } = await supabase.from("customer_message_log").insert({
-    company_id: params.companyId,
-    order_id: params.orderId,
-    event_key: params.eventKey,
-    action: params.action,
-    phone: params.phone,
-    message: params.message,
-    created_by: params.userId,
-  });
+  const targets: (string | null)[] =
+    params.orderIds && params.orderIds.length > 0 ? params.orderIds : [params.orderId];
+  const { error } = await supabase.from("customer_message_log").insert(
+    targets.map((orderId) => ({
+      company_id: params.companyId,
+      order_id: orderId,
+      event_key: params.eventKey,
+      action: params.action,
+      phone: params.phone,
+      message: params.message,
+      created_by: params.userId,
+    }))
+  );
   if (error) console.error("No se pudo registrar el mensaje:", error.message);
+  else notifyMessageQueueChanged();
 }

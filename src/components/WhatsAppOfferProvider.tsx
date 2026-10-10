@@ -7,6 +7,7 @@ import AvisarClienteDialog, { type MessageOption } from "@/components/AvisarClie
 import {
   buildBatchCreatedMessage,
   buildOrderMessageVars,
+  notifyMessageQueueChanged,
   recipientPhone,
   renderMessage,
   resolveEventBody,
@@ -100,6 +101,7 @@ async function prepareCreationOffer(companyId: string, request: Request): Promis
       message: combined,
       eventKey: request.event,
       orderId: first.id,
+      orderIds: orders.map((o) => o.id),
     },
     ...orders.map((o) => ({
       key: o.id,
@@ -193,7 +195,10 @@ export default function WhatsAppOfferProvider({ children }: { children: ReactNod
         <CreationOfferHost
           key={request.id}
           request={request}
-          onDone={() => setRequest((prev) => (prev?.id === request.id ? null : prev))}
+          onDone={() => {
+            setRequest((prev) => (prev?.id === request.id ? null : prev));
+            notifyMessageQueueChanged();
+          }}
         />
       )}
     </WhatsAppOfferContext.Provider>

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt, Cpu } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt, Cpu, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -16,10 +16,13 @@ import SuspendedAccount from "@/pages/SuspendedAccount";
 import UpgradeProDialog from "@/components/UpgradeProDialog";
 import QuickActionsFab from "@/components/QuickActionsFab";
 import WhatsAppOfferProvider from "@/components/WhatsAppOfferProvider";
+import PendingMessagesProvider from "@/components/PendingMessagesProvider";
+import { usePendingMessages } from "@/hooks/usePendingMessages";
 
 const baseNav = [
   { to: "/dashboard", label: "Órdenes", icon: LayoutDashboard, proOnly: false, businessOnly: false, adminOnly: false },
   { to: "/clientes", label: "Clientes", icon: Users, proOnly: false, businessOnly: false, adminOnly: false },
+  { to: "/avisos", label: "Avisos", icon: MessageCircle, proOnly: false, businessOnly: false, adminOnly: false },
   { to: "/inventario", label: "Inventario", icon: Package, proOnly: true, businessOnly: false, adminOnly: false },
   { to: "/productos", label: "Productos", icon: ShoppingBag, proOnly: false, businessOnly: true, adminOnly: false },
   { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true },
@@ -32,7 +35,26 @@ const adminNav = [
   { to: "/configuracion", label: "Configuración", icon: Settings, proOnly: false, businessOnly: false, adminOnly: true },
 ];
 
-export default function AppLayout() {
+function PendingBadge({ mobile }: { mobile: boolean }) {
+  const { count } = usePendingMessages();
+  if (count === 0) return null;
+  return (
+    <span
+      data-testid="pending-badge"
+      aria-label={`${count} avisos pendientes`}
+      className={cn(
+        "flex items-center justify-center rounded-full bg-green-600 font-bold leading-none text-white",
+        mobile
+          ? "absolute -right-2.5 -top-1.5 h-4 min-w-4 px-1 text-[9px] ring-2 ring-card"
+          : "ml-auto h-5 min-w-5 px-1.5 text-[11px]"
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+function AppLayoutContent() {
   const { user, loading } = useAuth();
   const { isAdmin } = useUserRole();
   const { canViewProducts, canViewGastos, canViewCaja, canManageCompany } = useStaffPermissions();
@@ -142,8 +164,12 @@ export default function AppLayout() {
           )
         }
       >
-        <item.icon className={mobile ? "h-5 w-5" : "h-4 w-4"} />
+        <span className="relative">
+          <item.icon className={mobile ? "h-5 w-5" : "h-4 w-4"} />
+          {item.to === "/avisos" && mobile && <PendingBadge mobile />}
+        </span>
         {item.label}
+        {item.to === "/avisos" && !mobile && <PendingBadge mobile={false} />}
       </NavLink>
     );
   };
@@ -253,5 +279,13 @@ export default function AppLayout() {
       </nav>
       <QuickActionsFab />
     </div>
+  );
+}
+
+export default function AppLayout() {
+  return (
+    <PendingMessagesProvider>
+      <AppLayoutContent />
+    </PendingMessagesProvider>
   );
 }

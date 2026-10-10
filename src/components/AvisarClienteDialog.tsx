@@ -23,6 +23,8 @@ export interface MessageOption {
   eventKey?: string;
   /** Orden a la que se asocia el registro; por defecto, la del diálogo. */
   orderId?: string | null;
+  /** Mensaje combinado de varias órdenes: se registra una vez por cada una. */
+  orderIds?: string[];
 }
 
 export default function AvisarClienteDialog({
@@ -64,6 +66,7 @@ export default function AvisarClienteDialog({
   const [selectedKey, setSelectedKey] = useState(options?.[0]?.key ?? "");
   const [currentEventKey, setCurrentEventKey] = useState(eventKey);
   const [currentOrderId, setCurrentOrderId] = useState(orderId);
+  const [currentOrderIds, setCurrentOrderIds] = useState<string[] | undefined>(options?.[0]?.orderIds);
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +74,7 @@ export default function AvisarClienteDialog({
     setSelectedKey(options?.[0]?.key ?? "");
     setCurrentEventKey(eventKey);
     setCurrentOrderId(orderId);
+    setCurrentOrderIds(options?.[0]?.orderIds);
     // options se reconstruye en cada render del padre; solo importa cuando
     // el diálogo se abre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,6 +86,7 @@ export default function AvisarClienteDialog({
       companyId,
       userId: user.id,
       orderId: currentOrderId,
+      orderIds: currentOrderIds,
       eventKey: currentEventKey,
       action,
       phone,
@@ -96,6 +101,7 @@ export default function AvisarClienteDialog({
     setMessage(opt.message);
     setCurrentEventKey(opt.eventKey ?? opt.key);
     setCurrentOrderId(opt.orderId !== undefined ? opt.orderId : orderId);
+    setCurrentOrderIds(opt.orderIds);
   };
 
   // window.open tiene que correr dentro del click: si se hace después de un

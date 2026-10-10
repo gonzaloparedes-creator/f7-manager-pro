@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard.tsx";
 import OrderDetail from "./pages/OrderDetail.tsx";
 import Settings from "./pages/Settings.tsx";
 import Clients from "./pages/Clients.tsx";
+import PendingMessages from "./pages/PendingMessages.tsx";
 import Reports from "./pages/Reports.tsx";
 import CashClosing from "./pages/CashClosing.tsx";
 import Gastos from "./pages/Gastos.tsx";
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ordenes/:id" element={<OrderDetail />} />
             <Route path="/clientes" element={<Clients />} />
+            <Route path="/avisos" element={<PendingMessages />} />
             <Route path="/inventario" element={<Inventory />} />
             <Route path="/productos" element={<Products />} />
             <Route path="/reportes" element={<Reports />} />

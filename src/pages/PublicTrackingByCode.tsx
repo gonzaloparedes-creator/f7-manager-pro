@@ -394,7 +394,9 @@ export default function PublicTrackingByCode() {
         {isToken && order.status === "presupuesto" && (
           <Card>
             <CardContent className="space-y-4 p-6">
-              <h2 className="font-semibold">¿Qué querés hacer con este presupuesto?</h2>
+              <h2 className="font-semibold">
+                {order.quote_response ? "Recibimos tu respuesta" : "¿Qué querés hacer con este presupuesto?"}
+              </h2>
 
               {order.quote_response ? (
                 <div className="space-y-1.5">
@@ -404,6 +406,9 @@ export default function PublicTrackingByCode() {
                   {order.quote_response_note && (
                     <p className="text-sm text-muted-foreground">"{order.quote_response_note}"</p>
                   )}
+                  <p className="text-sm text-muted-foreground">
+                    ¡Gracias! El taller ya tiene tu respuesta y se va a comunicar con vos.
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     Si necesitás cambiar tu respuesta, contactanos directamente.
                   </p>

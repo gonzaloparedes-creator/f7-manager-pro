@@ -41,6 +41,7 @@ import { useMessageTemplates } from "@/hooks/useMessageTemplates";
 import {
   buildOrderMessageVars,
   MESSAGE_EVENTS,
+  notifyMessageQueueChanged,
   recipientPhone,
   renderMessage,
   resolveEventBody,
@@ -551,6 +552,7 @@ export default function OrderDetail() {
         image_urls: imageUrls,
       } as any);
 
+      notifyMessageQueueChanged();
       if (newStatus !== order.status) await notifyStatusChange(imageUrls);
 
       toast({ title: "Actualizado", description: "El estado fue actualizado." });
