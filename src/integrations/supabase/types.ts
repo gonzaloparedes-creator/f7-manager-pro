@@ -587,6 +587,7 @@ export type Database = {
           installments_total: number | null
           notes: string | null
           payment_type: string
+          recurring_expense_id: string | null
         }
         Insert: {
           amount: number
@@ -603,6 +604,7 @@ export type Database = {
           installments_total?: number | null
           notes?: string | null
           payment_type: string
+          recurring_expense_id?: string | null
         }
         Update: {
           amount?: number
@@ -619,6 +621,7 @@ export type Database = {
           installments_total?: number | null
           notes?: string | null
           payment_type?: string
+          recurring_expense_id?: string | null
         }
         Relationships: [
           {
@@ -641,6 +644,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_recurring_expense_fkey"
+            columns: ["recurring_expense_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_expenses"
+            referencedColumns: ["id", "company_id"]
           },
         ]
       }
@@ -1125,8 +1135,8 @@ export type Database = {
           has_sim: boolean
           id: string
           imei: string | null
-          interruption_reason: string | null
           interrupted_at: string | null
+          interruption_reason: string | null
           marca: string | null
           modelo: string | null
           order_number: string
@@ -1182,8 +1192,8 @@ export type Database = {
           has_sim?: boolean
           id?: string
           imei?: string | null
-          interruption_reason?: string | null
           interrupted_at?: string | null
+          interruption_reason?: string | null
           marca?: string | null
           modelo?: string | null
           order_number: string
@@ -1239,8 +1249,8 @@ export type Database = {
           has_sim?: boolean
           id?: string
           imei?: string | null
-          interruption_reason?: string | null
           interrupted_at?: string | null
+          interruption_reason?: string | null
           marca?: string | null
           modelo?: string | null
           order_number?: string
@@ -1500,6 +1510,85 @@ export type Database = {
           },
         ]
       }
+      recurring_expenses: {
+        Row: {
+          active: boolean
+          amount: number
+          branch_id: string | null
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          day_of_month: number | null
+          day_of_week: number | null
+          description: string | null
+          frequency: string
+          generated_through: string | null
+          id: string
+          notes: string | null
+          payment_method: string | null
+          start_date: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          branch_id?: string | null
+          category: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          day_of_week?: number | null
+          description?: string | null
+          frequency: string
+          generated_through?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          start_date: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          branch_id?: string | null
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          day_of_week?: number | null
+          description?: string | null
+          frequency?: string
+          generated_through?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_expenses_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_partners: {
         Row: {
           commission_rate: number
@@ -1615,6 +1704,7 @@ export type Database = {
         Returns: boolean
       }
       generate_order_number: { Args: { _company_id: string }; Returns: string }
+      generate_recurring_expenses: { Args: never; Returns: number }
       get_history_by_code: {
         Args: { _code: string }
         Returns: {
@@ -1730,11 +1820,6 @@ export type Database = {
         }[]
       }
       get_user_branch: { Args: { _user_id: string }; Returns: string }
-      is_branch_restricted: { Args: { _user_id: string }; Returns: boolean }
-      transfer_order_to_branch: {
-        Args: { _branch_id: string; _order_id: string }
-        Returns: undefined
-      }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -1743,8 +1828,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_branch_restricted: { Args: { _user_id: string }; Returns: boolean }
       is_company_active: { Args: { _company_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      recurring_expense_is_due: {
+        Args: {
+          p_date: string
+          p_day_of_month: number
+          p_day_of_week: number
+          p_frequency: string
+        }
+        Returns: boolean
+      }
+      transfer_order_to_branch: {
+        Args: { _branch_id: string; _order_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "staff" | "superadmin" | "recepcion"

@@ -10,6 +10,7 @@ import f7Logo from "@/assets/f7-logo.png";
 import { useCompanyStatus } from "@/hooks/useCompanyStatus";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { usePlan } from "@/hooks/usePlan";
+import { useGenerateRecurringExpenses } from "@/hooks/useGenerateRecurringExpenses";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { PLAN_MESSAGES } from "@/lib/plans";
 import SuspendedAccount from "@/pages/SuspendedAccount";
@@ -64,6 +65,7 @@ function AppLayoutContent() {
   const hasExternalInventory = isBusiness || isRetail;
   const navigate = useNavigate();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  useGenerateRecurringExpenses(canViewGastos && !isStarter && !planLoading);
   const nav = useMemo(() => {
     const items = isAdmin ? [...baseNav, ...adminNav] : baseNav;
     let filtered = items.filter((i) => !i.adminOnly || isAdmin);

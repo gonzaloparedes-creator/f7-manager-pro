@@ -568,6 +568,16 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
         images: [{ file: "gastos-abonar-01.png", alt: "Abonar una cuota de un gasto a crédito" }],
       },
+      {
+        id: "recurrentes",
+        title: "Gastos recurrentes (alquiler, internet, sueldos…)",
+        body: [
+          "En la pestaña \"Recurrentes\" creás una regla para los gastos que se repiten: elegís la categoría, el monto, y si se repite cada mes (con el día del mes) o cada semana (con el día de la semana). El gasto se carga solo en esa fecha, sin que tengas que acordarte.",
+          "En \"Cuando se genere el gasto\" elegís si queda \"pendiente de pago\" (aparece como \"A pagar\" en la lista y lo abonás cuando pagues de verdad, con el botón \"Abonar\") o si ya se registra pagado con un método. Si elegís Efectivo, se descuenta del efectivo esperado en Caja → Cierre el día que se carga.",
+          "Los gastos que genera una regla llevan la marca \"Recurrente\". Si elegís el día 29, 30 o 31, en los meses más cortos se carga el último día del mes. Podés pausar una regla con el interruptor (al reanudarla no se cargan de golpe los meses que estuvo pausada), editarla — los cambios valen para los próximos gastos — o eliminarla; los gastos ya cargados se conservan.",
+          "Los gastos recurrentes se cargan cuando alguien con acceso a Gastos abre el sistema: si nadie lo abre un día, al entrar la próxima vez se cargan las fechas que faltaron (hasta 3 meses atrás), con la fecha que les correspondía.",
+        ],
+      },
     ],
   },
   {

@@ -12,11 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import NewExpenseDialog, { type EditableExpense } from "@/components/NewExpenseDialog";
 import PayExpenseInstallmentDialog, { type ExpenseForInstallment } from "@/components/PayExpenseInstallmentDialog";
+import RecurringExpenseDialog, { type RecurringRule } from "@/components/RecurringExpenseDialog";
+import RecurringExpensesPanel from "@/components/RecurringExpensesPanel";
+import { generateRecurringExpenses } from "@/hooks/useGenerateRecurringExpenses";
 import { formatPYG } from "@/lib/orders";
-import { Receipt, Plus, Pencil, Trash2, Wallet, ShieldAlert, ChevronLeft, ChevronRight } from "lucide-react";
+import { Receipt, Plus, Pencil, Trash2, Wallet, ShieldAlert, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -33,6 +37,7 @@ interface Expense {
   expense_date: string;
   notes: string | null;
   branch_id: string | null;
+  recurring_expense_id: string | null;
 }
 
 const ALL_CATEGORIES = "__all__";
@@ -58,6 +63,10 @@ export default function Gastos() {
   const [deleting, setDeleting] = useState(false);
   const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [rules, setRules] = useState<RecurringRule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(true);
+  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const [editRule, setEditRule] = useState<RecurringRule | null>(null);
 
   const viewMonth = useMemo(() => addMonths(new Date(), monthOffset), [monthOffset]);
   const monthLabel = format(viewMonth, "MMMM yyyy", { locale: es });
@@ -69,7 +78,7 @@ export default function Gastos() {
     const to = format(endOfMonth(viewMonth), "yyyy-MM-dd");
     const { data, error } = await supabase
       .from("expenses")
-      .select("id, category, description, amount, payment_type, amount_paid, installments_total, installments_paid, expense_date, notes, branch_id")
+      .select("id, category, description, amount, payment_type, amount_paid, installments_total, installments_paid, expense_date, notes, branch_id, recurring_expense_id")
       .eq("company_id", companyId)
       .gte("expense_date", from)
       .lte("expense_date", to)
@@ -78,7 +87,36 @@ export default function Gastos() {
     setExpenses((data ?? []) as Expense[]);
     setLoading(false);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [companyId, monthOffset]);
+
+  const loadRules = async () => {
+    if (!companyId) return;
+    const { data, error } = await supabase
+      .from("recurring_expenses")
+      .select("id, category, description, amount, frequency, day_of_month, day_of_week, payment_method, start_date, generated_through, active, notes, branch_id")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false });
+    if (error) toast({ title: "Error al cargar gastos recurrentes", description: error.message, variant: "destructive" });
+    setRules((data ?? []) as RecurringRule[]);
+    setRulesLoading(false);
+  };
+
+  const ready = !planLoading && !permLoading && canViewGastos && !isStarter;
+  useEffect(() => {
+    if (!companyId || !ready) return;
+    void generateRecurringExpenses(companyId).then(() => load());
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [companyId, monthOffset, ready]);
+  useEffect(() => {
+    if (!companyId || !ready) return;
+    void loadRules();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [companyId, ready]);
+
+  const afterRuleChange = async () => {
+    if (!companyId) return;
+    await generateRecurringExpenses(companyId, true);
+    await Promise.all([load(), loadRules()]);
+  };
 
   // El filtro de sucursal también define los totales de arriba; el de categoría solo la lista.
   const scoped = useMemo(() => {
@@ -148,6 +186,16 @@ export default function Gastos() {
         </Button>
       </div>
 
+      <Tabs defaultValue="gastos" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="gastos">Gastos</TabsTrigger>
+          <TabsTrigger value="recurrentes" className="gap-1.5">
+            <Repeat className="h-3.5 w-3.5" />
+            Recurrentes{rules.length > 0 ? ` (${rules.length})` : ""}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="gastos" className="mt-0 space-y-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Gastos del mes</div>
@@ -225,7 +273,16 @@ export default function Gastos() {
                         <TableCell className="whitespace-nowrap text-muted-foreground">
                           {format(new Date(`${e.expense_date}T00:00:00`), "d MMM yyyy", { locale: es })}
                         </TableCell>
-                        <TableCell><Badge variant="outline">{e.category}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline">{e.category}</Badge>
+                            {e.recurring_expense_id && (
+                              <Badge variant="secondary" className="gap-1" title="Se cargó automáticamente desde un gasto recurrente">
+                                <Repeat className="h-3 w-3" /> Recurrente
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         {hasMultipleBranches && <TableCell className="whitespace-nowrap text-muted-foreground">{branchName(e.branch_id)}</TableCell>}
                         <TableCell className="max-w-[220px] truncate text-muted-foreground">{e.description ?? "—"}</TableCell>
                         <TableCell className="text-right font-medium">{formatPYG(e.amount)}</TableCell>
@@ -235,7 +292,9 @@ export default function Gastos() {
                           ) : (
                             <div className="flex flex-col gap-0.5">
                               <Badge variant="outline" className="w-fit border-secondary/40 text-secondary">
-                                Crédito{e.installments_total ? ` · ${e.installments_paid}/${e.installments_total}` : ""}
+                                {e.recurring_expense_id && !e.installments_total
+                                  ? pending > 0 ? "A pagar" : "Pagado"
+                                  : `Crédito${e.installments_total ? ` · ${e.installments_paid}/${e.installments_total}` : ""}`}
                               </Badge>
                               {pending > 0 && (
                                 <span className="text-xs text-muted-foreground">Pendiente: {formatPYG(pending)}</span>
@@ -267,7 +326,25 @@ export default function Gastos() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="recurrentes" className="mt-0">
+          <RecurringExpensesPanel
+            rules={rules}
+            loading={rulesLoading}
+            onCreate={() => { setEditRule(null); setRuleDialogOpen(true); }}
+            onEdit={(r) => { setEditRule(r); setRuleDialogOpen(true); }}
+            onChanged={afterRuleChange}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <RecurringExpenseDialog
+        open={ruleDialogOpen}
+        onOpenChange={(o) => { setRuleDialogOpen(o); if (!o) setEditRule(null); }}
+        onSaved={afterRuleChange}
+        editItem={editRule}
+      />
       <NewExpenseDialog
         open={open}
         onOpenChange={(o) => { setOpen(o); if (!o) setEditItem(null); }}
