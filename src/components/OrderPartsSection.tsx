@@ -41,15 +41,22 @@ interface OrderPart {
 export default function OrderPartsSection({
   orderId,
   branchId,
+  orderTotal = 0,
+  showProfit = false,
 }: {
   orderId: string;
   branchId: string | null;
+  /** Presupuesto + cargos adicionales: el precio total que paga el cliente. */
+  orderTotal?: number;
+  /** Solo admin: muestra costo de repuestos, ganancia y margen de la orden. */
+  showProfit?: boolean;
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { toast } = useToast();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [parts, setParts] = useState<OrderPart[]>([]);
+  const [partsLoaded, setPartsLoaded] = useState(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
@@ -105,6 +112,7 @@ export default function OrderPartsSection({
       .eq("order_id", orderId)
       .order("created_at", { ascending: true });
     setParts((data ?? []) as OrderPart[]);
+    setPartsLoaded(true);
   };
 
   useEffect(() => {
@@ -112,6 +120,10 @@ export default function OrderPartsSection({
     loadParts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, companyId, branchId]);
+
+  const partsCost = parts.reduce((s, p) => s + Number(p.historical_cost ?? 0) * Number(p.quantity ?? 0), 0);
+  const profit = orderTotal - partsCost;
+  const marginPct = orderTotal > 0 ? Math.round((profit / orderTotal) * 100) : null;
 
   const filtered = items.filter((i) =>
     i.name.toLowerCase().includes(query.trim().toLowerCase())
@@ -454,6 +466,42 @@ export default function OrderPartsSection({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {showProfit && partsLoaded && (parts.length > 0 || orderTotal > 0) && (
+          <div
+            data-testid="order-profit-panel"
+            className="space-y-1.5 rounded-md border border-border bg-muted/30 p-3 text-sm"
+          >
+            <div className="flex items-center justify-between gap-2 text-muted-foreground">
+              <span>Precio al cliente</span>
+              <span data-testid="order-profit-price">{formatPYG(orderTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-muted-foreground">
+              <span>Costo de repuestos</span>
+              <span data-testid="order-profit-cost">− {formatPYG(partsCost)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 border-t border-border pt-1.5 font-semibold">
+              <span>Ganancia de esta orden</span>
+              <span
+                data-testid="order-profit-net"
+                className={profit >= 0 ? "text-primary" : "text-destructive"}
+              >
+                {formatPYG(profit)}
+                {marginPct !== null && (
+                  <span className="ml-1.5 text-xs font-medium text-muted-foreground">({marginPct}%)</span>
+                )}
+              </span>
+            </div>
+            {orderTotal <= 0 && (
+              <p className="text-xs text-muted-foreground">
+                Todavía no hay presupuesto cargado: la ganancia se completa cuando definas el precio.
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Solo la ves vos como administrador. El costo es el que tenía cada repuesto cuando se agregó a la orden.
+            </p>
           </div>
         )}
       </CardContent>

@@ -1171,7 +1171,15 @@ export default function OrderDetail() {
             </CardContent>
           </Card>
 
-          <OrderPartsSection orderId={order.id} branchId={order.current_branch_id ?? null} />
+          <OrderPartsSection
+            orderId={order.id}
+            branchId={order.current_branch_id ?? null}
+            showProfit={isAdmin}
+            orderTotal={
+              Number(order.quote_amount ?? 0) +
+              (order.cargos_adicionales ?? []).reduce((s, c) => s + Number(c.monto || 0), 0)
+            }
+          />
 
           {(isAdmin || order.quote_amount > 0 || order.deposit_amount > 0 || order.estimated_delivery_date || (order.cargos_adicionales?.length ?? 0) > 0 || (order.financial_documents?.length ?? 0) > 0) && (() => {
             const cargos = order.cargos_adicionales ?? [];

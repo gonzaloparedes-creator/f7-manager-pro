@@ -199,6 +199,7 @@ export const tutorialCategories: TutorialCategory[] = [
         badge: { label: "Requiere plan Pro o Business+" },
         body: [
           "Permite cargar los repuestos que se usaron en la reparación, tomándolos directamente del stock de Inventario. Al agregar un repuesto acá, el stock se descuenta automáticamente — no hace falta ajustarlo a mano en Inventario.",
+          "Si sos administrador, al final de esta sección ves un panel con la ganancia de esa orden: el precio que paga el cliente (presupuesto más cargos adicionales), el costo de los repuestos y lo que te queda, en Gs. y en porcentaje. El costo es el que tenía cada repuesto cuando lo agregaste a la orden, así que si después cambia el precio de compra, la ganancia de esta orden no se mueve. Tu equipo no ve este panel.",
         ],
         images: [{ file: "detalle-orden-repuestos-01.png", alt: "Sección de repuestos usados en la orden" }],
       },
@@ -428,6 +429,14 @@ export const tutorialCategories: TutorialCategory[] = [
           "El ingreso se reconoce cuando se cobra: la seña cuenta en la fecha que se cobró, y el saldo (junto con el costo de los repuestos de esa orden) cuenta en la fecha en que se termina de cobrar — así el reporte refleja la plata que efectivamente entró en ese período, no lo presupuestado.",
         ],
         images: [{ file: "reportes-ganancia-neta-01.png", alt: "Tarjetas de ingresos y ganancia neta" }],
+      },
+      {
+        id: "como-se-calcula",
+        title: "Cómo se calcula cada número",
+        body: [
+          "Arriba de las tarjetas hay una línea que resume la base de los números: lo cobrado cuenta por fecha de cobro, la tienda por fecha de venta, los costos son los que tenía cada repuesto o producto al usarse o venderse, y no se incluyen los gastos del negocio.",
+          "Al lado del nombre de cada tarjeta hay un ícono de ayuda (?). Tocalo y se abre una explicación corta de qué suma y qué no suma ese número. La Ganancia Neta Total, por ejemplo, no descuenta lo cargado en Gastos (alquiler, sueldos, etc.): es la ganancia sobre repuestos y productos.",
+        ],
       },
       {
         id: "grafico",

@@ -11,7 +11,7 @@ import { formatPYG, interruptionReasonLabel } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone } from "lucide-react";
+import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, HelpCircle, Info } from "lucide-react";
 import { usePlan } from "@/hooks/usePlan";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
@@ -721,11 +721,25 @@ export default function Reports() {
         </Popover>
       </div>
 
+      <p data-testid="reports-data-basis" className="-mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>
+          Base de los números: lo cobrado cuenta por fecha de cobro (la seña el día que se recibió, el saldo el día del cobro final) y la tienda por fecha de venta.
+          Los costos son los que tenía cada repuesto o producto al usarse o venderse. No incluye los gastos del negocio. Tocá el ? de cada tarjeta para ver el detalle.
+        </span>
+      </p>
+
       {hasTaller && hasTienda && (
         <Card className="border-primary/40 bg-gradient-to-br from-primary/10 via-transparent to-transparent">
           <CardContent className="flex items-center justify-between p-6">
             <div>
-              <div className="text-sm text-muted-foreground">Ganancia Neta Total (Taller + Tienda)</div>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                Ganancia Neta Total (Taller + Tienda)
+                <KpiHint
+                  label="Ganancia Neta Total"
+                  text="Ingreso neto del taller más ganancia neta de la tienda. No descuenta los gastos cargados en el módulo Gastos (alquiler, sueldos, etc.): es ganancia sobre repuestos y productos."
+                />
+              </div>
               <div className={`mt-1 text-3xl font-bold ${gananciaNetaTotal >= 0 ? "text-primary" : "text-destructive"}`}>
                 {formatPYG(gananciaNetaTotal)}
               </div>
@@ -743,6 +757,7 @@ export default function Reports() {
             <SummaryCard
               icon={Wallet}
               label="Ingresos Brutos"
+              hint="Lo cobrado por reparaciones en el período. La seña cuenta el día en que se recibió; el saldo, el día del cobro final de la orden. Incluye los cargos adicionales."
               value={ingresosBrutosTaller}
               accent="text-foreground"
               iconBg="bg-accent text-accent-foreground"
@@ -750,6 +765,7 @@ export default function Reports() {
             <SummaryCard
               icon={PackageMinus}
               label="Costo de Repuestos"
+              hint="Costo de los repuestos de las órdenes cuyo cobro final cayó en el período, con el costo que tenía cada repuesto cuando se agregó a la orden (no el costo actual del inventario)."
               value={costoRepuestos}
               accent="text-secondary"
               iconBg="bg-secondary/10 text-secondary"
@@ -758,6 +774,7 @@ export default function Reports() {
             <SummaryCard
               icon={ingresoNetoTaller >= 0 ? TrendingUp : TrendingDown}
               label="Ingreso Neto"
+              hint="Ingresos brutos menos costo de repuestos. No descuenta los gastos del módulo Gastos."
               value={ingresoNetoTaller}
               accent="text-primary"
               iconBg="bg-primary/10 text-primary"
@@ -770,6 +787,7 @@ export default function Reports() {
             <SummaryCard
               icon={Wallet}
               label="Ventas Brutas"
+              hint="Ventas de productos de la tienda en el período, según el día en que se hizo cada venta."
               value={ventasBrutasTienda}
               accent="text-foreground"
               iconBg="bg-accent text-accent-foreground"
@@ -777,6 +795,7 @@ export default function Reports() {
             <SummaryCard
               icon={PackageMinus}
               label="Costo de Productos"
+              hint="Costo de los productos vendidos en el período, con el costo que tenían en el momento de la venta."
               value={costoProductosVendidos}
               accent="text-secondary"
               iconBg="bg-secondary/10 text-secondary"
@@ -785,6 +804,7 @@ export default function Reports() {
             <SummaryCard
               icon={gananciaNetaTienda >= 0 ? TrendingUp : TrendingDown}
               label="Ganancia Neta"
+              hint="Ventas brutas menos costo de productos. No descuenta los gastos del módulo Gastos."
               value={gananciaNetaTienda}
               accent="text-primary"
               iconBg="bg-primary/10 text-primary"
@@ -899,6 +919,27 @@ function ReportBlock({ title, icon: Icon, children }: { title: string; icon: any
   );
 }
 
+function KpiHint({ label, text }: { label: string; text: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Cómo se calcula: ${label}`}
+          data-testid="kpi-hint"
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 text-sm" align="start">
+        <div className="mb-1 font-semibold">{label}</div>
+        <p className="text-muted-foreground">{text}</p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function SummaryCard({
   icon: Icon,
   label,
@@ -906,6 +947,7 @@ function SummaryCard({
   accent,
   iconBg,
   prefix,
+  hint,
 }: {
   icon: any;
   label: string;
@@ -913,12 +955,16 @@ function SummaryCard({
   accent?: string;
   iconBg?: string;
   prefix?: string;
+  hint?: string;
 }) {
   return (
     <Card>
       <CardContent className="flex items-center justify-between p-5">
         <div>
-          <div className="text-sm text-muted-foreground">{label}</div>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            {label}
+            {hint && <KpiHint label={label} text={hint} />}
+          </div>
           <div className={`text-2xl font-bold ${accent ?? ""}`}>
             {prefix}{formatPYG(value)}
           </div>
