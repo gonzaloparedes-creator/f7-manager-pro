@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
+import { useWhatsAppOffer } from "@/hooks/useWhatsAppOffer";
 import { renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
 import { resolveClientId } from "@/lib/clients";
 import { X, Search, UserPlus, Check, Loader2 } from "lucide-react";
@@ -83,6 +84,7 @@ export default function NewOrderDialog({
   const { limits, isStarter } = usePlan();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
+  const { offerCreation } = useWhatsAppOffer();
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -410,6 +412,7 @@ export default function NewOrderDialog({
       }
 
       toast({ title: "¡Orden creada!", description: `${order_number} fue registrada.` });
+      offerCreation([order.id], "orden_creada");
       reset(true);
       onOpenChange(false);
       onCreated();

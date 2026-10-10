@@ -132,6 +132,19 @@ export function buildOrderMessageVars(
   };
 }
 
+// Modo Lote: un solo mensaje por cliente con todos los equipos (cada uno con
+// su link, porque cada orden tiene su propio token de seguimiento).
+export function buildBatchCreatedMessage(
+  orders: { device_type: string; order_number: string; tracking_token: string }[],
+  ctx: { cliente: string; taller: string }
+): string {
+  const lines = orders.map(
+    (o) => `• ${o.device_type} — *${o.order_number}*\n  ${trackingUrl(o.tracking_token)}`
+  );
+  const where = ctx.taller ? ` en ${ctx.taller}` : "";
+  return `¡Hola ${ctx.cliente}! Recibimos tus ${orders.length} equipos${where}:\n\n${lines.join("\n")}\n\nPodés seguir el estado de cada reparación desde esos links 🔧`;
+}
+
 export type MessageAction = "opened" | "copied" | "dismissed";
 
 // Best effort, igual que logOrderPayment: el mensaje ya se abrió/copió,

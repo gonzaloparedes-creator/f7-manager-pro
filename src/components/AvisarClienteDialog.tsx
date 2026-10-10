@@ -19,6 +19,10 @@ export interface MessageOption {
   key: string;
   label: string;
   message: string;
+  /** Evento que se registra en el log; por defecto, `key`. */
+  eventKey?: string;
+  /** Orden a la que se asocia el registro; por defecto, la del diálogo. */
+  orderId?: string | null;
 }
 
 export default function AvisarClienteDialog({
@@ -33,6 +37,7 @@ export default function AvisarClienteDialog({
   description,
   options,
   suggested = true,
+  companyId: companyIdProp,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -48,30 +53,35 @@ export default function AvisarClienteDialog({
   options?: MessageOption[];
   /** true cuando F7 sugiere el aviso (se puede descartar con "No avisar"). */
   suggested?: boolean;
+  /** Si el padre ya conoce la empresa, evita perder el registro si se toca antes de que cargue useCompany. */
+  companyId?: string | null;
 }) {
   const { user } = useAuth();
-  const { companyId } = useCompany();
+  const { companyId: hookCompanyId } = useCompany();
+  const companyId = companyIdProp ?? hookCompanyId;
   const { toast } = useToast();
   const [message, setMessage] = useState(initialMessage);
   const [selectedKey, setSelectedKey] = useState(options?.[0]?.key ?? "");
   const [currentEventKey, setCurrentEventKey] = useState(eventKey);
+  const [currentOrderId, setCurrentOrderId] = useState(orderId);
 
   useEffect(() => {
     if (!open) return;
     setMessage(initialMessage);
     setSelectedKey(options?.[0]?.key ?? "");
     setCurrentEventKey(eventKey);
+    setCurrentOrderId(orderId);
     // options se reconstruye en cada render del padre; solo importa cuando
     // el diálogo se abre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialMessage, eventKey]);
+  }, [open, initialMessage, eventKey, orderId]);
 
   const record = (action: "opened" | "copied" | "dismissed") => {
     if (!companyId || !user) return;
     void logCustomerMessage({
       companyId,
       userId: user.id,
-      orderId,
+      orderId: currentOrderId,
       eventKey: currentEventKey,
       action,
       phone,
@@ -84,7 +94,8 @@ export default function AvisarClienteDialog({
     if (!opt) return;
     setSelectedKey(key);
     setMessage(opt.message);
-    setCurrentEventKey(opt.key);
+    setCurrentEventKey(opt.eventKey ?? opt.key);
+    setCurrentOrderId(opt.orderId !== undefined ? opt.orderId : orderId);
   };
 
   // window.open tiene que correr dentro del click: si se hace después de un

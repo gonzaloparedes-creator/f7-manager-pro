@@ -15,6 +15,7 @@ import { PLAN_MESSAGES } from "@/lib/plans";
 import SuspendedAccount from "@/pages/SuspendedAccount";
 import UpgradeProDialog from "@/components/UpgradeProDialog";
 import QuickActionsFab from "@/components/QuickActionsFab";
+import WhatsAppOfferProvider from "@/components/WhatsAppOfferProvider";
 
 const baseNav = [
   { to: "/dashboard", label: "Órdenes", icon: LayoutDashboard, proOnly: false, businessOnly: false, adminOnly: false },
@@ -240,7 +241,9 @@ export default function AppLayout() {
 
       <main className="md:pl-64 pb-20 md:pb-0">
         <div className="mx-auto max-w-6xl p-4 md:p-8 animate-fade-in">
-          <Outlet />
+          <WhatsAppOfferProvider>
+            <Outlet />
+          </WhatsAppOfferProvider>
         </div>
       </main>
 

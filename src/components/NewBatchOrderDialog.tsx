@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
+import { useWhatsAppOffer } from "@/hooks/useWhatsAppOffer";
 import { renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
 import { resolveClientId } from "@/lib/clients";
 import { Search, UserPlus, Check, Loader2, Plus, Trash2, Smartphone } from "lucide-react";
@@ -87,6 +88,7 @@ export default function NewBatchOrderDialog({
   const { limits, isStarter } = usePlan();
   const { template: serviceTermsTemplate } = useServiceTerms();
   const { toast } = useToast();
+  const { offerCreation } = useWhatsAppOffer();
   const [loading, setLoading] = useState(false);
 
   // Cada equipo del lote es una orden independiente creada en secuencia;
@@ -250,6 +252,7 @@ export default function NewBatchOrderDialog({
       }
 
       const createdNumbers: string[] = [];
+      const createdIds: string[] = [];
       const failed: string[] = [];
 
       for (const row of validRows) {
@@ -348,6 +351,7 @@ export default function NewBatchOrderDialog({
           }
 
           createdNumbers.push(order_number);
+          createdIds.push(order.id);
         } catch (e: any) {
           failed.push(`${row.device_type} (${e.message})`);
         }
@@ -363,6 +367,7 @@ export default function NewBatchOrderDialog({
         toast({ title: "Algunos equipos no se pudieron registrar", description: failed.join(" · "), variant: "destructive" });
       }
       if (createdNumbers.length > 0) {
+        offerCreation(createdIds, "orden_creada");
         reset();
         onOpenChange(false);
         onCreated();

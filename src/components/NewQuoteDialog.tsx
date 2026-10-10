@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
+import { useWhatsAppOffer } from "@/hooks/useWhatsAppOffer";
 import { useProblemPresets } from "@/hooks/useProblemPresets";
 import { useDeviceTypePresets } from "@/hooks/useDeviceTypePresets";
 import { useMarcaPresets } from "@/hooks/useMarcaPresets";
@@ -34,6 +35,7 @@ export default function NewQuoteDialog({
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const { offerCreation } = useWhatsAppOffer();
   const { presets: problemPresets } = useProblemPresets();
   const { presets: deviceTypePresets, selectionMode: deviceTypeSelectionMode } = useDeviceTypePresets();
   const { presets: marcaPresets, useDeviceClassification } = useMarcaPresets();
@@ -238,6 +240,7 @@ export default function NewQuoteDialog({
       } catch (e) { console.warn("notification failed", e); }
 
       toast({ title: "¡Presupuesto creado!", description: `${order_number} fue registrado.` });
+      offerCreation([created.id], "presupuesto_creado");
       reset();
       onOpenChange(false);
       onCreated();

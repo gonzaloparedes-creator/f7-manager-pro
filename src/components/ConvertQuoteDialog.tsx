@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useWhatsAppOffer } from "@/hooks/useWhatsAppOffer";
 import { formatPYG, renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
 import { Type, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ export default function ConvertQuoteDialog({
   order, open, onOpenChange, onConverted,
 }: { order: QuoteOrder; open: boolean; onOpenChange: (o: boolean) => void; onConverted: () => void }) {
   const { toast } = useToast();
+  const { offerCreation } = useWhatsAppOffer();
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { presets: accessoryPresets } = useAccessoryPresets();
@@ -139,6 +141,7 @@ export default function ConvertQuoteDialog({
       }
 
       toast({ title: "¡Orden creada!", description: `${order.order_number} pasó de presupuesto a orden recibida.` });
+      offerCreation([order.id], "orden_creada");
       onOpenChange(false);
       onConverted();
     } catch (e: any) {
