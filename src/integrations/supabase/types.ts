@@ -310,6 +310,7 @@ export type Database = {
           plan_type: string
           previous_system: string | null
           referral_partner_id: string | null
+          require_open_cash: boolean
           service_terms_template: string | null
           staff_can_close_caja: boolean
           staff_can_view_gastos: boolean
@@ -342,6 +343,7 @@ export type Database = {
           plan_type?: string
           previous_system?: string | null
           referral_partner_id?: string | null
+          require_open_cash?: boolean
           service_terms_template?: string | null
           staff_can_close_caja?: boolean
           staff_can_view_gastos?: boolean
@@ -374,6 +376,7 @@ export type Database = {
           plan_type?: string
           previous_system?: string | null
           referral_partner_id?: string | null
+          require_open_cash?: boolean
           service_terms_template?: string | null
           staff_can_close_caja?: boolean
           staff_can_view_gastos?: boolean
@@ -1122,11 +1125,14 @@ export type Database = {
           has_sim: boolean
           id: string
           imei: string | null
+          interruption_reason: string | null
+          interrupted_at: string | null
           marca: string | null
           modelo: string | null
           order_number: string
           original_quote_amount: number | null
           photos: string[]
+          priority: string
           problem_description: string | null
           problem_other: string | null
           problems: string[]
@@ -1176,11 +1182,14 @@ export type Database = {
           has_sim?: boolean
           id?: string
           imei?: string | null
+          interruption_reason?: string | null
+          interrupted_at?: string | null
           marca?: string | null
           modelo?: string | null
           order_number: string
           original_quote_amount?: number | null
           photos?: string[]
+          priority?: string
           problem_description?: string | null
           problem_other?: string | null
           problems?: string[]
@@ -1230,11 +1239,14 @@ export type Database = {
           has_sim?: boolean
           id?: string
           imei?: string | null
+          interruption_reason?: string | null
+          interrupted_at?: string | null
           marca?: string | null
           modelo?: string | null
           order_number?: string
           original_quote_amount?: number | null
           photos?: string[]
+          priority?: string
           problem_description?: string | null
           problem_other?: string | null
           problems?: string[]

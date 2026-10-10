@@ -67,6 +67,56 @@ export function statusBadgeClasses(status: string) {
   }
 }
 
+// Prioridad de la orden: ordena la cola de trabajo del taller. "normal" es el
+// valor por defecto y no se marca visualmente en las listas.
+export type OrderPriority = "baja" | "normal" | "alta";
+
+export const ORDER_PRIORITIES: OrderPriority[] = ["alta", "normal", "baja"];
+
+export const PRIORITY_LABELS: Record<OrderPriority, string> = {
+  alta: "Alta",
+  normal: "Normal",
+  baja: "Baja",
+};
+
+export function normalizePriority(value: string | null | undefined): OrderPriority {
+  return value === "alta" || value === "baja" ? value : "normal";
+}
+
+// Menor número = más arriba en la lista.
+export function priorityRank(value: string | null | undefined): number {
+  return ORDER_PRIORITIES.indexOf(normalizePriority(value));
+}
+
+export function priorityBadgeClasses(value: string | null | undefined) {
+  switch (normalizePriority(value)) {
+    case "alta":
+      return "bg-destructive/10 text-destructive";
+    case "baja":
+      return "bg-muted text-muted-foreground";
+    default:
+      return "bg-primary/10 text-primary";
+  }
+}
+
+// Motivos fijos para cuando una reparación se interrumpe (estado "Retirado
+// sin reparar"). Fijos a propósito: así Reportes puede agruparlos sin que
+// cada taller escriba lo mismo de cien maneras.
+export type InterruptionReason = "placa_danada" | "sin_repuesto" | "cliente_desistio" | "sin_viabilidad" | "otro";
+
+export const INTERRUPTION_REASONS: Record<InterruptionReason, string> = {
+  placa_danada: "Placa dañada",
+  sin_repuesto: "Sin repuesto disponible",
+  cliente_desistio: "El cliente desistió",
+  sin_viabilidad: "Sin viabilidad técnica",
+  otro: "Otro motivo",
+};
+
+export function interruptionReasonLabel(value: string | null | undefined) {
+  if (!value) return null;
+  return INTERRUPTION_REASONS[value as InterruptionReason] ?? value;
+}
+
 // Respuesta del cliente a un Presupuesto, dejada desde el link público de
 // tracking (solo vía tracking_token — ver PublicTrackingByCode.tsx y la
 // Edge Function respond-to-quote). El cliente no puede editar el monto

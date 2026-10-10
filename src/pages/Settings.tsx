@@ -816,6 +816,8 @@ function UsersTab() {
   const [savingCajaToggle, setSavingCajaToggle] = useState(false);
   const [virtualCashEnabled, setVirtualCashEnabled] = useState(false);
   const [savingVirtualCashToggle, setSavingVirtualCashToggle] = useState(false);
+  const [requireOpenCash, setRequireOpenCash] = useState(false);
+  const [savingRequireOpenCash, setSavingRequireOpenCash] = useState(false);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<UserRow | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
 
@@ -834,7 +836,7 @@ function UsersTab() {
     const [{ data: profs }, { data: brs }, { data: company }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, phone, branch_id, commission_rate, restrict_to_branch").eq("company_id", companyId),
       supabase.from("branches").select("id, name, address").eq("company_id", companyId).order("name"),
-      supabase.from("companies").select("commission_enabled, staff_can_view_stock, staff_can_view_products, staff_can_view_gastos, staff_can_close_caja, virtual_cash_enabled").eq("id", companyId).maybeSingle(),
+      supabase.from("companies").select("commission_enabled, staff_can_view_stock, staff_can_view_products, staff_can_view_gastos, staff_can_close_caja, virtual_cash_enabled, require_open_cash").eq("id", companyId).maybeSingle(),
     ]);
     const userIds = (profs ?? []).map((p: any) => p.id);
     let roles: any[] = [];
@@ -856,6 +858,7 @@ function UsersTab() {
     setStaffCanViewGastos(!!(company as { staff_can_view_gastos?: boolean } | null)?.staff_can_view_gastos);
     setStaffCanCloseCaja(!!(company as { staff_can_close_caja?: boolean } | null)?.staff_can_close_caja);
     setVirtualCashEnabled(!!(company as { virtual_cash_enabled?: boolean } | null)?.virtual_cash_enabled);
+    setRequireOpenCash(!!(company as { require_open_cash?: boolean } | null)?.require_open_cash);
     setLoading(false);
   };
   useEffect(() => { load(); }, [companyId]);
@@ -936,6 +939,19 @@ function UsersTab() {
       return toast({ title: "Error", description: error.message, variant: "destructive" });
     }
     toast({ title: value ? "Caja virtual habilitada" : "Caja virtual deshabilitada" });
+  };
+
+  const toggleRequireOpenCash = async (value: boolean) => {
+    if (!companyId) return;
+    setSavingRequireOpenCash(true);
+    setRequireOpenCash(value);
+    const { error } = await supabase.from("companies").update({ require_open_cash: value }).eq("id", companyId);
+    setSavingRequireOpenCash(false);
+    if (error) {
+      setRequireOpenCash(!value);
+      return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    toast({ title: value ? "Ahora hace falta abrir la caja para cobrar" : "Ya no se exige abrir la caja para cobrar" });
   };
 
   const updateUserCommissionRate = async (userId: string, rate: number) => {
@@ -1147,6 +1163,22 @@ function UsersTab() {
           <div className="flex items-center gap-2">
             {savingVirtualCashToggle && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             <Switch id="virtual-cash-toggle" checked={virtualCashEnabled} onCheckedChange={toggleVirtualCashEnabled} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-primary" />
+            <div>
+              <Label htmlFor="require-open-cash-toggle" className="cursor-pointer text-sm font-medium">Exigir caja abierta para cobrar</Label>
+              <div className="text-xs text-muted-foreground">
+                Si lo activás, no se puede cobrar el saldo de una orden ni hacer una venta de Productos hasta que alguien abra la caja del día (quien está limitado a una sucursal necesita la apertura de su sucursal). La seña al crear una orden no se bloquea.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {savingRequireOpenCash && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Switch id="require-open-cash-toggle" checked={requireOpenCash} onCheckedChange={toggleRequireOpenCash} />
           </div>
         </div>
 

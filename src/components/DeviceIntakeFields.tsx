@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG } from "@/lib/orders";
+import { formatPYG, ORDER_PRIORITIES, PRIORITY_LABELS, normalizePriority, type OrderPriority } from "@/lib/orders";
 import { compressPhoto, type PhotoEntry } from "@/lib/photos";
 import WarrantySelector from "@/components/WarrantySelector";
 import { Upload, CalendarIcon, Camera, Type, Grid3x3, X } from "lucide-react";
@@ -32,6 +32,7 @@ export interface DeviceIntakeValue {
   marca: string;
   modelo: string;
   assigned_technician_id: string;
+  priority?: OrderPriority;
   problems: string[];
   problem_other: string;
   problem_description: string;
@@ -341,6 +342,21 @@ export default function DeviceIntakeFields({
             <SelectContent>
               {technicians.map((t) => (
                 <SelectItem key={t.id} value={t.id}>{t.full_name || "Técnico sin nombre"}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={id("priority")}>Prioridad</Label>
+          <Select
+            value={normalizePriority(value.priority)}
+            onValueChange={(v) => onChange({ priority: v as OrderPriority })}
+          >
+            <SelectTrigger id={id("priority")}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {ORDER_PRIORITIES.map((p) => (
+                <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
               ))}
             </SelectContent>
           </Select>

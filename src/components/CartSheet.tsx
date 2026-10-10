@@ -13,6 +13,8 @@ import { formatPYG, isCashLabel } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import QuantityStepper from "@/components/QuantityStepper";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
+import { useCashRegisterGate } from "@/hooks/useCashRegisterGate";
+import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice";
 
 type DiscountUnit = "percent" | "amount";
 
@@ -51,6 +53,7 @@ export default function CartSheet({
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { presets: paymentMethodPresets } = usePaymentMethodPresets();
+  const cashGate = useCashRegisterGate(open);
   const [paymentMethod, setPaymentMethod] = useState("Efectivo");
   const [loading, setLoading] = useState(false);
   const [completedSale, setCompletedSale] = useState<CompletedCartSale | null>(null);
@@ -117,6 +120,10 @@ export default function CartSheet({
     }
     setLoading(true);
     try {
+      if (await cashGate.check()) {
+        toast.error("La caja de hoy no está abierta. Abrila desde Caja para poder vender.");
+        return;
+      }
       const saleGroupId = crypto.randomUUID();
       const rows = lines.map((l) => ({
         company_id: companyId,
@@ -323,8 +330,9 @@ export default function CartSheet({
                     </div>
                   )}
                 </div>
-                <SheetFooter>
-                  <Button onClick={checkout} disabled={loading} size="lg" className="w-full">
+                <SheetFooter className="flex-col gap-2 sm:flex-col sm:justify-start sm:space-x-0">
+                  {cashGate.blocked && <CashRegisterRequiredNotice what="vender" />}
+                  <Button onClick={checkout} disabled={loading || cashGate.blocked} size="lg" className="w-full">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Confirmar venta
                   </Button>

@@ -11,9 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatPYG, resolveStatusLabel, isClosedOrderStatus, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
+import {
+  formatPYG, resolveStatusLabel, isClosedOrderStatus, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse,
+  PRIORITY_LABELS, normalizePriority, priorityBadgeClasses, priorityRank,
+} from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
-import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays } from "lucide-react";
+import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays, Flag } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
 import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
@@ -48,6 +51,7 @@ interface Order {
   warranty_days: number | null;
   delivered_at: string | null;
   quote_response: QuoteResponse | null;
+  priority: string | null;
 }
 interface Branch { id: string; name: string }
 interface ProfileLite { id: string; full_name: string | null }
@@ -95,6 +99,7 @@ export default function Dashboard() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [onlyHighPriority, setOnlyHighPriority] = useState(false);
   const [techMap, setTechMap] = useState<Record<string, string>>({});
   const location = useLocation();
   const navigate = useNavigate();
@@ -124,7 +129,7 @@ export default function Dashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, customer_name, customer_phone, device_type, imei, marca, modelo, status, created_at, problems, quote_amount, deposit_amount, deposit_payment_method, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response")
+      .select("id, order_number, customer_name, customer_phone, device_type, imei, marca, modelo, status, created_at, problems, quote_amount, deposit_amount, deposit_payment_method, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response, priority")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false });
     if (error) {
@@ -213,6 +218,13 @@ export default function Dashboard() {
         );
       })
     : filteredByStatus;
+
+  // Las urgentes arriba y las de prioridad baja al final; el resto conserva el
+  // orden de siempre (última actividad). Una orden ya cerrada no se reordena.
+  const rankOf = (o: Order) => (isClosedOrderStatus(o.status) ? 1 : priorityRank(o.priority));
+  const visibleOrders = filtered
+    .filter((o) => !onlyHighPriority || (normalizePriority(o.priority) === "alta" && !isClosedOrderStatus(o.status)))
+    .sort((a, b) => rankOf(a) - rankOf(b));
 
   return (
     <div className="space-y-6">
@@ -310,18 +322,33 @@ export default function Dashboard() {
             {f.label}
           </button>
         ))}
+        <button
+          onClick={() => setOnlyHighPriority((v) => !v)}
+          aria-pressed={onlyHighPriority}
+          data-testid="filter-high-priority"
+          className={cn(
+            "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            onlyHighPriority
+              ? "border-destructive bg-destructive text-destructive-foreground"
+              : "border-border bg-card text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Flag className="h-3.5 w-3.5" /> Prioridad alta
+        </button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : visibleOrders.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <Smartphone className="h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground">
-              {searchQuery
+              {onlyHighPriority
+                ? "No hay órdenes de prioridad alta en esta vista."
+                : searchQuery
                 ? `Ninguna orden coincide con "${search.trim()}".`
                 : filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${resolveStatusLabel(filter, statusPresets)}.`}
             </p>
@@ -336,7 +363,7 @@ export default function Dashboard() {
         <>
           {/* Mobile: filas compactas, una línea de info por orden */}
           <div className="flex flex-col gap-2 sm:hidden">
-            {filtered.map((o) => {
+            {visibleOrders.map((o) => {
               const { saldo, isFullyPaid, hasQuoteOnly, hasPartial, total } = orderMoney(o);
               return (
                 <Link key={o.id} to={`/ordenes/${o.id}`}>
@@ -363,6 +390,11 @@ export default function Dashboard() {
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
+                      {normalizePriority(o.priority) !== "normal" && !isClosedOrderStatus(o.status) && (
+                        <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", priorityBadgeClasses(o.priority))}>
+                          Prioridad {PRIORITY_LABELS[normalizePriority(o.priority)].toLowerCase()}
+                        </span>
+                      )}
                       {o.status === "presupuesto" && o.quote_response && (
                         <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
                           {QUOTE_RESPONSE_LABELS[o.quote_response]}
@@ -392,7 +424,7 @@ export default function Dashboard() {
 
           {/* Desktop/tablet: cards completas con toda la info */}
           <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((o) => {
+          {visibleOrders.map((o) => {
             const { total, deposit, saldo, isFullyPaid, hasPartial, hasQuoteOnly } = orderMoney(o);
             return (
             <Link key={o.id} to={`/ordenes/${o.id}`}>
@@ -412,6 +444,11 @@ export default function Dashboard() {
                         </Badge>
                       )}
                       <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
+                      {normalizePriority(o.priority) !== "normal" && !isClosedOrderStatus(o.status) && (
+                        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", priorityBadgeClasses(o.priority))}>
+                          Prioridad {PRIORITY_LABELS[normalizePriority(o.priority)].toLowerCase()}
+                        </span>
+                      )}
                       {o.status === "presupuesto" && o.quote_response && (
                         <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
                           {QUOTE_RESPONSE_LABELS[o.quote_response]}

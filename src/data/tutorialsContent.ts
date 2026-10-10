@@ -62,6 +62,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Las tres tarjetas resumen de arriba (\"Total\", \"En proceso\", \"Listas para retirar\") también funcionan como filtro: tocá una para ver solo esas órdenes, y tocala de nuevo para volver a \"Activas\".",
           "Debajo del buscador hay chips de estado (por ejemplo \"Recibido\", \"En reparación\", \"Listo\") que se arman automáticamente según los estados que tenga configurados tu taller en Configuración → Estados. También hay dos chips fijos: \"Activas\" (todo lo que no está entregado, enviado, retirado sin reparar, ni es un presupuesto) y \"Presupuestos\".",
           "Si tu taller tiene más de una sucursal, los administradores ven además un filtro para mirar una sucursal a la vez o todas juntas.",
+          "Las órdenes abiertas se ordenan por prioridad: primero las de prioridad Alta, después las Normales y al final las de prioridad Baja (dentro de cada grupo, las más nuevas arriba). El chip \"Prioridad alta\" deja a la vista solo las urgentes.",
         ],
         images: [{ file: "ordenes-buscar-01.png", alt: "Buscador y filtros de estado en el Dashboard" }],
       },
@@ -73,6 +74,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "La etiqueta de color indica el estado actual de la orden. Al lado puede aparecer una etiqueta de garantía (si el trabajo tiene garantía vigente), el técnico asignado, y los problemas reportados por el cliente.",
           "Si la orden es un presupuesto, vas a ver una etiqueta con la respuesta del cliente (aceptado, rechazado o pendiente) apenas responda desde el link de seguimiento.",
           "Cuando una orden tiene saldo pendiente de cobro, aparece un botón \"Cobrar Saldo\" directo en la tarjeta para no tener que entrar al detalle. Abre la misma ventana de registrar pago que hay en el detalle de la orden: monto, método de pago y, si hace falta, un descuento — sin salir del Dashboard.",
+          "Las órdenes con prioridad Alta muestran una etiqueta roja \"Prioridad alta\" y las de prioridad Baja una gris; las Normales no llevan etiqueta para no llenar la pantalla. Las órdenes ya cerradas (entregadas, enviadas o retiradas sin reparar) no muestran prioridad.",
         ],
         images: [{ file: "ordenes-tarjeta-01.png", alt: "Detalle de una tarjeta de orden en el Dashboard" }],
       },
@@ -113,6 +115,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Se pueden marcar los accesorios que el cliente deja junto con el equipo (cargador, funda, etc.) y completar un checklist de recepción (estado de la pantalla, batería, etc.) para dejar registro del estado con el que entró.",
           "Si el equipo tiene PIN o patrón de desbloqueo, se puede cargar ahí mismo para que el técnico lo tenga a mano sin tener que preguntarlo de nuevo.",
           "Se completan los datos financieros (presupuesto y seña si el cliente adelanta algo), se elige la garantía y el técnico asignado (por defecto queda quien está creando la orden, pero se puede cambiar), y se puede tomar una firma del cliente y fotos del estado del equipo al recibirlo.",
+          "El campo \"Prioridad\" (Baja, Normal o Alta) arranca en Normal. Marcá Alta cuando el cliente tiene apuro o es una reparación que hay que sacar primero: esa orden sube al principio de la lista del Dashboard. Se puede cambiar en cualquier momento desde el detalle de la orden.",
           "Si el cliente es nuevo (no se seleccionó uno ya existente del buscador), aparece un switch \"Notificar por WhatsApp\" junto a sus datos — permite dejarlo desactivado desde el momento en que se crea, sin tener que ir después a Clientes a apagarlo. Si el cliente ya existe, no se muestra: se respeta la preferencia que ese cliente ya tiene guardada.",
         ],
         images: [
@@ -168,6 +171,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Arriba de todo está el número de orden, el nombre del cliente, sus teléfonos de contacto y, si se cargó, la cédula/RUC. También se ve quién recepcionó la orden y el estado actual.",
           "Desde acá se accede al link de seguimiento para copiarlo o compartirlo, al botón de Imprimir el recibo, y al menú de acciones de la orden.",
+          "En el encabezado también se cambia la prioridad de la orden (Baja, Normal o Alta) con un selector; el cambio se guarda al instante. Si la reparación se interrumpió, junto al estado aparece una etiqueta con el motivo.",
         ],
         images: [{ file: "detalle-orden-encabezado-01.png", alt: "Encabezado del detalle de una orden" }],
       },
@@ -228,6 +232,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Para cambiar el estado de una orden (por ejemplo, de \"En reparación\" a \"Listo para retirar\"), se elige el nuevo estado y se puede agregar una nota.",
           "Esa nota puede ser interna (solo la ve tu equipo) o visible para el cliente en su seguimiento — hay un interruptor para elegir cuál de las dos. Lo mismo aplica para las fotos que se adjunten en ese momento: quedan internas o se muestran en el link de seguimiento, según esa misma elección.",
+          "Si el cliente se lleva el equipo sin que se repare, elegí el estado \"Retirado sin reparar\": el sistema te pide el motivo de la interrupción (placa dañada, sin repuesto disponible, el cliente desistió, sin viabilidad técnica u otro motivo). Ese motivo es interno — queda en el Historial de la orden y en Reportes, pero el cliente no lo ve en su seguimiento. Si después se cambia a otro estado, el motivo se borra.",
           "Al guardar el cambio, si ese estado está marcado para avisar (Configuración → WhatsApp), F7 te muestra el aviso listo para mandarle al cliente: tocás \"Abrir WhatsApp\" y sale desde tu propio WhatsApp. Si en ese momento no querés avisar, tocás \"No avisar\".",
         ],
         images: [{ file: "detalle-orden-estado-01.png", alt: "Formulario para actualizar el estado de la orden" }],
@@ -443,6 +448,14 @@ export const tutorialCategories: TutorialCategory[] = [
         images: [{ file: "reportes-categorias-01.png", alt: "Ganancia por categoría, tipo de equipo, marca y modelo" }],
       },
       {
+        id: "interrumpidas",
+        title: "Reparaciones interrumpidas",
+        body: [
+          "Si en el rango elegido hubo equipos que se retiraron sin reparar, aparece la tarjeta \"Reparaciones interrumpidas\": cuántos fueron, qué porcentaje de los equipos cerrados en el período representan (entregados + retirados sin reparar) y el desglose por motivo — placa dañada, sin repuesto, el cliente desistió, sin viabilidad técnica u otro.",
+          "Sirve para ver de dónde se te escapa el trabajo: por ejemplo, si \"Sin repuesto disponible\" se repite mucho, quizás conviene tener más stock de ese repuesto. Las órdenes que se retiraron sin reparar antes de que existiera el motivo se cuentan aparte como \"Sin motivo registrado\".",
+        ],
+      },
+      {
         id: "medio-de-pago",
         title: "Ingresos por medio de pago",
         body: [
@@ -474,6 +487,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Al iniciar el día, cualquier miembro del equipo (staff o admin) puede abrir la caja: cuenta el efectivo con el que arranca (el fondo para dar vuelto) y lo carga acá, con una nota opcional.",
           "Una vez abierta, queda marcada para ese día — \"Volver a abrir este día\" permite repetirlo si hubo un error al contar. Más abajo hay un historial de aperturas anteriores.",
           "Si tenés varias sucursales, arriba a la derecha elegís de cuál es la caja: \"Toda la empresa\" (la caja general de siempre) o una sucursal puntual — cada una tiene su propia apertura y su propio cierre, con los ingresos y gastos de esa sucursal. Un encargado con \"Solo ve su sucursal\" trabaja siempre con la caja de la suya.",
+          "Si el administrador activó \"Exigir caja abierta para cobrar\" (Configuración → Usuarios), mientras la caja del día no esté abierta no se puede cobrar el saldo de una orden ni confirmar una venta de Productos: el sistema avisa y te lleva a Caja para abrirla. La seña al crear una orden, y un descuento sin cobro, no se bloquean. Si tu usuario está limitado a una sucursal, hace falta la apertura de esa sucursal.",
         ],
         images: [{ file: "cierre-caja-comparar-01.png", alt: "Apertura de caja" }],
       },
@@ -624,6 +638,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Un admin puede eliminar un usuario cuando alguien deja el taller (el ícono de tacho en su fila). No podés eliminarte a vos mismo ni al único admin de la empresa, y si el usuario tiene órdenes registradas a su nombre (como técnico o quien recepcionó), hay que reasignarlas primero — así no se pierde de quién es cada orden ya entregada o con garantía activa.",
           "Más abajo hay switches para ajustar qué puede ver el personal sin rol Admin: mostrar el stock disponible, permitir el acceso a Productos, a Gastos, y a hacer el Cierre de Caja (la Apertura de Caja siempre está disponible para cualquiera). Los de Gastos y Cierre de Caja afectan tanto a Staff como a Recepción; todos vienen apagados por defecto salvo Productos.",
           "Ahí mismo está el switch \"Usar caja virtual (banco) además de la caja física\": si lo activás, la Apertura y el Cierre de Caja separan el dinero en efectivo del dinero en el banco (transferencias, tarjeta, etc.). Viene apagado por defecto.",
+          "También ahí está \"Exigir caja abierta para cobrar\": si lo activás, nadie puede cobrar saldos ni hacer ventas de Productos hasta que se abra la caja del día. Viene apagado por defecto y solo tiene efecto en los planes que incluyen Caja.",
         ],
         images: [{ file: "configuracion-usuarios-01.png", alt: "Alta de usuarios y roles" }],
       },

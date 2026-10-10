@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
+import { useCashRegisterGate } from "@/hooks/useCashRegisterGate";
+import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice";
 import { useToast } from "@/hooks/use-toast";
 import { formatPYG, isCashLabel, logOrderPayment, resolveStatusLabel } from "@/lib/orders";
 import { Wallet, Loader2, Plus, Trash2 } from "lucide-react";
@@ -46,6 +48,7 @@ export default function RegisterPaymentDialog({
   const { presets: paymentMethodPresets } = usePaymentMethodPresets();
   const { presets: statusPresets } = useOrderStatusPresets();
   const { toast } = useToast();
+  const cashGate = useCashRegisterGate(open);
 
   const [payLines, setPayLines] = useState<PayLine[]>([]);
   const [discountValue, setDiscountValue] = useState("");
@@ -139,6 +142,12 @@ export default function RegisterPaymentDialog({
       return;
     }
 
+    // Solo un cobro mueve plata: un descuento solo (monto 0) no necesita caja.
+    if (totalPay > 0 && await cashGate.check()) {
+      toast({ title: "La caja de hoy no está abierta", description: "Abrila desde Caja para poder cobrar.", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       const newQuoteAmount = discountAmount > 0 ? Number(order.quote_amount ?? 0) - discountAmount : order.quote_amount;
@@ -208,6 +217,7 @@ export default function RegisterPaymentDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {cashGate.blocked && totalPay > 0 && <CashRegisterRequiredNotice what="cobrar" />}
           <div className="space-y-2">
             <Label htmlFor="rp-discount">Descuento (opcional)</Label>
             <div className="flex gap-2">
@@ -341,7 +351,7 @@ export default function RegisterPaymentDialog({
           <Button
             type="button"
             onClick={handleConfirm}
-            disabled={saving}
+            disabled={saving || (cashGate.blocked && totalPay > 0)}
             className="gap-2 bg-secondary text-secondary-foreground hover:bg-secondary/90"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}

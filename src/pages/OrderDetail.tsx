@@ -11,7 +11,11 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
-import { formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse } from "@/lib/orders";
+import {
+  formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse,
+  ORDER_PRIORITIES, PRIORITY_LABELS, normalizePriority, priorityBadgeClasses,
+  INTERRUPTION_REASONS, interruptionReasonLabel, type InterruptionReason,
+} from "@/lib/orders";
 import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
@@ -79,6 +83,9 @@ interface Order {
   quote_response?: QuoteResponse | null;
   quote_response_note?: string | null;
   quote_responded_at?: string | null;
+  priority?: string | null;
+  interruption_reason?: string | null;
+  interrupted_at?: string | null;
 }
 interface CargoAdicional { motivo: string; monto: number; }
 interface FinancialDocument { name: string; url: string; uploaded_at: string; }
@@ -128,6 +135,7 @@ export default function OrderDetail() {
   const [newStatus, setNewStatus] = useState<string>(_statusDraft?.newStatus ?? "recibido");
   const [note, setNote] = useState(_statusDraft?.note ?? "");
   const [noteVisible, setNoteVisible] = useState(_statusDraft?.noteVisible ?? true);
+  const [interruptionReason, setInterruptionReason] = useState<string>("");
   const [updating, setUpdating] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [showChargeForm, setShowChargeForm] = useState(false);
@@ -262,6 +270,7 @@ export default function OrderDetail() {
         received_by_name: receivedByName,
       };
       setOrder(normalized);
+      setInterruptionReason(normalized.interruption_reason ?? "");
       // Only adopt server status if user has no in-progress draft
       if (!loadStatusDraft()) setNewStatus(o.status);
       document.title = `${o.order_number} | F7 Manager Pro`;
@@ -530,10 +539,28 @@ export default function OrderDetail() {
     setAvisarOpen(true);
   };
 
+  const changePriority = async (value: string) => {
+    if (!order) return;
+    const previous = order.priority;
+    setOrder({ ...order, priority: value });
+    const { error } = await supabase.from("orders").update({ priority: value }).eq("id", order.id);
+    if (error) {
+      setOrder((o) => (o ? { ...o, priority: previous } : o));
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Prioridad actualizada", description: `Ahora es ${PRIORITY_LABELS[normalizePriority(value)].toLowerCase()}.` });
+  };
+
   const updateStatus = async () => {
     if (!order || !user) return;
     if (newStatus === order.status && !note && evidenceFiles.length === 0) {
       toast({ title: "Sin cambios", description: "Cambiá el estado, agregá una nota o subí fotos." });
+      return;
+    }
+    const interrupting = newStatus === "retirado_sin_reparar";
+    if (interrupting && !interruptionReason) {
+      toast({ title: "Falta el motivo", description: "Elegí por qué se interrumpió la reparación.", variant: "destructive" });
       return;
     }
     setUpdating(true);
@@ -584,7 +611,12 @@ export default function OrderDetail() {
 
       const { error } = await supabase
         .from("orders")
-        .update({ status: newStatus, technician_notes: note && noteVisible ? note : order.technician_notes })
+        .update({
+          status: newStatus,
+          technician_notes: note && noteVisible ? note : order.technician_notes,
+          interruption_reason: interrupting ? interruptionReason : null,
+          interrupted_at: interrupting ? (order.status === newStatus && order.interrupted_at ? order.interrupted_at : new Date().toISOString()) : null,
+        })
         .eq("id", order.id);
       if (error) throw error;
       await supabase.from("order_status_history").insert({
@@ -592,6 +624,17 @@ export default function OrderDetail() {
         note: note || null, is_internal: !noteVisible,
         image_urls: imageUrls,
       } as any);
+      if (interrupting && (newStatus !== order.status || interruptionReason !== (order.interruption_reason ?? ""))) {
+        try {
+          await supabase.from("order_status_history").insert({
+            order_id: order.id, status: newStatus, status_label: resolveStatusLabel(newStatus, statusPresets),
+            note: `Reparación interrumpida · motivo: ${interruptionReasonLabel(interruptionReason)}`,
+            is_internal: true, image_urls: [],
+          } as any);
+        } catch (e) {
+          console.warn("Failed to log interruption reason", e);
+        }
+      }
 
       notifyMessageQueueChanged();
       if (newStatus !== order.status) await notifyStatusChange(imageUrls);
@@ -818,6 +861,25 @@ export default function OrderDetail() {
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={order.status} label={resolveStatusLabel(order.status, statusPresets)} className="text-sm" />
           <WarrantyBadge deliveredAt={order.delivered_at} warrantyDays={order.warranty_days} />
+          {order.status === "retirado_sin_reparar" && order.interruption_reason && (
+            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground" data-testid="interruption-badge">
+              Motivo: {interruptionReasonLabel(order.interruption_reason)}
+            </span>
+          )}
+          <Select value={normalizePriority(order.priority)} onValueChange={changePriority}>
+            <SelectTrigger
+              aria-label="Prioridad de la orden"
+              data-testid="priority-select"
+              className={cn("h-8 w-auto gap-2 rounded-full border-0 px-3 text-xs font-medium", priorityBadgeClasses(order.priority))}
+            >
+              <SelectValue>Prioridad: {PRIORITY_LABELS[normalizePriority(order.priority)]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {ORDER_PRIORITIES.map((p) => (
+                <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={copyTracking} className="gap-2">
             <Copy className="h-4 w-4" /> Link tracking
           </Button>
@@ -1371,6 +1433,20 @@ export default function OrderDetail() {
                   </SelectContent>
                 </Select>
               </div>
+              {newStatus === "retirado_sin_reparar" && (
+                <div className="space-y-2">
+                  <Label htmlFor="order-interruption-reason">Motivo de la interrupción *</Label>
+                  <Select value={interruptionReason} onValueChange={setInterruptionReason}>
+                    <SelectTrigger id="order-interruption-reason"><SelectValue placeholder="¿Por qué no se pudo reparar?" /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(INTERRUPTION_REASONS) as InterruptionReason[]).map((k) => (
+                        <SelectItem key={k} value={k}>{INTERRUPTION_REASONS[k]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Queda guardado para los reportes y no lo ve el cliente.</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="order-status-note">Nota (opcional)</Label>
                 <Textarea

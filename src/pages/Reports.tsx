@@ -7,11 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { formatPYG } from "@/lib/orders";
+import { formatPYG, interruptionReasonLabel } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Wallet, TrendingUp, PackageMinus, TrendingDown, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone } from "lucide-react";
+import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone } from "lucide-react";
 import { usePlan } from "@/hooks/usePlan";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
@@ -36,6 +36,9 @@ interface OrderRow {
   device_type: string | null;
   marca: string | null;
   modelo: string | null;
+  interruption_reason: string | null;
+  interrupted_at: string | null;
+  updated_at: string;
 }
 interface PartRow {
   order_id: string;
@@ -209,6 +212,25 @@ function repairCountByField(
     map.set(key, (map.get(key) ?? 0) + 1);
   }
   return map;
+}
+
+/**
+ * Reparaciones interrumpidas (estado "Retirado sin reparar") en el rango, con
+ * su motivo. Las que se marcaron antes de existir el motivo no tienen
+ * interrupted_at: se usa la última actualización como fecha aproximada.
+ */
+function interruptionsInRange(orders: OrderRow[], from: Date | null, to: Date | null) {
+  const byReason = new Map<string, number>();
+  let interrupted = 0;
+  let delivered = 0;
+  for (const o of orders) {
+    if (o.status === "entregado" && inRange(o.delivered_at, from, to)) delivered += 1;
+    if (o.status !== "retirado_sin_reparar" || !inRange(o.interrupted_at ?? o.updated_at, from, to)) continue;
+    interrupted += 1;
+    const key = o.interruption_reason ?? "sin_motivo";
+    byReason.set(key, (byReason.get(key) ?? 0) + 1);
+  }
+  return { interrupted, delivered, byReason };
 }
 
 type CategoryMargin = { revenue: number; cost: number; count: number };
@@ -437,7 +459,7 @@ export default function Reports() {
         if (!hasTaller) return;
         const { data: o, error: oErr } = await supabase
           .from("orders")
-          .select("id, status, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, delivered_at, current_branch_id, assigned_technician_id, device_type, marca, modelo")
+          .select("id, status, quote_amount, senia_amount, cargos_adicionales, deposit_date, final_payment_date, delivered_at, current_branch_id, assigned_technician_id, device_type, marca, modelo, interruption_reason, interrupted_at, updated_at")
           .eq("company_id", companyId);
         if (oErr) hadError = true;
         const orderIds = (o ?? []).map((x: any) => x.id);
@@ -544,6 +566,8 @@ export default function Reports() {
     const top = Array.from(full.entries()).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 8);
     return new Map(top);
   }, [hasTaller, useDeviceClassification, orders, parts, from, to]);
+
+  const interruptions = useMemo(() => interruptionsInRange(orders, from, to), [orders, from, to]);
 
   const branchName = (id: string) => id ? (branches.find((b) => b.id === id)?.name ?? "Sucursal") : "Sin sucursal";
   const branchBreakdown = useMemo(() => {
@@ -770,7 +794,8 @@ export default function Reports() {
       </div>
 
       {(categoriaTaller.size > 0 || categoriaTienda.size > 0 || (hasMultipleBranches && branchBreakdown.length > 0) || staffBreakdown.length > 1
-        || gananciaPorEquipo.size > 0 || gananciaPorMarca.size > 0 || gananciaPorModeloTop.size > 0 || paymentMethodBreakdown.length > 0) && (
+        || gananciaPorEquipo.size > 0 || gananciaPorMarca.size > 0 || gananciaPorModeloTop.size > 0 || paymentMethodBreakdown.length > 0
+        || (hasTaller && interruptions.interrupted > 0)) && (
         <div className="grid gap-4 md:grid-cols-2">
           {categoriaTaller.size > 0 && (
             <CostByCategoryCard title="Costo de repuestos por categoría" rows={categoriaTaller} />
@@ -792,6 +817,9 @@ export default function Reports() {
           )}
           {paymentMethodBreakdown.length > 0 && (
             <RevenueListCard title="Ingresos por medio de pago" icon={Wallet} rows={paymentMethodBreakdown} />
+          )}
+          {hasTaller && interruptions.interrupted > 0 && (
+            <InterruptionsCard {...interruptions} />
           )}
           {staffBreakdown.length > 1 && (
             <StaffCommissionCard rows={staffBreakdown} commissionEnabled={commissionEnabled} />
@@ -900,6 +928,32 @@ function SummaryCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function InterruptionsCard({ interrupted, delivered, byReason }: { interrupted: number; delivered: number; byReason: Map<string, number> }) {
+  const closed = interrupted + delivered;
+  const pct = closed > 0 ? Math.round((interrupted / closed) * 100) : 0;
+  const rows = Array.from(byReason.entries()).sort((a, b) => b[1] - a[1]);
+  return (
+    <BreakdownCardShell title="Reparaciones interrumpidas" icon={PackageX}>
+      <div data-testid="interruptions-card" className="space-y-3">
+        <div>
+          <div className="text-2xl font-bold">{interrupted}</div>
+          <div className="text-xs text-muted-foreground">
+            {pct}% de los equipos que se cerraron en este período ({interrupted} de {closed}) se retiraron sin reparar.
+          </div>
+        </div>
+        <ul className="space-y-1.5 text-sm">
+          {rows.map(([reason, count]) => (
+            <li key={reason} className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">{reason === "sin_motivo" ? "Sin motivo registrado" : interruptionReasonLabel(reason)}</span>
+              <span className="font-medium">{count}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </BreakdownCardShell>
   );
 }
 
