@@ -11,7 +11,9 @@ import { formatPYG, interruptionReasonLabel } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, HelpCircle, Info } from "lucide-react";
+import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, Info } from "lucide-react";
+import KpiHint from "@/components/KpiHint";
+import ReportsInsights from "@/components/ReportsInsights";
 import { usePlan } from "@/hooks/usePlan";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
@@ -901,6 +903,8 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+
+      <ReportsInsights from={from} to={to} hasTaller={hasTaller} hasTienda={hasTienda} />
     </div>
   );
 }
@@ -916,27 +920,6 @@ function ReportBlock({ title, icon: Icon, children }: { title: string; icon: any
         {children}
       </div>
     </div>
-  );
-}
-
-function KpiHint({ label, text }: { label: string; text: string }) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Cómo se calcula: ${label}`}
-          data-testid="kpi-hint"
-          className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <HelpCircle className="h-3.5 w-3.5" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 text-sm" align="start">
-        <div className="mb-1 font-semibold">{label}</div>
-        <p className="text-muted-foreground">{text}</p>
-      </PopoverContent>
-    </Popover>
   );
 }
 

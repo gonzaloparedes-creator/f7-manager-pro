@@ -465,6 +465,16 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "para-decidir-mejor",
+        title: "Para decidir mejor: taller e inventario",
+        body: [
+          "Al final de Reportes hay una sección \"Para decidir mejor\" con análisis que salen de lo que ya cargás en el sistema, sin trabajo extra. Cada tarjeta tiene su ícono de ayuda (?) con la explicación de cómo se calcula.",
+          "Taller (usa el período elegido arriba): \"Entregas a tiempo\" compara el día en que se entregó cada equipo contra la fecha de entrega que le prometiste al cliente — las órdenes sin fecha prometida no entran en el porcentaje. \"Servicios más pedidos\" lista los problemas que más se cargaron y el ticket promedio de esas órdenes. \"Tiempo en cada etapa\" muestra cuánto se queda una orden, en promedio, en cada estado, para ver dónde se demora el taller.",
+          "\"Clientes que no volvieron\" lista a quienes ya tuvieron una orden, no tienen ninguna abierta y su última visita fue hace más de 90 días, de los que se fueron hace menos tiempo a los que se fueron hace más. Con el botón WhatsApp se abre un mensaje corto que podés editar antes de enviar. No depende del período elegido.",
+          "Inventario: \"Dinero parado\" suma lo que tenés inmovilizado en artículos con stock que no se usaron ni se vendieron en 30, 60, 90 o 180 días (stock por costo). \"Lista de reposición\" junta los artículos que llegaron a su stock mínimo, los agotados primero, y el botón \"Copiar lista\" la deja lista para pegar en un mensaje al proveedor. \"Hoja de conteo\" abre una hoja imprimible con el stock que dice el sistema y columnas en blanco para anotar lo que contás en el estante; si tenés varias sucursales podés elegir de cuál imprimirla.",
+        ],
+      },
+      {
         id: "medio-de-pago",
         title: "Ingresos por medio de pago",
         body: [
