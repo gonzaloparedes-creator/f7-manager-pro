@@ -321,6 +321,8 @@ export type Database = {
           use_device_type_presets: boolean
           virtual_cash_enabled: boolean
           weekly_repairs_estimate: string | null
+          whatsapp_notify_prefs: Json
+          whatsapp_queue_since: string
         }
         Insert: {
           city?: string | null
@@ -351,6 +353,8 @@ export type Database = {
           use_device_type_presets?: boolean
           virtual_cash_enabled?: boolean
           weekly_repairs_estimate?: string | null
+          whatsapp_notify_prefs?: Json
+          whatsapp_queue_since?: string
         }
         Update: {
           city?: string | null
@@ -381,6 +385,8 @@ export type Database = {
           use_device_type_presets?: boolean
           virtual_cash_enabled?: boolean
           weekly_repairs_estimate?: string | null
+          whatsapp_notify_prefs?: Json
+          whatsapp_queue_since?: string
         }
         Relationships: [
           {
@@ -388,6 +394,64 @@ export type Database = {
             columns: ["referral_partner_id"]
             isOneToOne: false
             referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_message_log: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          event_key: string
+          id: string
+          message: string | null
+          order_id: string | null
+          phone: string | null
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          event_key: string
+          id?: string
+          message?: string | null
+          order_id?: string | null
+          phone?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          event_key?: string
+          id?: string
+          message?: string | null
+          order_id?: string | null
+          phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_message_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_message_log_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_message_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1492,6 +1556,38 @@ export type Database = {
           label?: string
         }
         Relationships: []
+      }
+      whatsapp_templates: {
+        Row: {
+          body: string
+          company_id: string
+          event_key: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          company_id: string
+          event_key: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          company_id?: string
+          event_key?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

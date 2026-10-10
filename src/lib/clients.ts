@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 // teléfono legítimo.
 const MIN_REAL_PHONE_DIGITS = 6;
 
-function normalizedRealPhone(phone: string | null | undefined): string | null {
+export function normalizedRealPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   const digits = phone.replace(/^595/, "");
   return digits.length >= MIN_REAL_PHONE_DIGITS ? phone : null;

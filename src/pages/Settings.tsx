@@ -104,6 +104,7 @@ export default function Settings() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
+  const [prefsCompanyId, setPrefsCompanyId] = useState<string | null>(null);
 
   const [qr, setQr] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -116,10 +117,21 @@ export default function Settings() {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, phone, whatsapp_connected, whatsapp_phone, notification_preferences, branch_id")
+      .select("full_name, phone, whatsapp_connected, whatsapp_phone, notification_preferences, branch_id, company_id")
       .eq("id", user.id).maybeSingle();
     if (data) {
-      const prefs = { ...DEFAULT_PREFS, ...((data as any).notification_preferences as Partial<NotifPrefs> ?? {}) };
+      // Los avisos sugeridos (modo seguro) leen las preferencias a nivel
+      // empresa; las del perfil las sigue leyendo el envío automático viejo
+      // hasta que se apague. Se muestran las de la empresa y se guardan en
+      // ambos lados para que los dos modos queden consistentes.
+      const companyId = data.company_id;
+      let companyPrefs: Partial<NotifPrefs> = {};
+      if (companyId) {
+        const { data: c } = await supabase.from("companies").select("whatsapp_notify_prefs").eq("id", companyId).maybeSingle();
+        companyPrefs = (c?.whatsapp_notify_prefs as Partial<NotifPrefs> | null) ?? {};
+      }
+      const prefs = { ...DEFAULT_PREFS, ...((data as any).notification_preferences as Partial<NotifPrefs> ?? {}), ...companyPrefs };
+      setPrefsCompanyId(companyId);
       setProfile({ ...(data as any), notification_preferences: prefs });
     }
   };
@@ -133,10 +145,14 @@ export default function Settings() {
     const next = { ...profile.notification_preferences, [key]: value };
     setProfile({ ...profile, notification_preferences: next });
     setSavingPrefs(true);
-    const { error } = await supabase.from("profiles")
-      .update({ notification_preferences: next as any })
-      .eq("id", user.id);
+    const [profileRes, companyRes] = await Promise.all([
+      supabase.from("profiles").update({ notification_preferences: next as any }).eq("id", user.id),
+      prefsCompanyId
+        ? supabase.from("companies").update({ whatsapp_notify_prefs: next }).eq("id", prefsCompanyId)
+        : Promise.resolve({ error: null }),
+    ]);
     setSavingPrefs(false);
+    const error = profileRes.error ?? companyRes.error;
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setProfile({ ...profile });

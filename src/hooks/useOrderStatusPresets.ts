@@ -2,7 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 
-export type OrderStatusPreset = { id: string; key: string; label: string; sort_order: number; is_locked: boolean };
+export type OrderStatusPreset = {
+  id: string;
+  key: string;
+  label: string;
+  sort_order: number;
+  is_locked: boolean;
+  message_template: string | null;
+};
 
 export function useOrderStatusPresets() {
   const { companyId } = useCompany();
@@ -14,7 +21,7 @@ export function useOrderStatusPresets() {
     setLoading(true);
     const { data } = await supabase
       .from("order_status_presets")
-      .select("id, key, label, sort_order, is_locked")
+      .select("id, key, label, sort_order, is_locked, message_template")
       .eq("company_id", companyId)
       .order("sort_order", { ascending: true });
     setPresets((data ?? []) as OrderStatusPreset[]);

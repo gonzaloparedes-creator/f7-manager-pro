@@ -16,7 +16,7 @@ import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useAssignableTechnicians } from "@/hooks/useAssignableTechnicians";
-import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks, Paperclip, Loader2, Tags } from "lucide-react";
+import { ArrowLeft, Copy, Phone, Smartphone, FileText, ChevronLeft, ChevronRight, X, Hash, Wallet, CalendarDays, Wrench, Trash2, Plus, Printer, Camera, ImagePlus, Building2, UserCheck, Package, Pencil, Lock, ListChecks, Paperclip, Loader2, Tags, MessageCircle } from "lucide-react";
 import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
@@ -35,6 +35,19 @@ import OrderActionsMenu from "@/components/OrderActionsMenu";
 import OrderPartsSection from "@/components/OrderPartsSection";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import ConvertQuoteDialog from "@/components/ConvertQuoteDialog";
+import AvisarClienteDialog, { type MessageOption } from "@/components/AvisarClienteDialog";
+import { fetchWhatsAppSettings } from "@/hooks/useWhatsAppSettings";
+import { useMessageTemplates } from "@/hooks/useMessageTemplates";
+import {
+  buildOrderMessageVars,
+  MESSAGE_EVENTS,
+  recipientPhone,
+  renderMessage,
+  resolveEventBody,
+  resolveStatusBody,
+  statusEventKey,
+  type MessageEventKey,
+} from "@/lib/customerMessages";
 import imageCompression from "browser-image-compression";
 
 interface Order {
@@ -51,6 +64,7 @@ interface Order {
   financial_documents: FinancialDocument[];
   client_id: string | null;
   customer_cedula?: string | null;
+  client_notify_whatsapp?: boolean;
   assigned_technician_id?: string | null;
   current_branch_id?: string | null;
   accessories?: string[] | null;
@@ -129,6 +143,15 @@ export default function OrderDetail() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState<string>("");
   const [transferring, setTransferring] = useState(false);
+  const { overrides: templateOverrides } = useMessageTemplates();
+  const [avisarOpen, setAvisarOpen] = useState(false);
+  const [avisar, setAvisar] = useState<{
+    eventKey: string;
+    message: string;
+    phone: string | null;
+    suggested: boolean;
+    options?: MessageOption[];
+  } | null>(null);
 
   const addEvidenceFiles = (files: File[]) => {
     if (files.length === 0) return;
@@ -201,13 +224,15 @@ export default function OrderDetail() {
     setLoadError(null);
     if (o) {
       let cedula: string | null = null;
+      let clientNotifyWhatsapp = true;
       if ((o as any).client_id) {
         const { data: cli } = await supabase
           .from("clients")
-          .select("cedula")
+          .select("cedula, notify_whatsapp")
           .eq("id", (o as any).client_id)
           .maybeSingle();
         cedula = cli?.cedula ?? null;
+        clientNotifyWhatsapp = cli?.notify_whatsapp !== false;
       }
       let receivedByName: string | null = null;
       if ((o as any).received_by_id) {
@@ -227,6 +252,7 @@ export default function OrderDetail() {
           ? ((o as any).financial_documents as FinancialDocument[])
           : [],
         customer_cedula: cedula,
+        client_notify_whatsapp: clientNotifyWhatsapp,
         received_by_name: receivedByName,
       };
       setOrder(normalized);
@@ -376,6 +402,92 @@ export default function OrderDetail() {
     }
   };
 
+  const sendLegacyStatusNotification = async (imageUrls: string[]) => {
+    if (!order) return;
+    try {
+      await supabase.functions.invoke("send-status-notification", {
+        body: {
+          customer_name: order.customer_name,
+          customer_phone: order.alternative_phone || order.customer_phone,
+          device_type: order.device_type,
+          order_number: order.order_number,
+          order_code: order.tracking_token,
+          new_status: newStatus,
+          app_origin: window.location.origin,
+          image_urls: imageUrls,
+        },
+      });
+    } catch (e) { console.warn(e); }
+  };
+
+  const statusMessageFor = (statusKey: string) => {
+    if (!order) return "";
+    const vars = buildOrderMessageVars(order, {
+      taller: businessName ?? "",
+      estado: resolveStatusLabel(statusKey, statusPresets),
+    });
+    return renderMessage(resolveStatusBody(statusKey, statusPresets), vars);
+  };
+
+  // Las empresas que todavía tienen Evolution conectado siguen recibiendo el
+  // aviso automático del servidor (hasta el apagado); el resto recibe la
+  // sugerencia para abrir WhatsApp con un toque.
+  const notifyStatusChange = async (imageUrls: string[]) => {
+    if (!order) return;
+    if (!companyId) {
+      await sendLegacyStatusNotification(imageUrls);
+      return;
+    }
+    let settings;
+    try {
+      settings = await fetchWhatsAppSettings(companyId);
+    } catch (e) {
+      console.warn(e);
+      await sendLegacyStatusNotification(imageUrls);
+      return;
+    }
+    if (settings.evolutionActive) {
+      await sendLegacyStatusNotification(imageUrls);
+      return;
+    }
+    if (settings.prefs[newStatus] !== true) return;
+    if (order.client_notify_whatsapp === false) return;
+    const phone = recipientPhone(order);
+    if (!phone) return;
+    setAvisar({ eventKey: statusEventKey(newStatus), message: statusMessageFor(newStatus), phone, suggested: true });
+    setAvisarOpen(true);
+  };
+
+  const openManualWhatsApp = () => {
+    if (!order) return;
+    const eventMessage = (event: MessageEventKey) =>
+      renderMessage(
+        resolveEventBody(event, templateOverrides),
+        buildOrderMessageVars(order, { taller: businessName ?? "", estado: resolveStatusLabel(order.status, statusPresets) })
+      );
+    const options: MessageOption[] = [];
+    if (order.status === "presupuesto") {
+      options.push({ key: "presupuesto_creado", label: MESSAGE_EVENTS.presupuesto_creado.label, message: eventMessage("presupuesto_creado") });
+    }
+    options.push({
+      key: statusEventKey(order.status),
+      label: `Estado actual: ${resolveStatusLabel(order.status, statusPresets)}`,
+      message: statusMessageFor(order.status),
+    });
+    if (order.status !== "presupuesto") {
+      options.push({ key: "orden_creada", label: MESSAGE_EVENTS.orden_creada.label, message: eventMessage("orden_creada") });
+    }
+    options.push({ key: "seguimiento", label: MESSAGE_EVENTS.seguimiento.label, message: eventMessage("seguimiento") });
+    setAvisar({
+      eventKey: options[0].key,
+      message: options[0].message,
+      phone: recipientPhone(order),
+      suggested: false,
+      options,
+    });
+    setAvisarOpen(true);
+  };
+
   const updateStatus = async () => {
     if (!order || !user) return;
     if (newStatus === order.status && !note && evidenceFiles.length === 0) {
@@ -439,22 +551,7 @@ export default function OrderDetail() {
         image_urls: imageUrls,
       } as any);
 
-      if (newStatus !== order.status) {
-        try {
-          await supabase.functions.invoke("send-status-notification", {
-            body: {
-              customer_name: order.customer_name,
-              customer_phone: order.alternative_phone || order.customer_phone,
-              device_type: order.device_type,
-              order_number: order.order_number,
-              order_code: order.tracking_token,
-              new_status: newStatus,
-              app_origin: window.location.origin,
-              image_urls: imageUrls,
-            },
-          });
-        } catch (e) { console.warn(e); }
-      }
+      if (newStatus !== order.status) await notifyStatusChange(imageUrls);
 
       toast({ title: "Actualizado", description: "El estado fue actualizado." });
       setNote("");
@@ -680,6 +777,9 @@ export default function OrderDetail() {
           <WarrantyBadge deliveredAt={order.delivered_at} warrantyDays={order.warranty_days} />
           <Button variant="outline" size="sm" onClick={copyTracking} className="gap-2">
             <Copy className="h-4 w-4" /> Link tracking
+          </Button>
+          <Button variant="outline" size="sm" onClick={openManualWhatsApp} className="gap-2">
+            <MessageCircle className="h-4 w-4" /> WhatsApp
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
             <Printer className="h-4 w-4" /> Imprimir
@@ -1557,6 +1657,19 @@ export default function OrderDetail() {
       <PrintReceipt order={order} businessName={businessName} serviceTerms={renderServiceTerms(serviceTermsTemplate, order.warranty_days)} statusLabel={resolveStatusLabel(order.status, statusPresets)} />
 
       <RegisterPaymentDialog order={order} open={payDialogOpen} onOpenChange={setPayDialogOpen} onRegistered={load} />
+      {avisar && (
+        <AvisarClienteDialog
+          open={avisarOpen}
+          onOpenChange={setAvisarOpen}
+          orderId={order.id}
+          customerName={order.customer_name}
+          phone={avisar.phone}
+          eventKey={avisar.eventKey}
+          initialMessage={avisar.message}
+          options={avisar.options}
+          suggested={avisar.suggested}
+        />
+      )}
     </div>
   );
 }
