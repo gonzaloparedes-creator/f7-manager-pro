@@ -21,6 +21,7 @@ import DeliveryCalendarDialog from "@/components/DeliveryCalendarDialog";
 import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
+import EvolutionMigrationBanner from "@/components/EvolutionMigrationBanner";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -255,6 +256,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <EvolutionMigrationBanner />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard

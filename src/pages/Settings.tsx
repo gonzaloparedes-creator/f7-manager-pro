@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -20,7 +20,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, MessageCircle, Loader2, Bell, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff, ShoppingBag, Receipt, Wallet, Landmark } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff, ShoppingBag, Receipt, Wallet, Landmark } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -35,37 +35,12 @@ import DeviceTypePresetsTab from "@/components/DeviceTypePresetsTab";
 import MarcaPresetsTab from "@/components/MarcaPresetsTab";
 import ServiceTermsTab from "@/components/ServiceTermsTab";
 import OrderStatusPresetsTab from "@/components/OrderStatusPresetsTab";
+import WhatsAppSettingsTab from "@/components/WhatsAppSettingsTab";
 import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
-type NotifPrefs = {
-  orden_creada: boolean;
-  recibido: boolean;
-  en_diagnostico: boolean;
-  en_reparacion: boolean;
-  listo: boolean;
-  enviado: boolean;
-  entregado: boolean;
-};
-
-const DEFAULT_PREFS: NotifPrefs = {
-  orden_creada: true,
-  recibido: true, en_diagnostico: false, en_reparacion: false, listo: true, enviado: true, entregado: false,
-};
-
-const STATUS_LABELS: { key: keyof NotifPrefs; label: string }[] = [
-  { key: "recibido", label: "Recibido" },
-  { key: "en_diagnostico", label: "En diagnóstico" },
-  { key: "en_reparacion", label: "En reparación" },
-  { key: "listo", label: "Listo para retirar" },
-  { key: "enviado", label: "Enviado" },
-  { key: "entregado", label: "Entregado" },
-];
-
 interface Profile {
   full_name: string | null; phone: string | null;
-  whatsapp_connected: boolean; whatsapp_phone: string | null;
-  notification_preferences: NotifPrefs;
   branch_id: string | null;
 }
 
@@ -103,13 +78,8 @@ export default function Settings() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPrefs, setSavingPrefs] = useState(false);
-  const [prefsCompanyId, setPrefsCompanyId] = useState<string | null>(null);
-
-  const [qr, setQr] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [polling, setPolling] = useState(false);
-  const pollRef = useRef<number | null>(null);
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") || "perfil");
 
   useEffect(() => { document.title = "Configuración | F7 Manager Pro"; }, []);
 
@@ -117,49 +87,14 @@ export default function Settings() {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, phone, whatsapp_connected, whatsapp_phone, notification_preferences, branch_id, company_id")
+      .select("full_name, phone, branch_id")
       .eq("id", user.id).maybeSingle();
-    if (data) {
-      // Los avisos sugeridos (modo seguro) leen las preferencias a nivel
-      // empresa; las del perfil las sigue leyendo el envío automático viejo
-      // hasta que se apague. Se muestran las de la empresa y se guardan en
-      // ambos lados para que los dos modos queden consistentes.
-      const companyId = data.company_id;
-      let companyPrefs: Partial<NotifPrefs> = {};
-      if (companyId) {
-        const { data: c } = await supabase.from("companies").select("whatsapp_notify_prefs").eq("id", companyId).maybeSingle();
-        companyPrefs = (c?.whatsapp_notify_prefs as Partial<NotifPrefs> | null) ?? {};
-      }
-      const prefs = { ...DEFAULT_PREFS, ...((data as any).notification_preferences as Partial<NotifPrefs> ?? {}), ...companyPrefs };
-      setPrefsCompanyId(companyId);
-      setProfile({ ...(data as any), notification_preferences: prefs });
-    }
+    if (data) setProfile(data);
   };
   // user?.id (no el objeto user): ver Dashboard.tsx — evita pisar campos que
   // se están editando por un simple refresh de token al volver de otra pestaña.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [user?.id]);
-
-  const togglePref = async (key: keyof NotifPrefs, value: boolean) => {
-    if (!user || !profile) return;
-    const next = { ...profile.notification_preferences, [key]: value };
-    setProfile({ ...profile, notification_preferences: next });
-    setSavingPrefs(true);
-    const [profileRes, companyRes] = await Promise.all([
-      supabase.from("profiles").update({ notification_preferences: next as any }).eq("id", user.id),
-      prefsCompanyId
-        ? supabase.from("companies").update({ whatsapp_notify_prefs: next }).eq("id", prefsCompanyId)
-        : Promise.resolve({ error: null }),
-    ]);
-    setSavingPrefs(false);
-    const error = profileRes.error ?? companyRes.error;
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      setProfile({ ...profile });
-    }
-  };
-
-  useEffect(() => () => { if (pollRef.current) window.clearInterval(pollRef.current); }, []);
 
   const saveProfile = async () => {
     if (!user || !profile) return;
@@ -170,43 +105,6 @@ export default function Settings() {
     setSavingProfile(false);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else toast({ title: "Perfil actualizado" });
-  };
-
-  const startPolling = () => {
-    if (pollRef.current) return;
-    setPolling(true);
-    pollRef.current = window.setInterval(async () => {
-      const { data, error } = await supabase.functions.invoke("check-whatsapp-status");
-      if (error) return;
-      if (data?.state === "open") {
-        if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null; }
-        setPolling(false); setQr(null);
-        toast({ title: "¡WhatsApp conectado!" });
-        load();
-      }
-    }, 3000);
-  };
-
-  const connect = async () => {
-    setConnecting(true);
-    const { data, error } = await supabase.functions.invoke("connect-whatsapp-evolution");
-    setConnecting(false);
-    if (error || data?.error) {
-      const description = data?.error ?? await edgeFunctionErrorMessage(error, "No se pudo conectar");
-      toast({ title: "Error", description, variant: "destructive" });
-      return;
-    }
-    if (data?.qr) { setQr(data.qr); startPolling(); }
-    else toast({ title: "Sin QR", description: "Revisá la configuración de Evolution API." });
-  };
-
-  const disconnect = async () => {
-    await supabase.functions.invoke("disconnect-whatsapp");
-    setQr(null);
-    if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null; }
-    setPolling(false);
-    toast({ title: "Desconectado" });
-    load();
   };
 
   if (roleLoading || permLoading || !profile) {
@@ -222,8 +120,6 @@ export default function Settings() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const qrSrc = qr ? (qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`) : null;
-
   return (
     <div className="space-y-6">
       <div>
@@ -231,7 +127,7 @@ export default function Settings() {
         <p className="text-sm text-muted-foreground">Gestioná tu taller, sucursales y usuarios.</p>
       </div>
 
-      <Tabs defaultValue="perfil" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className={`grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 ${isStarterPlan ? "lg:grid-cols-10" : "lg:grid-cols-11"}`}>
           <TabsTrigger value="perfil" className="h-9">Perfil</TabsTrigger>
           <TabsTrigger value="whatsapp" className="h-9">WhatsApp</TabsTrigger>
@@ -271,92 +167,10 @@ export default function Settings() {
           <TicketWidthCard />
 
           <LocationCard />
-
-          <Card>
-            <CardContent className="space-y-4 p-6">
-              <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
-                <div className="flex-1">
-                  <div className="font-semibold">Notificaciones Automáticas</div>
-                  <div className="text-xs text-muted-foreground">
-                    Elegí cuándo se envía un mensaje de WhatsApp al cliente: al crear la orden/presupuesto, y en cada cambio de estado.
-                  </div>
-                </div>
-                {savingPrefs && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-              </div>
-              <div className="space-y-1.5">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Al crear la orden o presupuesto</div>
-                <div className="divide-y rounded-md border">
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <Label htmlFor="notif-orden_creada" className="cursor-pointer text-sm font-medium">Avisar al cliente</Label>
-                    <Switch id="notif-orden_creada" checked={profile.notification_preferences.orden_creada} onCheckedChange={(v) => togglePref("orden_creada", v)} />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Al cambiar el estado</div>
-                <div className="divide-y rounded-md border">
-                  {STATUS_LABELS.map(({ key, label }) => (
-                    <div key={key} className="flex items-center justify-between px-4 py-3">
-                      <Label htmlFor={`notif-${key}`} className="cursor-pointer text-sm font-medium">{label}</Label>
-                      <Switch id={`notif-${key}`} checked={profile.notification_preferences[key]} onCheckedChange={(v) => togglePref(key, v)} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="whatsapp">
-          <Card>
-            <CardContent className="space-y-4 p-6">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-primary" />
-                <div className="flex-1">
-                  <div className="font-semibold">WhatsApp</div>
-                  <div className="text-xs text-muted-foreground">Notificá automáticamente a tus clientes.</div>
-                </div>
-                {profile.whatsapp_connected ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--status-listo-bg))] px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--status-listo))]">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Conectado
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                    Desconectado
-                  </span>
-                )}
-              </div>
-
-              {profile.whatsapp_connected && profile.whatsapp_phone && (
-                <div className="text-sm text-muted-foreground">Número: {profile.whatsapp_phone}</div>
-              )}
-
-              {qrSrc && (
-                <div className="flex flex-col items-center gap-3 rounded-lg border bg-muted/30 p-6">
-                  <img src={qrSrc} alt="QR de WhatsApp" className="h-56 w-56 rounded-md bg-white p-2" />
-                  <p className="text-center text-sm text-muted-foreground">
-                    Escaneá el código con WhatsApp → Dispositivos vinculados
-                  </p>
-                  {polling && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Esperando conexión...
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {profile.whatsapp_connected ? (
-                  <Button variant="outline" onClick={disconnect}>Desconectar</Button>
-                ) : (
-                  <Button onClick={connect} disabled={connecting}>
-                    {connecting ? "Generando QR..." : "Conectar WhatsApp"}
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <WhatsAppSettingsTab onOpenStatuses={() => setTab("estados")} />
         </TabsContent>
 
         <TabsContent value="sucursales">

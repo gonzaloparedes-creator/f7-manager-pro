@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
+import { useWhatsAppSettings } from "@/hooks/useWhatsAppSettings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ListChecks, Plus, Trash2, Loader2, Lock, ChevronUp, ChevronDown, Pencil, Check, X, MessageCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { getDefaultStatusMessage, renderStatusMessage } from "@/lib/orders";
+import { getDefaultStatusMessage } from "@/lib/orders";
+import MessageTemplateEditor from "@/components/MessageTemplateEditor";
+import type { MessageVars } from "@/lib/customerMessages";
+
+// El envío automático viejo (Evolution) solo reemplaza estas cinco variables.
+const EVOLUTION_VARIABLES: (keyof MessageVars)[] = ["cliente", "equipo", "orden", "estado", "link"];
 
 type Preset = { id: string; key: string; label: string; sort_order: number; is_locked: boolean; message_template: string | null };
 
@@ -34,6 +39,7 @@ function slugify(label: string, taken: Set<string>) {
 export default function OrderStatusPresetsTab() {
   const { toast } = useToast();
   const { companyId } = useCompany();
+  const { evolutionActive } = useWhatsAppSettings();
   const [items, setItems] = useState<Preset[]>([]);
   const [loading, setLoading] = useState(true);
   const [newLabel, setNewLabel] = useState("");
@@ -125,7 +131,7 @@ export default function OrderStatusPresetsTab() {
     setSavingMessage(true);
     const { error } = await supabase
       .from("order_status_presets")
-      .update({ message_template: trimmed })
+      .update({ message_template: trimmed === getDefaultStatusMessage(messageEditing.key) ? null : trimmed })
       .eq("id", messageEditing.id);
     setSavingMessage(false);
     if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -143,7 +149,7 @@ export default function OrderStatusPresetsTab() {
             <div className="font-semibold">Estados de la orden</div>
             <div className="text-xs text-muted-foreground">
               Los pasos del selector "Actualizar estado". "Recibido" y "Entregado" (con candado) no se pueden borrar.
-              Con el ícono de WhatsApp de cada fila podés personalizar el mensaje que recibe el cliente en ese estado.
+              Con el ícono de WhatsApp de cada fila podés personalizar el mensaje que le sugerimos mandar al cliente en ese estado.
             </div>
           </div>
         </div>
@@ -234,29 +240,17 @@ export default function OrderStatusPresetsTab() {
           <DialogHeader>
             <DialogTitle>Mensaje de WhatsApp — {messageEditing?.label}</DialogTitle>
             <DialogDescription>
-              El texto que recibe el cliente cuando una orden pasa a este estado.
+              El texto que F7 te deja escrito para avisarle al cliente cuando una orden pasa a este estado. Lo revisás y lo mandás con un toque.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
-            Usá estos placeholders, se reemplazan automáticamente:{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{cliente}}"}</code>{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{equipo}}"}</code>{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{orden}}"}</code>{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{estado}}"}</code>{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{link}}"}</code>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status_message_text">Mensaje</Label>
-            <Textarea
-              id="status_message_text"
-              rows={6}
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              className="resize-none text-sm"
-            />
-          </div>
+          <MessageTemplateEditor
+            id="status_message_text"
+            value={messageText}
+            onChange={setMessageText}
+            previewVars={{ estado: messageEditing?.label ?? "" }}
+            variables={evolutionActive ? EVOLUTION_VARIABLES : undefined}
+          />
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -270,19 +264,6 @@ export default function OrderStatusPresetsTab() {
             <Button type="button" onClick={saveMessage} disabled={savingMessage}>
               {savingMessage ? "Guardando..." : "Guardar cambios"}
             </Button>
-          </div>
-
-          <div className="space-y-2 border-t border-border pt-4">
-            <Label className="text-xs text-muted-foreground">Vista previa (con datos de ejemplo)</Label>
-            <div className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm leading-relaxed">
-              {renderStatusMessage(messageText, {
-                cliente: "Juan Pérez",
-                equipo: "Celular",
-                orden: "ORD-0001",
-                estado: messageEditing?.label ?? "",
-                link: "https://f7manager.com/tracking/ORD-0001",
-              })}
-            </div>
           </div>
         </DialogContent>
       </Dialog>

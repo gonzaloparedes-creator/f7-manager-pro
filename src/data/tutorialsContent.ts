@@ -228,9 +228,19 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Para cambiar el estado de una orden (por ejemplo, de \"En reparación\" a \"Listo para retirar\"), se elige el nuevo estado y se puede agregar una nota.",
           "Esa nota puede ser interna (solo la ve tu equipo) o visible para el cliente en su seguimiento — hay un interruptor para elegir cuál de las dos. Lo mismo aplica para las fotos que se adjunten en ese momento: quedan internas o se muestran en el link de seguimiento, según esa misma elección.",
-          "Cada cambio de estado dispara automáticamente un mensaje de WhatsApp al cliente (si tu taller tiene WhatsApp conectado en Configuración), avisándole que su equipo avanzó de estado.",
+          "Al guardar el cambio, si ese estado está marcado para avisar (Configuración → WhatsApp), F7 te muestra el aviso listo para mandarle al cliente: tocás \"Abrir WhatsApp\" y sale desde tu propio WhatsApp. Si en ese momento no querés avisar, tocás \"No avisar\".",
         ],
         images: [{ file: "detalle-orden-estado-01.png", alt: "Formulario para actualizar el estado de la orden" }],
+      },
+      {
+        id: "avisar-cliente",
+        title: "Avisar al cliente por WhatsApp",
+        body: [
+          "F7 no manda los mensajes por su cuenta: te los deja escritos y los mandás vos con un toque, desde tu propio WhatsApp (o WhatsApp Web en la compu). Así no hay riesgo de que WhatsApp bloquee tu número.",
+          "El aviso aparece solo al crear una orden o presupuesto y al cambiar de estado, según lo que hayas dejado prendido en Configuración → WhatsApp. El diálogo muestra el teléfono del cliente y el mensaje, que podés retocar antes de abrir WhatsApp; \"Copiar\" lo copia por si preferís pegarlo en otro lado.",
+          "En cualquier momento podés avisar a mano con el botón \"WhatsApp\" del detalle de la orden: elegís qué mensaje mandar (estado actual, seguimiento, presupuesto...). También se puede mandar el comprobante de una venta de mostrador desde Productos, y avisarle a un técnico que tiene una orden nueva con el botón \"Avisar\" junto a su nombre.",
+          "Los avisos que dejaste para después quedan en el menú Avisos (con un número en rojo cuando hay pendientes), junto con las respuestas que dejan los clientes a un presupuesto. Si un cliente tiene apagado \"Notificar por WhatsApp\", o su teléfono es un relleno como \"000\", F7 no te sugiere avisarle.",
+        ],
       },
       {
         id: "bitacora",
@@ -290,7 +300,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Editar datos y contactar por WhatsApp",
         body: [
           "Desde el mismo detalle se pueden corregir nombre, teléfono o cédula/RUC, y hay un botón directo para abrirle un chat de WhatsApp.",
-          "También hay un switch \"Notificar por WhatsApp\": si lo apagás, ese cliente deja de recibir los avisos automáticos (orden creada, cambios de estado, respuesta a un presupuesto) — útil para clientes mayoristas u otros contactos que no quieran ese tipo de mensajes. Por defecto está prendido para todos.",
+          "También hay un switch \"Notificar por WhatsApp\": si lo apagás, F7 deja de sugerirte avisarle a ese cliente (orden creada, cambios de estado, respuesta a un presupuesto) — útil para clientes mayoristas u otros contactos que no quieran ese tipo de mensajes. Igual podés escribirle a mano cuando quieras. Por defecto está prendido para todos.",
         ],
         images: [{ file: "clientes-editar-01.png", alt: "Edición de datos de un cliente" }],
       },
@@ -565,7 +575,7 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "perfil",
         title: "Perfil",
         body: [
-          "Tus datos personales (nombre, teléfono), la identidad del taller que ven tus clientes (nombre del negocio y logo — el que aparece en el link de seguimiento y en los mensajes de WhatsApp), la ubicación (país/departamento/ciudad), y qué notificaciones automáticas de WhatsApp mandar: al crear la orden o presupuesto (interruptor aparte, \"Avisar al cliente\"), y en cada cambio de estado.",
+          "Tus datos personales (nombre, teléfono), la identidad del taller que ven tus clientes (nombre del negocio y logo — el que aparece en el link de seguimiento y en los mensajes de WhatsApp), y la ubicación (país/departamento/ciudad). Los avisos de WhatsApp se configuran en su propia pestaña.",
         ],
         images: [{ file: "configuracion-perfil-01.png", alt: "Tab de Perfil en Configuración" }],
       },
@@ -573,10 +583,21 @@ export const tutorialCategories: TutorialCategory[] = [
         id: "whatsapp",
         title: "WhatsApp",
         body: [
-          "Acá se conecta el número de WhatsApp del taller escaneando un código QR (usando WhatsApp Business en el celular). Una vez conectado, el sistema puede mandar avisos automáticos a tus clientes cuando cambia el estado de su orden.",
-          "Ese mismo WhatsApp conectado también avisa al técnico cuando se le asigna una orden nueva (Nueva Orden, Modo Lote o al convertir un Presupuesto) — necesita que el técnico tenga un teléfono cargado en Usuarios. Si nadie asignó el equipo a otra persona (uno mismo se la asigna), no se manda aviso.",
+          "Acá definís cómo avisás a tus clientes. F7 te deja cada mensaje escrito y lo mandás con un toque desde tu propio WhatsApp: no hace falta conectar nada ni escanear ningún código.",
+          "\"Cuándo avisar a tus clientes\": un interruptor para cuando se crea la orden o presupuesto y uno por cada estado (incluidos los que creaste vos). Los que dejes prendidos te muestran el aviso listo para mandar; los demás los podés mandar a mano desde el detalle de la orden.",
+          "\"Mensajes de WhatsApp\": el texto de cada aviso (orden creada, presupuesto, seguimiento y las respuestas a un presupuesto). Se editan tocando las variables (cliente, equipo, número de orden, estado, link, taller, monto, saldo, garantía) para insertarlas donde está el cursor, con una vista previa de cómo lo ve el cliente. \"Restaurar predeterminado\" vuelve al texto original. Los mensajes de cada estado se editan en la pestaña Estados.",
+          "Si tu taller todavía tiene un WhatsApp conectado por código QR (la forma anterior), arriba aparece un aviso con el botón \"Desconectar y pasar al modo seguro\". Esa conexión no es oficial y WhatsApp puede bloquear el número conectado, por eso se va a dejar de usar.",
         ],
-        images: [{ file: "configuracion-whatsapp-01.png", alt: "Conexión de WhatsApp por código QR" }],
+      },
+      {
+        id: "whatsapp-preguntas",
+        title: "WhatsApp: preguntas frecuentes",
+        body: [
+          "¿Por qué ya no es automático? Porque los envíos automáticos por código QR no son una vía oficial: WhatsApp puede bloquear el número del taller sin avisar, y con él se pierden los chats con tus clientes. Mandar el mensaje desde tu propio WhatsApp es lo que más cuida tu número.",
+          "¿Puedo seguir con el QR? Por un tiempo sí: mientras esté conectado, los avisos siguen saliendo solos como antes. Pero esa conexión se va a apagar, y conviene pasarse antes desde Configuración → WhatsApp.",
+          "¿Qué pasa si me olvido de avisar? El aviso queda esperando en el menú Avisos, y desde ahí lo mandás cuando puedas.",
+          "¿Y si quiero que sea 100 % automático? Hoy no está disponible. La opción para eso es la API oficial de WhatsApp, que tiene costo y requiere verificar el negocio con Meta; la estamos evaluando.",
+        ],
       },
       {
         id: "sucursales",
@@ -628,7 +649,7 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Estados",
         body: [
           "Permite personalizar los nombres de los estados por los que pasa una orden (por ejemplo, cambiar \"En reparación\" por el texto que uses en tu taller), reordenarlos y definir cuáles quedan fijos.",
-          "Cada estado tiene además su propio mensaje de WhatsApp editable: con el ícono de mensaje se abre un editor con placeholders (cliente, equipo, número de orden, estado y link de seguimiento) que se reemplazan automáticamente al enviar, más una vista previa en vivo. Si no se edita, se sigue usando el mensaje predeterminado de siempre.",
+          "Cada estado tiene además su propio mensaje de WhatsApp editable: con el ícono de mensaje se abre un editor con variables (cliente, equipo, número de orden, estado, link de seguimiento, taller, monto, saldo y garantía) que se insertan tocándolas y se reemplazan al armar el aviso, más una vista previa de cómo lo ve el cliente. Si no se edita, se usa el mensaje predeterminado.",
         ],
         images: [{ file: "configuracion-estados-01.png", alt: "Configuración de estados de orden" }],
       },
@@ -689,7 +710,7 @@ export const videoPlaceholders: VideoPlaceholder[] = [
   { id: "primeros-pasos", title: "Primeros pasos: tu primera orden", description: "Un recorrido completo desde crear la orden hasta entregarla." },
   { id: "modo-lote", title: "Modo Lote: varios equipos a la vez", description: "Cómo cargar rápido cuando un cliente trae más de un equipo." },
   { id: "cobrar-cerrar", title: "Cobrar y cerrar una orden", description: "Seña, saldo y cómo queda reflejado en Reportes." },
-  { id: "whatsapp", title: "Configurar WhatsApp y notificaciones", description: "Conectar tu número y automatizar los avisos a tus clientes." },
+  { id: "whatsapp", title: "Configurar WhatsApp y notificaciones", description: "Dejar listos los mensajes y avisar a tus clientes con un toque." },
   { id: "inventario", title: "Inventario: descuento automático de repuestos", description: "Cómo se conecta el stock con las órdenes de reparación." },
   { id: "reportes", title: "Tu primer reporte de ganancias", description: "Leer los números de tu taller mes a mes." },
 ];
