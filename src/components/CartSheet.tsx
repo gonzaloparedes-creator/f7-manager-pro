@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
-import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2 } from "lucide-react";
+import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2, MessageCircle } from "lucide-react";
 import { formatPYG, isCashLabel } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import QuantityStepper from "@/components/QuantityStepper";
@@ -37,6 +37,7 @@ export default function CartSheet({
   setCart,
   onSold,
   onPrintRequest,
+  onReceiptRequest,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -45,6 +46,7 @@ export default function CartSheet({
   setCart: React.Dispatch<React.SetStateAction<Cart>>;
   onSold?: () => void;
   onPrintRequest?: (sale: CompletedCartSale) => void;
+  onReceiptRequest?: (sale: CompletedCartSale) => void;
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
@@ -170,6 +172,11 @@ export default function CartSheet({
             </SheetHeader>
             <SheetFooter className="mt-auto">
               <Button variant="outline" onClick={close}>Cerrar</Button>
+              {onReceiptRequest && (
+                <Button variant="outline" onClick={() => onReceiptRequest(completedSale)} className="gap-2">
+                  <MessageCircle className="h-4 w-4 text-green-600" /> Enviar por WhatsApp
+                </Button>
+              )}
               <Button onClick={() => onPrintRequest?.(completedSale)} className="gap-2">
                 <Printer className="h-4 w-4" /> Imprimir ticket
               </Button>

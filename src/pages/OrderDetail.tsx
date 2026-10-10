@@ -36,6 +36,8 @@ import OrderPartsSection from "@/components/OrderPartsSection";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import ConvertQuoteDialog from "@/components/ConvertQuoteDialog";
 import AvisarClienteDialog, { type MessageOption } from "@/components/AvisarClienteDialog";
+import AvisarTecnicoDialog from "@/components/AvisarTecnicoDialog";
+import { loadTechnicianRecipients, type TechnicianRecipient } from "@/lib/technicianNotice";
 import { fetchWhatsAppSettings } from "@/hooks/useWhatsAppSettings";
 import { useMessageTemplates } from "@/hooks/useMessageTemplates";
 import {
@@ -140,6 +142,9 @@ export default function OrderDetail() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const { technicians, loading: techniciansLoading } = useAssignableTechnicians();
   const [assigning, setAssigning] = useState(false);
+  const [techNoticeLoading, setTechNoticeLoading] = useState(false);
+  const [techNoticeOpen, setTechNoticeOpen] = useState(false);
+  const [techRecipients, setTechRecipients] = useState<TechnicianRecipient[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState<string>("");
@@ -304,6 +309,42 @@ export default function OrderDetail() {
       } as any);
     } catch (e) {
       console.warn("Failed to log system history", e);
+    }
+  };
+
+  // El aviso se arma al tocar el botón; el click que abre WhatsApp es el del
+  // diálogo, así que el popup no queda bloqueado por el await de acá.
+  const openTechnicianNotice = async () => {
+    if (!order || !companyId) return;
+    setTechNoticeLoading(true);
+    try {
+      const { recipients, withoutPhone } = await loadTechnicianRecipients(
+        companyId,
+        [{
+          id: order.id,
+          order_number: order.order_number,
+          customer_name: order.customer_name,
+          device_type: order.device_type,
+          assigned_technician_id: order.assigned_technician_id ?? null,
+        }],
+        user?.id ?? null
+      );
+      if (recipients.length === 0) {
+        toast({
+          title: "No se puede avisar",
+          description: withoutPhone.length > 0
+            ? `${withoutPhone[0]} no tiene un teléfono válido cargado en su perfil.`
+            : "Esta orden no tiene otro técnico asignado.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setTechRecipients(recipients);
+      setTechNoticeOpen(true);
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo preparar el aviso.", variant: "destructive" });
+    } finally {
+      setTechNoticeLoading(false);
     }
   };
 
@@ -873,23 +914,37 @@ export default function OrderDetail() {
                   Cargando técnicos...
                 </div>
               ) : (
-                <Select
-                  value={order.assigned_technician_id ?? "__none__"}
-                  onValueChange={assignTechnician}
-                  disabled={assigning}
-                >
-                  <SelectTrigger id="assigned-tech">
-                    <SelectValue placeholder="Sin asignar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Sin asignar</SelectItem>
-                    {technicians.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name || "Técnico sin nombre"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select
+                    value={order.assigned_technician_id ?? "__none__"}
+                    onValueChange={assignTechnician}
+                    disabled={assigning}
+                  >
+                    <SelectTrigger id="assigned-tech">
+                      <SelectValue placeholder="Sin asignar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin asignar</SelectItem>
+                      {technicians.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.full_name || "Técnico sin nombre"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {order.assigned_technician_id && order.assigned_technician_id !== user?.id && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0 gap-2"
+                      onClick={openTechnicianNotice}
+                      disabled={techNoticeLoading || assigning}
+                    >
+                      {techNoticeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4 text-green-600" />}
+                      Avisar
+                    </Button>
+                  )}
+                </div>
               )}
               {order.current_branch_id && (
                 <p className="text-xs text-muted-foreground">
@@ -1659,6 +1714,7 @@ export default function OrderDetail() {
       <PrintReceipt order={order} businessName={businessName} serviceTerms={renderServiceTerms(serviceTermsTemplate, order.warranty_days)} statusLabel={resolveStatusLabel(order.status, statusPresets)} />
 
       <RegisterPaymentDialog order={order} open={payDialogOpen} onOpenChange={setPayDialogOpen} onRegistered={load} />
+      <AvisarTecnicoDialog open={techNoticeOpen} onOpenChange={setTechNoticeOpen} recipients={techRecipients} />
       {avisar && (
         <AvisarClienteDialog
           open={avisarOpen}

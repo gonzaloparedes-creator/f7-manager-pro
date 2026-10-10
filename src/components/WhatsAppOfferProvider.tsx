@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
+import { useAuth } from "@/hooks/useAuth";
 import { fetchWhatsAppSettings } from "@/hooks/useWhatsAppSettings";
 import { WhatsAppOfferContext, type CreationOfferEvent } from "@/hooks/useWhatsAppOffer";
 import AvisarClienteDialog, { type MessageOption } from "@/components/AvisarClienteDialog";
+import AvisarTecnicoDialog from "@/components/AvisarTecnicoDialog";
 import {
   buildBatchCreatedMessage,
   buildOrderMessageVars,
@@ -15,6 +17,7 @@ import {
   type TemplateOverrides,
 } from "@/lib/customerMessages";
 import { resolveStatusLabel } from "@/lib/orders";
+import { loadTechnicianRecipients, type TechnicianRecipient } from "@/lib/technicianNotice";
 
 interface Request {
   id: number;
@@ -31,32 +34,60 @@ interface PreparedOffer {
   options?: MessageOption[];
 }
 
-type OfferOrder = OrderMessageSource & { id: string; status: string; client_id: string | null };
+type OfferOrder = OrderMessageSource & {
+  id: string;
+  status: string;
+  client_id: string | null;
+  assigned_technician_id: string | null;
+};
 
-// Devuelve null cuando no corresponde ofrecer nada: la empresa sigue en modo
-// Evolution (el servidor ya avisa solo), el aviso de "orden creada" está
-// apagado, el cliente pidió no recibir avisos, o el teléfono es un relleno.
-async function prepareCreationOffer(companyId: string, request: Request): Promise<PreparedOffer | null> {
+interface PreparedOffers {
+  client: PreparedOffer | null;
+  technicians: TechnicianRecipient[];
+}
+
+// En modo Evolution el servidor ya avisa solo (cliente y técnico): no se
+// ofrece nada. Si no, el aviso al cliente depende de su preferencia y el del
+// técnico de que haya una persona asignada con teléfono.
+async function prepareOffers(companyId: string, userId: string | null, request: Request): Promise<PreparedOffers> {
+  const none: PreparedOffers = { client: null, technicians: [] };
   const settings = await fetchWhatsAppSettings(companyId);
-  if (settings.evolutionActive || settings.prefs.orden_creada !== true) return null;
+  if (settings.evolutionActive) return none;
 
-  const [ordersRes, templatesRes, companyRes, presetsRes] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(
-        "id, status, client_id, order_number, tracking_token, customer_name, customer_phone, alternative_phone, secondary_phone, device_type, quote_amount, deposit_amount, cargos_adicionales, warranty_days"
-      )
-      .eq("company_id", companyId)
-      .in("id", request.orderIds),
+  const ordersRes = await supabase
+    .from("orders")
+    .select(
+      "id, status, client_id, order_number, tracking_token, customer_name, customer_phone, alternative_phone, secondary_phone, device_type, quote_amount, deposit_amount, cargos_adicionales, warranty_days, assigned_technician_id"
+    )
+    .eq("company_id", companyId)
+    .in("id", request.orderIds);
+  if (ordersRes.error) throw ordersRes.error;
+  const byId = new Map((ordersRes.data ?? []).map((o) => [o.id, o as unknown as OfferOrder]));
+  const orders = request.orderIds.map((id) => byId.get(id)).filter((o): o is OfferOrder => !!o);
+  if (orders.length === 0) return none;
+
+  // Un presupuesto todavía no tiene trabajo para el técnico.
+  const technicians =
+    request.event === "orden_creada"
+      ? (await loadTechnicianRecipients(companyId, orders, userId)).recipients
+      : [];
+
+  const client = settings.prefs.orden_creada === true ? await prepareClientOffer(companyId, request, orders) : null;
+  return { client, technicians };
+}
+
+// Devuelve null cuando no corresponde avisar al cliente: pidió no recibir
+// avisos o el teléfono es un relleno.
+async function prepareClientOffer(
+  companyId: string,
+  request: Request,
+  orders: OfferOrder[]
+): Promise<PreparedOffer | null> {
+  const [templatesRes, companyRes, presetsRes] = await Promise.all([
     supabase.from("whatsapp_templates").select("event_key, body").eq("company_id", companyId),
     supabase.from("companies").select("name").eq("id", companyId).maybeSingle(),
     supabase.from("order_status_presets").select("key, label").eq("company_id", companyId),
   ]);
-  if (ordersRes.error) throw ordersRes.error;
-
-  const byId = new Map((ordersRes.data ?? []).map((o) => [o.id, o as unknown as OfferOrder]));
-  const orders = request.orderIds.map((id) => byId.get(id)).filter((o): o is OfferOrder => !!o);
-  if (orders.length === 0) return null;
 
   const clientIds = [...new Set(orders.map((o) => o.client_id).filter((c): c is string => !!c))];
   if (clientIds.length > 0) {
@@ -123,7 +154,9 @@ async function prepareCreationOffer(companyId: string, request: Request): Promis
 
 function CreationOfferHost({ request, onDone }: { request: Request; onDone: () => void }) {
   const { companyId, loading } = useCompany();
-  const [offer, setOffer] = useState<PreparedOffer | null>(null);
+  const { user } = useAuth();
+  const [offers, setOffers] = useState<PreparedOffers | null>(null);
+  const [stage, setStage] = useState<"client" | "technician">("client");
   const [open, setOpen] = useState(false);
   const started = useRef(false);
 
@@ -135,13 +168,14 @@ function CreationOfferHost({ request, onDone }: { request: Request; onDone: () =
     }
     if (started.current) return;
     started.current = true;
-    prepareCreationOffer(companyId, request)
+    prepareOffers(companyId, user?.id ?? null, request)
       .then((prepared) => {
-        if (!prepared) {
+        if (!prepared.client && prepared.technicians.length === 0) {
           onDone();
           return;
         }
-        setOffer(prepared);
+        setOffers(prepared);
+        setStage(prepared.client ? "client" : "technician");
         setOpen(true);
       })
       .catch((e) => {
@@ -152,23 +186,48 @@ function CreationOfferHost({ request, onDone }: { request: Request; onDone: () =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, loading]);
 
-  if (!offer) return null;
+  if (!offers) return null;
+
+  // Los dos avisos no se muestran a la vez: primero el del cliente y, cuando
+  // se cierra (después de la animación), el del técnico.
+  if (stage === "client" && offers.client) {
+    const offer = offers.client;
+    return (
+      <AvisarClienteDialog
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (o) return;
+          if (offers.technicians.length > 0) {
+            setTimeout(() => {
+              setStage("technician");
+              setOpen(true);
+            }, 300);
+          } else {
+            setTimeout(onDone, 300);
+          }
+        }}
+        orderId={offer.orderId}
+        customerName={offer.customerName}
+        phone={offer.phone}
+        eventKey={offer.eventKey}
+        initialMessage={offer.message}
+        options={offer.options}
+        suggested
+        companyId={companyId}
+      />
+    );
+  }
+
   return (
-    <AvisarClienteDialog
+    <AvisarTecnicoDialog
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
         // Se desmonta recién cuando termina la animación de cierre.
         if (!o) setTimeout(onDone, 300);
       }}
-      orderId={offer.orderId}
-      customerName={offer.customerName}
-      phone={offer.phone}
-      eventKey={offer.eventKey}
-      initialMessage={offer.message}
-      options={offer.options}
-      suggested
-      companyId={companyId}
+      recipients={offers.technicians}
     />
   );
 }

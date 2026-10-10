@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
+import EnviarReciboDialog from "@/components/EnviarReciboDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useAuth } from "@/hooks/useAuth";
@@ -106,6 +107,8 @@ export default function Products() {
   const [cartOpen, setCartOpen] = useState(false);
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [ticketWidthMm, setTicketWidthMm] = useState(80);
+  const [receiptSale, setReceiptSale] = useState<CompletedCartSale | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   useEffect(() => {
     if (!companyId) return;
@@ -145,6 +148,19 @@ export default function Products() {
       branchName: branches.find((b) => b.id === sale.branch_id)?.name ?? null,
       widthMm: ticketWidthMm,
     });
+  };
+
+  const toCompletedSale = (g: SaleGroup): CompletedCartSale => ({
+    id: g.key,
+    created_at: g.created_at,
+    payment_method: g.payment_method,
+    branch_id: g.branch_id,
+    items: g.items.map((i) => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price })),
+  });
+
+  const handleReceiptSale = (sale: CompletedCartSale) => {
+    setReceiptSale(sale);
+    setReceiptOpen(true);
   };
 
   const hasExternalInventory = isBusiness || isRetail;
@@ -560,14 +576,17 @@ export default function Products() {
                           size="icon"
                           variant="ghost"
                           className="h-10 w-10"
+                          aria-label="Enviar comprobante por WhatsApp"
+                          onClick={() => handleReceiptSale(toCompletedSale(g))}
+                        >
+                          <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-10 w-10"
                           aria-label="Imprimir ticket"
-                          onClick={() => handlePrintSale({
-                            id: g.key,
-                            created_at: g.created_at,
-                            payment_method: g.payment_method,
-                            branch_id: g.branch_id,
-                            items: g.items.map((i) => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price })),
-                          })}
+                          onClick={() => handlePrintSale(toCompletedSale(g))}
                         >
                           <Printer className="h-3.5 w-3.5 text-muted-foreground" />
                         </Button>
@@ -618,6 +637,14 @@ export default function Products() {
         setCart={setCart}
         onSold={load}
         onPrintRequest={handlePrintSale}
+        onReceiptRequest={handleReceiptSale}
+      />
+      <EnviarReciboDialog
+        open={receiptOpen}
+        onOpenChange={setReceiptOpen}
+        sale={receiptSale}
+        businessName={businessName}
+        branchName={receiptSale ? branches.find((b) => b.id === receiptSale.branch_id)?.name ?? null : null}
       />
 
       <ConfirmDialog
