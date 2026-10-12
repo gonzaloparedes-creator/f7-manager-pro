@@ -162,6 +162,44 @@ describe("reglas", () => {
     });
   });
 
+  describe("DCP panic (coprocesador de pantalla)", () => {
+    const line = [
+      "panic(cpu 1 caller 0xfffffff0340eab88): DCP PANIC - History buffer not yet allocated - iomfb_bic_proc_async(71)",
+      "History buffer not yet allocated",
+      "RTKit: RTKit-3255.160.4.release - Client: AppleDCP-1041.120.7~2714-iphone14d1ydcp.RELEASE",
+      "Faulting task  71 Call Stack: 0x0000000000062810 0x00000000000621e8",
+      " 16 iomfb_dcp_disp_serv     | 016     |  1104/4096  | SEMWAIT    | 0xffffffff420aae60 | ",
+      " 50 iomfb_backlight         | 016     |   272/4096  | SEMWAIT    | 0xffffffff41f259d0 | ",
+      "Debugger message: panic",
+    ].join("\n");
+
+    it("iPhone 13: pide probar otra pantalla y medir el conector J11800", () => {
+      const a = analyze(ips(line, "iPhone14,5", "iPhone OS 26.6.2 (23G90)"));
+      expect(a.device.name).toBe("iPhone 13");
+      expect(a.findings.map((f) => f.ruleId)).toEqual(["dcp-panic"]);
+      const f = a.findings[0];
+      expect(f.category).toBe("hardware");
+      expect(f.evidence).toMatch(/DCP PANIC/);
+      expect(f.checks.join(" ")).toMatch(/otra pantalla/);
+      expect(f.checks.join(" ")).toMatch(/caída de tensión en el conector J11800/);
+      expect(f.components.join(" ")).toMatch(/J11800/);
+    });
+
+    it("otros modelos: mismo consejo pero sin inventar el designador del conector", () => {
+      const f = analyze(ips(line, "iPhone15,4")).findings[0];
+      expect(f.ruleId).toBe("dcp-panic");
+      expect(f.checks.join(" ")).toMatch(/otra pantalla/);
+      expect(f.checks.join(" ")).toMatch(/conector de pantalla/);
+      expect(`${f.components.join(" ")} ${f.checks.join(" ")}`).not.toMatch(/J11800/);
+    });
+
+    it("los nombres de tareas dcp/backlight del log no disparan otras reglas", () => {
+      const ids = analyze(ips(line, "iPhone14,5")).findings.map((x) => x.ruleId);
+      expect(ids).not.toContain("camera");
+      expect(ids).not.toContain("unknown");
+    });
+  });
+
   describe("SMC: máscara de sensores", () => {
     const smcLine = (sensors: string) =>
       "panic(cpu 0 caller 0xfffffff039eeae08): SMC PANIC - ASSERT: target/d27/target.cpp:321: 0, SMC BSC failure, TAOC ----\n" +

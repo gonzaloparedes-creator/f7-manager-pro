@@ -317,6 +317,12 @@ function smcSensorMask(text: string): Array<{ word: number; bit: number; value: 
   return bits;
 }
 
+// Conector de la placa lógica a medir cuando el DCP (coprocesador de pantalla) entra en pánico.
+// El designador cambia en cada placa: solo se nombran los confirmados en reparaciones reales.
+const DCP_DISPLAY_CONNECTORS: Record<string, string> = {
+  "iPhone14,5": "J11800",
+};
+
 const SOFTWARE_CHECKS = [
   "Restaurar iOS desde cero (sin restaurar backup) para descartar software.",
   "Verificar que el almacenamiento no esté casi lleno.",
@@ -465,6 +471,33 @@ const RULES: Rule[] = [
         ...(faceId ? ["Medir caída de tensión en el conector del proyector de puntos y de la cámara infrarroja."] : []),
       ];
       return { components, checks };
+    },
+  },
+  {
+    id: "dcp-panic",
+    title: "Falla del coprocesador de pantalla (DCP panic)",
+    category: "hardware",
+    confidence: "media",
+    pattern: /\bdcp\s+panic\b/i,
+    explanation:
+      "El coprocesador de pantalla (DCP), que maneja la imagen y la retroiluminación, entró en pánico y reinició el equipo. Lo más frecuente es que la causa sea la propia pantalla o su conexión; si con otra pantalla sigue igual, apunta a la alimentación del conector de pantalla en la placa.",
+    components: ["Pantalla", "Conector de pantalla (BTB) de la placa lógica"],
+    checks: [
+      "Probar con otra pantalla.",
+      "Medir caída de tensión en el conector de pantalla de la placa lógica para detectar cortos o falta de alimentación.",
+      "Revisar los pines del conector por suciedad, humedad o corrosión.",
+    ],
+    refine: (_m, device) => {
+      const connector = device.id ? DCP_DISPLAY_CONNECTORS[device.id] : undefined;
+      if (!connector) return {};
+      return {
+        components: ["Pantalla", `Conector ${connector} de la placa lógica`],
+        checks: [
+          "Probar con otra pantalla.",
+          `Medir caída de tensión en el conector ${connector} para detectar cortos o falta de alimentación.`,
+          "Revisar los pines del conector por suciedad, humedad o corrosión.",
+        ],
+      };
     },
   },
   {
