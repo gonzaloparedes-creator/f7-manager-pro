@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { normalizedRealPhone } from "@/lib/clients";
 import { formatPYG, getDefaultStatusMessage } from "@/lib/orders";
+import type { PostSaleEventKey } from "@/lib/postSale";
 
 export interface MessageVars {
   cliente: string;
@@ -12,9 +13,18 @@ export interface MessageVars {
   monto: string;
   saldo: string;
   garantia: string;
+  /** Solo en los mensajes de post-venta. */
+  resena?: string;
+  vencimiento?: string;
 }
 
-export const MESSAGE_VARIABLES: { key: keyof MessageVars; label: string; example: string }[] = [
+export const MESSAGE_VARIABLES: {
+  key: keyof MessageVars;
+  label: string;
+  example: string;
+  /** No se ofrece al editar mensajes de órdenes: solo tiene valor en post-venta. */
+  postSaleOnly?: boolean;
+}[] = [
   { key: "cliente", label: "Cliente", example: "Juan Pérez" },
   { key: "equipo", label: "Equipo", example: "Celular" },
   { key: "orden", label: "N° de orden", example: "ORD-0001" },
@@ -24,6 +34,8 @@ export const MESSAGE_VARIABLES: { key: keyof MessageVars; label: string; example
   { key: "monto", label: "Monto del presupuesto", example: "Gs. 350.000" },
   { key: "saldo", label: "Saldo pendiente", example: "Gs. 200.000" },
   { key: "garantia", label: "Garantía", example: "30 días" },
+  { key: "resena", label: "Link de reseña", example: "https://g.page/r/tu-taller/review", postSaleOnly: true },
+  { key: "vencimiento", label: "Vence la garantía", example: "28/10/2026", postSaleOnly: true },
 ];
 
 export const PREVIEW_VARS: MessageVars = MESSAGE_VARIABLES.reduce(
@@ -48,7 +60,8 @@ export type MessageEventKey =
   | "seguimiento"
   | "presupuesto_aceptado"
   | "presupuesto_rechazado"
-  | "presupuesto_cambios";
+  | "presupuesto_cambios"
+  | PostSaleEventKey;
 
 export const MESSAGE_EVENTS: Record<MessageEventKey, { label: string; defaultBody: string }> = {
   orden_creada: {
@@ -80,6 +93,21 @@ export const MESSAGE_EVENTS: Record<MessageEventKey, { label: string; defaultBod
     label: "Cambios al presupuesto",
     defaultBody:
       "¡Hola {{cliente}}! Recibimos tu pedido de cambios sobre el presupuesto de tu {{equipo}}. Lo revisamos y te contactamos a la brevedad. 🔧",
+  },
+  postventa_resena: {
+    label: "Pedir reseña",
+    defaultBody:
+      "¡Hola {{cliente}}! Soy de {{taller}}. ¿Cómo te fue con tu {{equipo}}? Si quedaste conforme, nos ayudaría muchísimo que nos dejes una reseña acá: {{resena}} 🙏 ¡Gracias!",
+  },
+  postventa_garantia: {
+    label: "Garantía por vencer",
+    defaultBody:
+      "¡Hola {{cliente}}! Te avisamos desde {{taller}} que la garantía de tu {{equipo}} (Orden *{{orden}}*) vence el {{vencimiento}}. Si notás algún problema con la reparación, escribinos antes de esa fecha y lo revisamos. 🔧",
+  },
+  postventa_cumple: {
+    label: "Saludo de cumpleaños",
+    defaultBody:
+      "¡Hola {{cliente}}! Todo el equipo de {{taller}} te desea un muy feliz cumpleaños 🎂 ¡Que tengas un gran día!",
   },
 };
 
@@ -190,6 +218,8 @@ export async function logCustomerMessage(params: {
   userId: string;
   orderId: string | null;
   orderIds?: string[];
+  /** Mensajes sin orden (cumpleaños): a qué cliente corresponden. */
+  clientId?: string | null;
   eventKey: string;
   action: MessageAction;
   phone: string | null;
@@ -201,6 +231,7 @@ export async function logCustomerMessage(params: {
     targets.map((orderId) => ({
       company_id: params.companyId,
       order_id: orderId,
+      client_id: params.clientId ?? null,
       event_key: params.eventKey,
       action: params.action,
       phone: params.phone,

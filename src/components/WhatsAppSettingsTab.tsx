@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import WhatsAppPrefsCard from "@/components/WhatsAppPrefsCard";
+import WhatsAppPostSaleCard from "@/components/WhatsAppPostSaleCard";
 import WhatsAppTemplatesCard from "@/components/WhatsAppTemplatesCard";
 import { evolutionSunsetLabel } from "@/lib/whatsappMigration";
 import { MessageCircle, ShieldAlert, ShieldCheck } from "lucide-react";
@@ -32,7 +33,7 @@ async function edgeErrorMessage(error: unknown, fallback: string): Promise<strin
 export default function WhatsAppSettingsTab({ onOpenStatuses }: { onOpenStatuses?: () => void }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { evolutionActive, reload } = useWhatsAppSettings();
+  const { evolutionActive, postSaleAvailable, reload } = useWhatsAppSettings();
   const [ownConnected, setOwnConnected] = useState(false);
   const [ownPhone, setOwnPhone] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -130,7 +131,8 @@ export default function WhatsAppSettingsTab({ onOpenStatuses }: { onOpenStatuses
       </Card>
 
       <WhatsAppPrefsCard evolutionActive={evolutionActive} />
-      <WhatsAppTemplatesCard onOpenStatuses={onOpenStatuses} evolutionActive={evolutionActive} />
+      <WhatsAppPostSaleCard />
+      <WhatsAppTemplatesCard onOpenStatuses={onOpenStatuses} evolutionActive={evolutionActive} postSaleAvailable={postSaleAvailable} />
 
       <ConfirmDialog
         open={confirmOpen}

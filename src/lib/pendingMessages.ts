@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { fetchWhatsAppSettings } from "@/hooks/useWhatsAppSettings";
+import { fetchWhatsAppSettings, type WhatsAppSettings } from "@/hooks/useWhatsAppSettings";
 import {
   MESSAGE_EVENTS,
   buildOrderMessageVars,
@@ -13,6 +13,30 @@ import {
   type TemplateOverrides,
 } from "@/lib/customerMessages";
 import { resolveStatusLabel } from "@/lib/orders";
+import { normalizedRealPhone } from "@/lib/clients";
+import {
+  POST_SALE_EVENT,
+  POST_SALE_EVENT_KEYS,
+  POST_SALE_LOG_LOOKBACK_DAYS,
+  REVIEW_MAX_DAYS,
+  REVIEW_MIN_DAYS,
+  WARRANTY_LEAD_DAYS,
+  elapsedDays,
+  formatDMY,
+  isWarrantyDue,
+  joinDistinct,
+  phoneKey,
+  pickBirthdays,
+  pickReviewGroups,
+  pickWarrantyGroups,
+  postSaleActive,
+  reviewRequestsActive,
+  warrantyDaysLeft,
+  warrantyExpiryDate,
+  type DeliveredOrder,
+  type PostSaleKind,
+  type PostSaleLogRow,
+} from "@/lib/postSale";
 
 // La cola solo mira lo reciente: un aviso de hace semanas ya no le sirve al
 // cliente, y acota cuánto historial hay que leer en cada refresco.
@@ -22,19 +46,29 @@ const PAGE_SIZE = 1000;
 const MAX_PAGES = 5;
 const CHUNK_SIZE = 40;
 
-export type PendingKind = "status" | "creation" | "quote_response";
+export type PendingKind = "status" | "creation" | "quote_response" | PostSaleKind;
+
+export const POST_SALE_KINDS: PendingKind[] = ["review", "warranty", "birthday"];
 
 export interface PendingMessage {
-  /** `${orderId}:${eventKey}` — estable entre refrescos. */
+  /** Estable entre refrescos: `${orderId}:${eventKey}` (en post-venta, el teléfono o el cliente). */
   id: string;
-  orderId: string;
-  orderNumber: string;
+  /** null en los saludos de cumpleaños, que no tienen orden. */
+  orderId: string | null;
+  /** Post-venta que cubre varias órdenes (un lote): el registro se escribe una vez por cada una. */
+  orderIds?: string[];
+  /** Solo en cumpleaños: el registro apunta al cliente. */
+  clientId: string | null;
+  orderNumber: string | null;
   customerName: string;
-  deviceType: string;
+  deviceType: string | null;
   eventKey: string;
   eventLabel: string;
   kind: PendingKind;
+  /** Cuándo pasó (avisos) o desde cuándo corresponde contactar (post-venta). */
   occurredAt: string;
+  /** Contexto en texto para la lista de post-venta ("Entregado hace 4 días"). */
+  detail?: string;
   phone: string;
   message: string;
 }
@@ -129,10 +163,7 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-export async function fetchPendingMessages(companyId: string): Promise<PendingQueue> {
-  const settings = await fetchWhatsAppSettings(companyId);
-  if (settings.evolutionActive) return { evolutionActive: true, items: [] };
-
+async function fetchOrderEventItems(companyId: string, settings: WhatsAppSettings): Promise<PendingMessage[]> {
   const sinceMs = Math.max(
     settings.queueSince ? new Date(settings.queueSince).getTime() : 0,
     Date.now() - QUEUE_WINDOW_DAYS * 24 * 60 * 60 * 1000
@@ -263,6 +294,7 @@ export async function fetchPendingMessages(companyId: string): Promise<PendingQu
     items.push({
       id: `${orderId}:${latest.eventKey}`,
       orderId,
+      clientId: null,
       orderNumber: order.order_number,
       customerName: order.customer_name,
       deviceType: order.device_type,
@@ -287,6 +319,7 @@ export async function fetchPendingMessages(companyId: string): Promise<PendingQu
     items.push({
       id: `${typed.id}:${eventKey}`,
       orderId: typed.id,
+      clientId: null,
       orderNumber: typed.order_number,
       customerName: typed.customer_name,
       deviceType: typed.device_type,
@@ -299,6 +332,257 @@ export async function fetchPendingMessages(companyId: string): Promise<PendingQu
     });
   }
 
+  return items;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Cuánto atrás se buscan entregas con garantía vigente: cubre garantías de
+// hasta 6 meses (las del taller son de 15 a 90 días).
+const WARRANTY_LOOKBACK_DAYS = 181;
+// La lista de candidatos a garantía / cumpleaños cambia de a poco: no hace
+// falta releerla en cada refresco de la cola (cada 90 s).
+const CANDIDATES_TTL_MS = 10 * 60 * 1000;
+
+const candidatesCache = new Map<string, { at: number; value: Promise<unknown> }>();
+
+function cachedCandidates<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = candidatesCache.get(key);
+  if (hit && Date.now() - hit.at < CANDIDATES_TTL_MS) return hit.value as Promise<T>;
+  const value = load();
+  candidatesCache.set(key, { at: Date.now(), value });
+  value.catch(() => candidatesCache.delete(key));
+  return value;
+}
+
+// Se llama después de cambiar algo que altera esos candidatos (ej. cargar un
+// cumpleaños) para que la lista lo refleje enseguida.
+export function clearPostSaleCache() {
+  candidatesCache.clear();
+}
+
+type DeliveredRow = OrderMessageSource & {
+  id: string;
+  client_id: string | null;
+  delivered_at: string;
+};
+
+const DELIVERED_FIELDS =
+  "id, client_id, order_number, tracking_token, customer_name, customer_phone, alternative_phone, secondary_phone, device_type, quote_amount, deposit_amount, cargos_adicionales, warranty_days, delivered_at";
+
+type DeliveredCandidate = DeliveredOrder & { row: DeliveredRow };
+
+function toCandidate(row: DeliveredRow, optedOut: Set<string>): DeliveredCandidate | null {
+  if (row.client_id && optedOut.has(row.client_id)) return null;
+  const phone = recipientPhone(row);
+  if (!phone) return null;
+  return {
+    orderId: row.id,
+    deliveredAt: row.delivered_at,
+    phone,
+    warrantyDays: Number(row.warranty_days ?? 0),
+    row,
+  };
+}
+
+const agoText = (days: number) => (days <= 0 ? "hoy" : days === 1 ? "ayer" : `hace ${days} días`);
+
+const iso = (ms: number) => new Date(ms).toISOString();
+
+type BirthdayClientRow = { id: string; name: string; phone: string | null; birth_date: string | null };
+
+async function fetchPostSaleItems(companyId: string, settings: WhatsAppSettings): Promise<PendingMessage[]> {
+  const ps = settings.postSale;
+  if (!settings.postSaleAvailable || !postSaleActive(ps)) return [];
+
+  const now = new Date();
+  const nowMs = now.getTime();
+  const wantReview = reviewRequestsActive(ps);
+  const reviewUrl = ps.reviewUrl?.trim() ?? "";
+  const needsOrders = wantReview || ps.warranty;
+
+  const [logRows, optedOutRes, templatesRes, companyRes, reviewRows, warrantyRows, birthdayClients] =
+    await Promise.all([
+      fetchPaged<PostSaleLogRow>((from, to) =>
+        supabase
+          .from("customer_message_log")
+          .select("order_id, client_id, event_key, action, phone, created_at")
+          .eq("company_id", companyId)
+          .in("event_key", POST_SALE_EVENT_KEYS)
+          .gte("created_at", iso(nowMs - POST_SALE_LOG_LOOKBACK_DAYS * DAY_MS))
+          .order("created_at", { ascending: true })
+          .range(from, to)
+      ),
+      needsOrders
+        ? supabase.from("clients").select("id").eq("company_id", companyId).eq("notify_whatsapp", false)
+        : Promise.resolve({ data: [] as { id: string }[], error: null }),
+      supabase.from("whatsapp_templates").select("event_key, body").eq("company_id", companyId),
+      supabase.from("companies").select("name").eq("id", companyId).maybeSingle(),
+      wantReview
+        ? supabase
+            .from("orders")
+            .select(DELIVERED_FIELDS)
+            .eq("company_id", companyId)
+            .eq("status", "entregado")
+            .gt("delivered_at", iso(nowMs - (REVIEW_MAX_DAYS + 1) * DAY_MS))
+            .lte("delivered_at", iso(nowMs - REVIEW_MIN_DAYS * DAY_MS))
+            .then((res) => {
+              if (res.error) throw res.error;
+              return (res.data ?? []) as unknown as DeliveredRow[];
+            })
+        : Promise.resolve([] as DeliveredRow[]),
+      ps.warranty ? fetchWarrantyDueRows(companyId, now) : Promise.resolve([] as DeliveredRow[]),
+      ps.birthday
+        ? cachedCandidates(`${companyId}:birthdays`, () =>
+            fetchPaged<BirthdayClientRow>((from, to) =>
+              supabase
+                .from("clients")
+                .select("id, name, phone, birth_date")
+                .eq("company_id", companyId)
+                .eq("notify_whatsapp", true)
+                .not("birth_date", "is", null)
+                .range(from, to)
+            )
+          )
+        : Promise.resolve([] as BirthdayClientRow[]),
+    ]);
+  if (optedOutRes.error) throw optedOutRes.error;
+
+  const optedOut = new Set((optedOutRes.data ?? []).map((c) => c.id));
+  const overrides: TemplateOverrides = {};
+  for (const row of templatesRes.data ?? []) overrides[row.event_key] = row.body;
+  const taller = companyRes.data?.name ?? "";
+  const items: PendingMessage[] = [];
+
+  const reviewCandidates = reviewRows.flatMap((r) => toCandidate(r, optedOut) ?? []);
+  for (const group of pickReviewGroups(reviewCandidates, logRows, now)) {
+    const primary = group.primary.row;
+    const vars = {
+      ...buildOrderMessageVars(primary, { taller }),
+      equipo: joinDistinct(group.orders.map((o) => o.row.device_type)),
+      orden: group.orders.map((o) => o.row.order_number).join(", "),
+      resena: reviewUrl,
+    };
+    items.push({
+      id: `${phoneKey(group.primary.phone)}:${POST_SALE_EVENT.review}`,
+      orderId: primary.id,
+      orderIds: group.orders.map((o) => o.orderId),
+      clientId: null,
+      orderNumber: vars.orden,
+      customerName: primary.customer_name,
+      deviceType: vars.equipo,
+      eventKey: POST_SALE_EVENT.review,
+      eventLabel: MESSAGE_EVENTS.postventa_resena.label,
+      kind: "review",
+      occurredAt: iso(new Date(group.primary.deliveredAt).getTime() + REVIEW_MIN_DAYS * DAY_MS),
+      detail: `Entregado ${agoText(elapsedDays(group.primary.deliveredAt, now))}`,
+      phone: group.primary.phone,
+      message: renderMessage(resolveEventBody("postventa_resena", overrides), vars),
+    });
+  }
+
+  const warrantyCandidates = warrantyRows.flatMap((r) => toCandidate(r, optedOut) ?? []);
+  for (const group of pickWarrantyGroups(warrantyCandidates, logRows, now)) {
+    const primary = group.primary.row;
+    const expiry = warrantyExpiryDate(group.primary.deliveredAt, group.primary.warrantyDays);
+    const left = warrantyDaysLeft(group.primary.deliveredAt, group.primary.warrantyDays, now) ?? 0;
+    const vars = {
+      ...buildOrderMessageVars(primary, { taller }),
+      equipo: joinDistinct(group.orders.map((o) => o.row.device_type)),
+      orden: group.orders.map((o) => o.row.order_number).join(", "),
+      vencimiento: formatDMY(expiry),
+    };
+    const leftText = left <= 0 ? "hoy" : left === 1 ? "mañana" : `en ${left} días`;
+    items.push({
+      id: `${primary.id}:${POST_SALE_EVENT.warranty}`,
+      orderId: primary.id,
+      orderIds: group.orders.map((o) => o.orderId),
+      clientId: null,
+      orderNumber: vars.orden,
+      customerName: primary.customer_name,
+      deviceType: vars.equipo,
+      eventKey: POST_SALE_EVENT.warranty,
+      eventLabel: MESSAGE_EVENTS.postventa_garantia.label,
+      kind: "warranty",
+      occurredAt: iso(expiry.getTime() - WARRANTY_LEAD_DAYS * DAY_MS),
+      detail: `Garantía vence ${leftText} (${vars.vencimiento})`,
+      phone: group.primary.phone,
+      message: renderMessage(resolveEventBody("postventa_garantia", overrides), vars),
+    });
+  }
+
+  const reachableClients = birthdayClients.flatMap((c) => {
+    const phone = normalizedRealPhone(c.phone);
+    return phone && c.birth_date ? [{ id: c.id, name: c.name, phone, birthDate: c.birth_date }] : [];
+  });
+  for (const { client, occurrence } of pickBirthdays(reachableClients, logRows, now)) {
+    items.push({
+      id: `${client.id}:${POST_SALE_EVENT.birthday}`,
+      orderId: null,
+      clientId: client.id,
+      orderNumber: null,
+      customerName: client.name,
+      deviceType: null,
+      eventKey: POST_SALE_EVENT.birthday,
+      eventLabel: MESSAGE_EVENTS.postventa_cumple.label,
+      kind: "birthday",
+      occurredAt: occurrence.start.toISOString(),
+      detail:
+        occurrence.daysAgo === 0
+          ? "Cumple hoy"
+          : occurrence.daysAgo === 1
+            ? "Cumplió ayer"
+            : `Cumplió hace ${occurrence.daysAgo} días`,
+      phone: client.phone,
+      message: renderMessage(resolveEventBody("postventa_cumple", overrides), { cliente: client.name, taller }),
+    });
+  }
+
+  return items;
+}
+
+// Dos pasos para no traer las órdenes completas de seis meses: primero solo
+// id / entrega / días de garantía (cacheado), y de ahí las que vencen en los
+// próximos días con todos los campos.
+async function fetchWarrantyDueRows(companyId: string, now: Date): Promise<DeliveredRow[]> {
+  const light = await cachedCandidates(`${companyId}:warranty`, () =>
+    fetchPaged<{ id: string; delivered_at: string | null; warranty_days: number | null }>((from, to) =>
+      supabase
+        .from("orders")
+        .select("id, delivered_at, warranty_days")
+        .eq("company_id", companyId)
+        .eq("status", "entregado")
+        .gt("warranty_days", 0)
+        .gte("delivered_at", iso(now.getTime() - WARRANTY_LOOKBACK_DAYS * DAY_MS))
+        .range(from, to)
+    )
+  );
+  const dueIds = light
+    .filter((r) => r.delivered_at && isWarrantyDue(r.delivered_at, r.warranty_days, now))
+    .map((r) => r.id);
+  const pages = await Promise.all(
+    chunk(dueIds, CHUNK_SIZE).map(async (ids) => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(DELIVERED_FIELDS)
+        .eq("company_id", companyId)
+        .eq("status", "entregado")
+        .in("id", ids);
+      if (error) throw error;
+      return (data ?? []) as unknown as DeliveredRow[];
+    })
+  );
+  return pages.flat();
+}
+
+export async function fetchPendingMessages(companyId: string): Promise<PendingQueue> {
+  const settings = await fetchWhatsAppSettings(companyId);
+  // Con Evolution conectado el servidor ya avisa solo los cambios de estado:
+  // no hay cola de eso. La post-venta no la manda nadie, así que se calcula igual.
+  const [orderItems, postSaleItems] = await Promise.all([
+    settings.evolutionActive ? Promise.resolve([] as PendingMessage[]) : fetchOrderEventItems(companyId, settings),
+    fetchPostSaleItems(companyId, settings),
+  ]);
+  const items = [...orderItems, ...postSaleItems];
   items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
-  return { evolutionActive: false, items };
+  return { evolutionActive: settings.evolutionActive, items };
 }

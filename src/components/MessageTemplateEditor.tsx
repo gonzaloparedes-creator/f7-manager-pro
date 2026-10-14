@@ -38,7 +38,7 @@ export default function MessageTemplateEditor({
   onChange: (value: string) => void;
   /** Datos de ejemplo que pisan a los genéricos (ej. el estado que se edita). */
   previewVars?: Partial<MessageVars>;
-  /** Variables que se pueden usar; por defecto todas. */
+  /** Variables que se pueden usar; por defecto todas las de órdenes (las de post-venta hay que pedirlas). */
   variables?: (keyof MessageVars)[];
   rows?: number;
 }) {
@@ -57,7 +57,7 @@ export default function MessageTemplateEditor({
     });
   };
 
-  const available = MESSAGE_VARIABLES.filter((v) => !variables || variables.includes(v.key));
+  const available = MESSAGE_VARIABLES.filter((v) => (variables ? variables.includes(v.key) : !v.postSaleOnly));
   const unknown = unavailableVariables(value, new Set<string>(available.map((v) => v.key)));
   const preview = renderMessage(value, { ...PREVIEW_VARS, ...previewVars });
 

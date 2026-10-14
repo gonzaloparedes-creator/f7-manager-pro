@@ -31,6 +31,8 @@ export default function AvisarClienteDialog({
   open,
   onOpenChange,
   orderId,
+  orderIds,
+  clientId,
   customerName,
   phone,
   eventKey,
@@ -44,6 +46,10 @@ export default function AvisarClienteDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   orderId: string | null;
+  /** Mensaje que cubre varias órdenes (lote): el registro se escribe una vez por cada una. */
+  orderIds?: string[];
+  /** Mensajes sin orden (cumpleaños): el registro apunta al cliente. */
+  clientId?: string | null;
   customerName: string;
   /** Teléfono ya validado (null si el de la orden es un relleno tipo "000"). */
   phone: string | null;
@@ -66,7 +72,7 @@ export default function AvisarClienteDialog({
   const [selectedKey, setSelectedKey] = useState(options?.[0]?.key ?? "");
   const [currentEventKey, setCurrentEventKey] = useState(eventKey);
   const [currentOrderId, setCurrentOrderId] = useState(orderId);
-  const [currentOrderIds, setCurrentOrderIds] = useState<string[] | undefined>(options?.[0]?.orderIds);
+  const [currentOrderIds, setCurrentOrderIds] = useState<string[] | undefined>(orderIds ?? options?.[0]?.orderIds);
 
   useEffect(() => {
     if (!open) return;
@@ -74,7 +80,7 @@ export default function AvisarClienteDialog({
     setSelectedKey(options?.[0]?.key ?? "");
     setCurrentEventKey(eventKey);
     setCurrentOrderId(orderId);
-    setCurrentOrderIds(options?.[0]?.orderIds);
+    setCurrentOrderIds(orderIds ?? options?.[0]?.orderIds);
     // options se reconstruye en cada render del padre; solo importa cuando
     // el diálogo se abre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,6 +93,7 @@ export default function AvisarClienteDialog({
       userId: user.id,
       orderId: currentOrderId,
       orderIds: currentOrderIds,
+      clientId,
       eventKey: currentEventKey,
       action,
       phone,

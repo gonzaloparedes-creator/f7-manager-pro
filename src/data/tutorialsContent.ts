@@ -246,6 +246,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "El aviso aparece solo al crear una orden o presupuesto y al cambiar de estado, según lo que hayas dejado prendido en Configuración → WhatsApp. El diálogo muestra el teléfono del cliente y el mensaje, que podés retocar antes de abrir WhatsApp; \"Copiar\" lo copia por si preferís pegarlo en otro lado.",
           "En cualquier momento podés avisar a mano con el botón \"WhatsApp\" del detalle de la orden: elegís qué mensaje mandar (estado actual, seguimiento, presupuesto...). También se puede mandar el comprobante de una venta de mostrador desde Productos, y avisarle a un técnico que tiene una orden nueva con el botón \"Avisar\" junto a su nombre.",
           "Los avisos que dejaste para después quedan en el menú Avisos (con un número en rojo cuando hay pendientes), junto con las respuestas que dejan los clientes a un presupuesto. Si un cliente tiene apagado \"Notificar por WhatsApp\", o su teléfono es un relleno como \"000\", F7 no te sugiere avisarle.",
+          "Además, si tenés el plan Pro o superior y lo activás en Configuración → WhatsApp → Post-venta, el menú Avisos suma la lista \"Para contactar hoy\": pedir una reseña a los 3 días de entregar una reparación, avisar que la garantía está por vencer y saludar en el cumpleaños del cliente. Se arma sola, pero cada mensaje lo mandás vos con un toque. Una vez que le escribiste (o lo descartaste) a un cliente, deja de aparecer.",
         ],
       },
       {
@@ -307,6 +308,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "Desde el mismo detalle se pueden corregir nombre, teléfono o cédula/RUC, y hay un botón directo para abrirle un chat de WhatsApp.",
           "También hay un switch \"Notificar por WhatsApp\": si lo apagás, F7 deja de sugerirte avisarle a ese cliente (orden creada, cambios de estado, respuesta a un presupuesto) — útil para clientes mayoristas u otros contactos que no quieran ese tipo de mensajes. Igual podés escribirle a mano cuando quieras. Por defecto está prendido para todos.",
+          "Y el campo \"Cumpleaños\" (opcional): si cargás la fecha y tenés prendido el saludo de cumpleaños en Configuración → WhatsApp → Post-venta, F7 te lo recuerda ese día en Avisos para que le mandes el saludo con un toque.",
         ],
         images: [{ file: "clientes-editar-01.png", alt: "Edición de datos de un cliente" }],
       },
@@ -629,6 +631,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "Acá definís cómo avisás a tus clientes. F7 te deja cada mensaje escrito y lo mandás con un toque desde tu propio WhatsApp: no hace falta conectar nada ni escanear ningún código.",
           "\"Cuándo avisar a tus clientes\": un interruptor para cuando se crea la orden o presupuesto y uno por cada estado (incluidos los que creaste vos). Los que dejes prendidos te muestran el aviso listo para mandar; los demás los podés mandar a mano desde el detalle de la orden.",
           "\"Mensajes de WhatsApp\": el texto de cada aviso (orden creada, presupuesto, seguimiento y las respuestas a un presupuesto). Se editan tocando las variables (cliente, equipo, número de orden, estado, link, taller, monto, saldo, garantía) para insertarlas donde está el cursor, con una vista previa de cómo lo ve el cliente. \"Restaurar predeterminado\" vuelve al texto original. Los mensajes de cada estado se editan en la pestaña Estados.",
+          "\"Post-venta: para contactar hoy\" (desde el plan Pro): tres interruptores, todos apagados al principio. \"Pedir reseña\" (3 a 7 días después de entregar; necesita que cargues el link de tu ficha de Google para dejar reseñas), \"Garantía por vencer\" (los últimos 3 días de la garantía de la reparación) y \"Cumpleaños\" (el día del cumpleaños cargado en Clientes, y hasta 2 días después). Lo que prendas aparece en Avisos, en la sección \"Para contactar hoy\". Los textos de estos tres mensajes se editan en \"Mensajes de WhatsApp\" → Post-venta, con las variables {{resena}} y {{vencimiento}} además de las de siempre.",
           "Si tu taller todavía tiene un WhatsApp conectado por código QR (la forma anterior), arriba aparece un aviso con el botón \"Desconectar y pasar al modo seguro\". Esa conexión no es oficial y WhatsApp puede bloquear el número conectado, por eso se va a dejar de usar.",
         ],
       },
@@ -639,6 +642,7 @@ export const tutorialCategories: TutorialCategory[] = [
           "¿Por qué ya no es automático? Porque los envíos automáticos por código QR no son una vía oficial: WhatsApp puede bloquear el número del taller sin avisar, y con él se pierden los chats con tus clientes. Mandar el mensaje desde tu propio WhatsApp es lo que más cuida tu número.",
           "¿Puedo seguir con el QR? Por un tiempo sí: mientras esté conectado, los avisos siguen saliendo solos como antes. Pero esa conexión se va a apagar, y conviene pasarse antes desde Configuración → WhatsApp.",
           "¿Qué pasa si me olvido de avisar? El aviso queda esperando en el menú Avisos, y desde ahí lo mandás cuando puedas.",
+          "¿Le llega a todos los clientes la reseña o el saludo? No: F7 respeta al cliente que tiene apagado \"Notificar por WhatsApp\" y al que tiene un teléfono de relleno. Además, la reseña no se le vuelve a pedir al mismo número antes de 30 días, y si trajo varios equipos juntos recibe un solo mensaje.",
           "¿Y si quiero que sea 100 % automático? Hoy no está disponible. La opción para eso es la API oficial de WhatsApp, que tiene costo y requiere verificar el negocio con Meta; la estamos evaluando.",
         ],
       },

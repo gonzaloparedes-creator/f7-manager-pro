@@ -12,6 +12,7 @@ import {
   renderMessage,
   PREVIEW_VARS,
   type MessageEventKey,
+  type MessageVars,
 } from "@/lib/customerMessages";
 
 const EVENT_ORDER: MessageEventKey[] = [
@@ -23,6 +24,16 @@ const EVENT_ORDER: MessageEventKey[] = [
   "presupuesto_cambios",
 ];
 
+const POST_SALE_ORDER: MessageEventKey[] = ["postventa_resena", "postventa_garantia", "postventa_cumple"];
+
+// Cada mensaje de post-venta solo conoce los datos que tiene a mano: el
+// saludo de cumpleaños, por ejemplo, no tiene orden ni equipo.
+const POST_SALE_VARIABLES: Partial<Record<MessageEventKey, (keyof MessageVars)[]>> = {
+  postventa_resena: ["cliente", "equipo", "orden", "taller", "resena"],
+  postventa_garantia: ["cliente", "equipo", "orden", "taller", "garantia", "vencimiento"],
+  postventa_cumple: ["cliente", "taller"],
+};
+
 const EVENT_HELP: Record<MessageEventKey, string> = {
   orden_creada: "Cuando creás una orden de reparación.",
   presupuesto_creado: "Cuando creás un presupuesto.",
@@ -30,14 +41,19 @@ const EVENT_HELP: Record<MessageEventKey, string> = {
   presupuesto_aceptado: "Cuando el cliente acepta un presupuesto desde su link.",
   presupuesto_rechazado: "Cuando el cliente rechaza un presupuesto.",
   presupuesto_cambios: "Cuando el cliente pide cambios en un presupuesto.",
+  postventa_resena: "A los 3 días de entregar una reparación, para pedirle una reseña. Se activa en Post-venta.",
+  postventa_garantia: "Unos días antes de que venza la garantía de una reparación. Se activa en Post-venta.",
+  postventa_cumple: "El día del cumpleaños del cliente (si cargaste su fecha en Clientes). Se activa en Post-venta.",
 };
 
 export default function WhatsAppTemplatesCard({
   onOpenStatuses,
   evolutionActive = false,
+  postSaleAvailable = false,
 }: {
   onOpenStatuses?: () => void;
   evolutionActive?: boolean;
+  postSaleAvailable?: boolean;
 }) {
   const { toast } = useToast();
   const { companyId } = useCompany();
@@ -92,6 +108,26 @@ export default function WhatsAppTemplatesCard({
     load();
   };
 
+  const renderRow = (key: MessageEventKey) => (
+    <div key={key} className="flex items-start gap-3 px-4 py-3" data-testid={`template-row-${key}`}>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">{MESSAGE_EVENTS[key].label}</span>
+          {custom[key] && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Personalizado</span>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground">{EVENT_HELP[key]}</div>
+        <div className="line-clamp-2 text-xs text-muted-foreground/80">
+          {renderMessage(bodyOf(key), PREVIEW_VARS)}
+        </div>
+      </div>
+      <Button variant="ghost" size="icon" onClick={() => openEditor(key)} aria-label={`Editar mensaje: ${MESSAGE_EVENTS[key].label}`}>
+        <Pencil className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   return (
     <Card>
       <CardContent className="space-y-4 p-6">
@@ -117,27 +153,15 @@ export default function WhatsAppTemplatesCard({
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="divide-y rounded-md border">
-            {EVENT_ORDER.map((key) => (
-              <div key={key} className="flex items-start gap-3 px-4 py-3" data-testid={`template-row-${key}`}>
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">{MESSAGE_EVENTS[key].label}</span>
-                    {custom[key] && (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Personalizado</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{EVENT_HELP[key]}</div>
-                  <div className="line-clamp-2 text-xs text-muted-foreground/80">
-                    {renderMessage(bodyOf(key), PREVIEW_VARS)}
-                  </div>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => openEditor(key)} aria-label={`Editar mensaje: ${MESSAGE_EVENTS[key].label}`}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
+          <>
+            <div className="divide-y rounded-md border">{EVENT_ORDER.map(renderRow)}</div>
+            {postSaleAvailable && (
+              <div className="space-y-2 pt-2">
+                <div className="text-sm font-semibold">Post-venta</div>
+                <div className="divide-y rounded-md border">{POST_SALE_ORDER.map(renderRow)}</div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </CardContent>
 
@@ -148,7 +172,12 @@ export default function WhatsAppTemplatesCard({
             <DialogDescription>{editing ? EVENT_HELP[editing] : ""}</DialogDescription>
           </DialogHeader>
 
-          <MessageTemplateEditor id="event_template_text" value={text} onChange={setText} />
+          <MessageTemplateEditor
+            id="event_template_text"
+            value={text}
+            onChange={setText}
+            variables={editing ? POST_SALE_VARIABLES[editing] : undefined}
+          />
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button

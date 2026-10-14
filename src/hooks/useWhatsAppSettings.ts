@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
+import { DEFAULT_POST_SALE_SETTINGS, type PostSaleSettings } from "@/lib/postSale";
 
 export interface WhatsAppSettings {
   prefs: Record<string, boolean>;
@@ -9,19 +10,26 @@ export interface WhatsAppSettings {
   // en ese caso el servidor sigue avisando solo y no se ofrece el diálogo
   // nuevo (evita mandarle dos veces el mismo aviso al cliente).
   evolutionActive: boolean;
+  postSale: PostSaleSettings;
+  // Post-venta es de los planes Pro, Business y Retail (no Starter).
+  postSaleAvailable: boolean;
 }
 
 export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppSettings = {
   prefs: {},
   queueSince: null,
   evolutionActive: false,
+  postSale: DEFAULT_POST_SALE_SETTINGS,
+  postSaleAvailable: false,
 };
 
 export async function fetchWhatsAppSettings(companyId: string): Promise<WhatsAppSettings> {
   const [companyRes, connectedRes] = await Promise.all([
     supabase
       .from("companies")
-      .select("whatsapp_notify_prefs, whatsapp_queue_since")
+      .select(
+        "whatsapp_notify_prefs, whatsapp_queue_since, plan_type, postsale_review_enabled, postsale_warranty_enabled, postsale_birthday_enabled, review_url"
+      )
       .eq("id", companyId)
       .maybeSingle(),
     supabase
@@ -41,6 +49,13 @@ export async function fetchWhatsAppSettings(companyId: string): Promise<WhatsApp
     prefs,
     queueSince: companyRes.data?.whatsapp_queue_since ?? null,
     evolutionActive: (connectedRes.count ?? 0) > 0,
+    postSale: {
+      review: companyRes.data?.postsale_review_enabled ?? false,
+      warranty: companyRes.data?.postsale_warranty_enabled ?? false,
+      birthday: companyRes.data?.postsale_birthday_enabled ?? false,
+      reviewUrl: companyRes.data?.review_url ?? null,
+    },
+    postSaleAvailable: (companyRes.data?.plan_type ?? "starter") !== "starter",
   };
 }
 

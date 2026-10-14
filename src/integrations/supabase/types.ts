@@ -249,6 +249,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          birth_date: string | null
           cedula: string | null
           company_id: string
           created_at: string
@@ -260,6 +261,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          birth_date?: string | null
           cedula?: string | null
           company_id: string
           created_at?: string
@@ -271,6 +273,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          birth_date?: string | null
           cedula?: string | null
           company_id?: string
           created_at?: string
@@ -308,9 +311,13 @@ export type Database = {
           name: string
           order_seq: number
           plan_type: string
+          postsale_birthday_enabled: boolean
+          postsale_review_enabled: boolean
+          postsale_warranty_enabled: boolean
           previous_system: string | null
           referral_partner_id: string | null
           require_open_cash: boolean
+          review_url: string | null
           service_terms_template: string | null
           staff_can_close_caja: boolean
           staff_can_view_gastos: boolean
@@ -341,9 +348,13 @@ export type Database = {
           name: string
           order_seq?: number
           plan_type?: string
+          postsale_birthday_enabled?: boolean
+          postsale_review_enabled?: boolean
+          postsale_warranty_enabled?: boolean
           previous_system?: string | null
           referral_partner_id?: string | null
           require_open_cash?: boolean
+          review_url?: string | null
           service_terms_template?: string | null
           staff_can_close_caja?: boolean
           staff_can_view_gastos?: boolean
@@ -374,9 +385,13 @@ export type Database = {
           name?: string
           order_seq?: number
           plan_type?: string
+          postsale_birthday_enabled?: boolean
+          postsale_review_enabled?: boolean
+          postsale_warranty_enabled?: boolean
           previous_system?: string | null
           referral_partner_id?: string | null
           require_open_cash?: boolean
+          review_url?: string | null
           service_terms_template?: string | null
           staff_can_close_caja?: boolean
           staff_can_view_gastos?: boolean
@@ -404,6 +419,7 @@ export type Database = {
       customer_message_log: {
         Row: {
           action: string
+          client_id: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -415,6 +431,7 @@ export type Database = {
         }
         Insert: {
           action: string
+          client_id?: string | null
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -426,6 +443,7 @@ export type Database = {
         }
         Update: {
           action?: string
+          client_id?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null

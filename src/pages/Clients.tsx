@@ -17,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Pencil, Search, Users as UsersIcon, MessageCircle } from "lucide-react";
 import { openWhatsApp } from "@/lib/whatsapp";
+import { notifyMessageQueueChanged } from "@/lib/customerMessages";
+import { clearPostSaleCache } from "@/lib/pendingMessages";
 import { resolveStatusLabel } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 
@@ -26,6 +28,7 @@ type Client = {
   phone: string | null;
   cedula: string | null;
   notify_whatsapp: boolean;
+  birth_date: string | null;
   created_at: string;
 };
 
@@ -52,6 +55,7 @@ export default function Clients() {
   const [editPhone, setEditPhone] = useState("");
   const [editCedula, setEditCedula] = useState("");
   const [editNotifyWhatsapp, setEditNotifyWhatsapp] = useState(true);
+  const [editBirthDate, setEditBirthDate] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -59,7 +63,7 @@ export default function Clients() {
     if (!user || !companyId) return;
     setLoading(true);
     const [{ data: c, error: cErr }, { data: o, error: oErr }] = await Promise.all([
-      supabase.from("clients").select("id,name,phone,cedula,notify_whatsapp,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
+      supabase.from("clients").select("id,name,phone,cedula,notify_whatsapp,birth_date,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
       supabase.from("orders").select("id,order_number,device_type,status,client_id,created_at").eq("company_id", companyId).order("created_at", { ascending: false }),
     ]);
     if (cErr || oErr) {
@@ -100,7 +104,7 @@ export default function Clients() {
   const openEdit = (c: Client) => {
     setEditing(c);
     // Hydrate from draft if exists, otherwise from the row
-    let draft: { name?: string; phone?: string; cedula?: string; notifyWhatsapp?: boolean } | null = null;
+    let draft: { name?: string; phone?: string; cedula?: string; notifyWhatsapp?: boolean; birthDate?: string } | null = null;
     try {
       const raw = localStorage.getItem(clientDraftKey(c.id));
       if (raw) draft = JSON.parse(raw);
@@ -109,15 +113,16 @@ export default function Clients() {
     setEditPhone(draft?.phone ?? (c.phone ?? "").replace(/^595/, ""));
     setEditCedula(draft?.cedula ?? (c.cedula ?? ""));
     setEditNotifyWhatsapp(draft?.notifyWhatsapp ?? c.notify_whatsapp);
+    setEditBirthDate(draft?.birthDate ?? c.birth_date ?? "");
   };
 
   // Auto-save edit-client draft on change
   useEffect(() => {
     if (!editing) return;
     try {
-      localStorage.setItem(clientDraftKey(editing.id), JSON.stringify({ name: editName, phone: editPhone, cedula: editCedula, notifyWhatsapp: editNotifyWhatsapp }));
+      localStorage.setItem(clientDraftKey(editing.id), JSON.stringify({ name: editName, phone: editPhone, cedula: editCedula, notifyWhatsapp: editNotifyWhatsapp, birthDate: editBirthDate }));
     } catch { /* ignore */ }
-  }, [editing, editName, editPhone, editCedula, editNotifyWhatsapp]);
+  }, [editing, editName, editPhone, editCedula, editNotifyWhatsapp, editBirthDate]);
 
   const saveEdit = async () => {
     if (!editing) return;
@@ -130,10 +135,14 @@ export default function Clients() {
         phone: phone ? `595${phone}` : null,
         cedula: editCedula.trim() || null,
         notify_whatsapp: editNotifyWhatsapp,
+        birth_date: editBirthDate || null,
       })
       .eq("id", editing.id);
     setSaving(false);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    // La lista de cumpleaños de Avisos se guarda unos minutos: se renueva para que el cambio se vea ya.
+    clearPostSaleCache();
+    notifyMessageQueueChanged();
     toast({ title: "Cliente actualizado" });
     try { localStorage.removeItem(clientDraftKey(editing.id)); } catch {}
     setEditing(null);
@@ -287,6 +296,20 @@ export default function Clients() {
                 value={editCedula}
                 onChange={(e) => setEditCedula(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-client-birth">Cumpleaños (opcional)</Label>
+              <Input
+                id="edit-client-birth"
+                type="date"
+                min="1900-01-01"
+                max={new Date().toISOString().slice(0, 10)}
+                value={editBirthDate}
+                onChange={(e) => setEditBirthDate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Si activaste el saludo de cumpleaños en Configuración, F7 te lo recuerda ese día en Avisos.
+              </p>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
               <div className="space-y-0.5">
