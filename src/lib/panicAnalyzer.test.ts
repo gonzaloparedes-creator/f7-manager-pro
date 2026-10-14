@@ -216,6 +216,32 @@ describe("reglas", () => {
       expect(f.components.join(" ")).not.toMatch(/Batería/);
     });
 
+    it("iPhone 14 con el bit 0x400000 (4194304): nombra la carga inalámbrica y el conector J10500 (caso real)", () => {
+      const real2 = smcLine("S.sensor array 0 - 5 is 0, 4194304, 0, 0, 0").replace("TAOC", "TAOJ");
+      const f = analyze(ips(real2, "iPhone14,7", "iPhone OS 27.0.1 (24A446)")).findings[0];
+      expect(f.ruleId).toBe("smc");
+      expect(f.title).toMatch(/carga inalámbrica/);
+      expect(f.title).not.toMatch(/proximidad/);
+      expect(f.confidence).toBe("media");
+      expect(f.components.join(" ")).toMatch(/J10500/);
+      expect(f.components.join(" ")).not.toMatch(/proximidad/);
+      expect(f.checks.join(" ")).toMatch(/1\.2 V/);
+      expect(f.checks.join(" ")).toMatch(/JCID/);
+    });
+
+    it("iPhone 14 con ambos bits: junta los dos sensores", () => {
+      const f = analyze(ips(smcLine("S.sensor array 0 - 5 is 0, 6291456, 0, 0, 0"), "iPhone14,7")).findings[0];
+      expect(f.title).toMatch(/proximidad/);
+      expect(f.title).toMatch(/carga inalámbrica/);
+    });
+
+    it("otro modelo con la máscara de la carga inalámbrica: no inventa el sensor", () => {
+      const f = analyze(ips(smcLine("S.sensor array 0 - 5 is 0, 4194304, 0, 0, 0"), "iPhone15,2")).findings[0];
+      expect(f.confidence).toBe("baja");
+      expect(f.title).not.toMatch(/carga inalámbrica/);
+      expect(f.explanation).toContain("0x400000");
+    });
+
     it("otro modelo con la misma máscara: no inventa el sensor, muestra la máscara", () => {
       const f = analyze(ips(real, "iPhone15,2")).findings[0];
       expect(f.ruleId).toBe("smc");

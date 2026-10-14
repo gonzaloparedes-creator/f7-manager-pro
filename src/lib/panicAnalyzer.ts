@@ -303,6 +303,20 @@ const SMC_SENSOR_BITS: Array<{ ids: string[]; word: number; bit: number; sensor:
       "Si persiste, revisar el conector BTB y la placa lógica.",
     ],
   },
+  {
+    ids: ["iPhone14,7"],
+    word: 1,
+    bit: 22,
+    sensor: "carga inalámbrica",
+    components: ["Flex de carga inalámbrica (defectuoso o mal conectado)", "Conector J10500 de la placa lógica (caída de tensión)"],
+    checks: [
+      "Probar con otro flex de carga inalámbrica.",
+      "Revisar la caída de tensión del conector J10500.",
+      "Unir las placas o probar en el iSocket con su batería, conectando los periféricos para que el equipo no reinicie mientras se mide.",
+      "Al encender, los pines 15 y 17 del conector J10500 deben tener 1.2 V y el pin 11, 1.8 V.",
+      "Con osciloscopio en los pines 15 y 17 (JCID) del J10500 debe haber reloj y datos.",
+    ],
+  },
 ];
 
 function smcSensorMask(text: string): Array<{ word: number; bit: number; value: number }> {
