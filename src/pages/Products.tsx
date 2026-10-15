@@ -19,6 +19,7 @@ import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartS
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
 import EnviarReciboDialog from "@/components/EnviarReciboDialog";
+import WarrantyLookup from "@/components/WarrantyLookup";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,6 +63,10 @@ type Sale = {
   branch_id: string | null;
   sale_group_id: string | null;
   trade_in_value: number | null;
+  imei: string | null;
+  warranty_days: number | null;
+  customer_name: string | null;
+  customer_phone: string | null;
 };
 
 type SaleGroup = {
@@ -72,6 +77,8 @@ type SaleGroup = {
   payment_method: string | null;
   branch_id: string | null;
   tradeInValue: number;
+  customerName: string | null;
+  customerPhone: string | null;
 };
 
 const ALL_BRANCHES = "__all__";
@@ -168,8 +175,16 @@ export default function Products() {
     created_at: g.created_at,
     payment_method: g.payment_method,
     branch_id: g.branch_id,
-    items: g.items.map((i) => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price })),
+    items: g.items.map((i) => ({
+      product_name: i.product_name,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      imei: i.imei,
+      warranty_days: i.warranty_days,
+    })),
     trade_in: g.tradeInValue > 0 ? { device_name: tradeInDeviceName(g.key), value: g.tradeInValue } : null,
+    customer_name: g.customerName,
+    customer_phone: g.customerPhone,
   });
 
   const handleReceiptSale = (sale: CompletedCartSale) => {
@@ -191,7 +206,7 @@ export default function Products() {
         .order("created_at", { ascending: false }),
       (supabase as any)
         .from("product_sales")
-        .select("id, product_name, quantity, unit_price, trade_in_value, payment_method, created_at, branch_id, sale_group_id")
+        .select("id, product_name, quantity, unit_price, trade_in_value, payment_method, created_at, branch_id, sale_group_id, imei, warranty_days, customer_name, customer_phone")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -335,6 +350,8 @@ export default function Products() {
         payment_method: groupItems[0].payment_method,
         branch_id: groupItems[0].branch_id,
         tradeInValue: tradeInOfSale(groupItems),
+        customerName: groupItems.find((i) => i.customer_name)?.customer_name ?? null,
+        customerPhone: groupItems.find((i) => i.customer_phone)?.customer_phone ?? null,
       }))
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [sales]);
@@ -573,12 +590,13 @@ export default function Products() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto">
+        <TabsList className="grid h-auto w-full grid-cols-2 sm:inline-flex sm:h-10 sm:w-auto">
           <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
           <TabsTrigger value="ventas">
             Ventas recientes{saleGroups.length > 0 ? ` (${saleGroups.length})` : ""}
           </TabsTrigger>
           <TabsTrigger value="compras">Compras de equipos</TabsTrigger>
+          <TabsTrigger value="garantias">Garantías</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalogo" className="space-y-4">
@@ -759,6 +777,10 @@ export default function Products() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="garantias">
+          <WarrantyLookup />
         </TabsContent>
       </Tabs>
 

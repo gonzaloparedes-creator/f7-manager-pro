@@ -432,6 +432,16 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "garantias-equipos",
+        title: "Garantía de los equipos vendidos y consulta por IMEI",
+        body: [
+          "Cuando en el carrito hay un celular (un producto marcado como equipo), aparece el bloque \"Garantía del equipo\": elegís los días de garantía (arranca en 30; podés poner 0 para vender sin garantía u otra cantidad) y, si querés, el nombre y el WhatsApp del comprador. Los dos datos del comprador son opcionales. La garantía vale para todos los equipos de esa venta; los productos que no son equipos (fundas, vidrios) no llevan garantía.",
+          "El ticket impreso y el comprobante por WhatsApp muestran el IMEI, los días de garantía y hasta qué fecha vale. Si cargaste el WhatsApp del comprador, al enviar el comprobante el número ya viene completo.",
+          "La pestaña \"Garantías\" (en Productos) junta en una sola lista los equipos que vendiste y las reparaciones entregadas con garantía. Escribí el IMEI (completo o los últimos dígitos), el nombre o el teléfono del cliente, o el modelo, y ves enseguida si ese equipo está vigente, por vencer (últimos 3 días), vencido o vendido sin garantía. Los botones de arriba filtran por estado.",
+          "Las ventas de equipos anteriores a esta función aparecen con su IMEI pero como \"Sin garantía registrada\": el sistema no sabe qué garantía se les dio, así que no la inventa. La lista muestra las últimas 1000 garantías de cada tipo. La garantía queda guardada con la venta y no se puede modificar después.",
+        ],
+      },
+      {
         id: "ventas",
         title: "Ventas recientes y ticket imprimible",
         body: [

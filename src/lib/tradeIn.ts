@@ -58,10 +58,18 @@ export function buildTradeInSaleParams(args: {
   paymentMethod: string;
   lines: TradeInSaleLine[];
   draft: TradeInDraft;
+  warranty?: {
+    warranty_days: number | null;
+    customer_name: string | null;
+    customer_phone: string | null;
+  };
 }) {
   return {
     sale_group_id: args.saleGroupId,
     payment_method: args.paymentMethod,
+    warranty_days: args.warranty?.warranty_days ?? null,
+    customer_name: args.warranty?.customer_name ?? null,
+    customer_phone: args.warranty?.customer_phone ?? null,
     items: args.lines.map((l) => ({
       inventory_item_id: l.inventory_item_id,
       quantity: l.quantity,

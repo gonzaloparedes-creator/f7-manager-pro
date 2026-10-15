@@ -24,4 +24,29 @@ describe("buildSaleReceiptMessage", () => {
     expect(msg).toContain("Equipo recibido (iPhone 11): -Gs. 1.200.000");
     expect(msg).toContain("*A pagar: Gs. 1.800.000*");
   });
+
+  it("sin garantía registrada no escribe líneas de garantía ni IMEI", () => {
+    const msg = buildSaleReceiptMessage(sale, {});
+    expect(msg).not.toContain("IMEI");
+    expect(msg).not.toContain("arantía");
+  });
+
+  it("con garantía muestra IMEI, vencimiento y la nota de conservar el comprobante", () => {
+    const msg = buildSaleReceiptMessage(
+      { ...sale, items: [{ ...sale.items[0], imei: "356938035643809", warranty_days: 30 }] },
+      {}
+    );
+    expect(msg).toContain("IMEI: 356938035643809");
+    expect(msg).toContain("Garantía: 30 días (hasta 14/11/2026)");
+    expect(msg).toContain("comprobante de garantía");
+  });
+
+  it("deja constancia de la venta sin garantía y no pide guardar el mensaje", () => {
+    const msg = buildSaleReceiptMessage(
+      { ...sale, items: [{ ...sale.items[0], imei: "356938035643809", warranty_days: 0 }] },
+      {}
+    );
+    expect(msg).toContain("Sin garantía");
+    expect(msg).not.toContain("comprobante de garantía");
+  });
 });

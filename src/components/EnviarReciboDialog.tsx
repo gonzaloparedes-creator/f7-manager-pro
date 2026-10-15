@@ -10,8 +10,9 @@ import { buildSaleReceiptMessage } from "@/lib/saleReceipt";
 import type { TicketSale } from "@/components/SaleTicket";
 import { MessageCircle, Copy } from "lucide-react";
 
-// Una venta de mostrador no guarda el teléfono del comprador, así que se
-// escribe acá y no queda registrado en ningún lado.
+// El teléfono se completa con el del comprador si la venta de un equipo lo
+// registró; en el resto de las ventas de mostrador se escribe acá y no queda
+// guardado en ningún lado.
 export default function EnviarReciboDialog({
   open,
   onOpenChange,
@@ -31,7 +32,7 @@ export default function EnviarReciboDialog({
 
   useEffect(() => {
     if (!open || !sale) return;
-    setPhoneInput("");
+    setPhoneInput(sale.customer_phone ?? "");
     setMessage(buildSaleReceiptMessage(sale, { businessName, branchName }));
     // businessName/branchName solo importan al abrir: editar el texto a mano
     // no se tiene que pisar si cargan después.
@@ -94,7 +95,7 @@ export default function EnviarReciboDialog({
               id="receipt-message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              rows={9}
+              rows={12}
               className="text-sm"
             />
           </div>

@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatPYG } from "@/lib/orders";
+import { warrantyDocumentLine } from "@/lib/deviceWarranty";
 import type { TicketSale } from "@/components/SaleTicket";
 
 export function saleTotal(sale: TicketSale): number {
@@ -26,9 +27,15 @@ export function buildSaleReceiptMessage(
 ): string {
   const shop = businessName?.trim() || "F7 Manager Pro";
   const date = format(new Date(sale.created_at), "dd/MM/yy HH:mm", { locale: es });
-  const lines = sale.items.map(
-    (i) => `• ${i.quantity} x ${i.product_name} — ${formatPYG(i.quantity * Number(i.unit_price || 0))}`
-  );
+  const lines = sale.items.flatMap((i) => {
+    const warranty = warrantyDocumentLine(sale.created_at, i.warranty_days);
+    return [
+      `• ${i.quantity} x ${i.product_name} — ${formatPYG(i.quantity * Number(i.unit_price || 0))}`,
+      ...(i.imei ? [`   IMEI: ${i.imei}`] : []),
+      ...(warranty ? [`   ${warranty}`] : []),
+    ];
+  });
+  const hasWarranty = sale.items.some((i) => Number(i.warranty_days) > 0);
   return [
     `🧾 *Comprobante de venta — ${shop}*${branchName ? ` (${branchName})` : ""}`,
     `Ticket #${sale.id.slice(-6).toUpperCase()} · ${date}`,
@@ -37,6 +44,7 @@ export function buildSaleReceiptMessage(
     "",
     ...totalLines(sale),
     ...(sale.payment_method ? [`Pago: ${sale.payment_method}`] : []),
+    ...(hasWarranty ? ["", "Guardá este mensaje: sirve como comprobante de garantía."] : []),
     "",
     "¡Gracias por tu compra!",
   ].join("\n");

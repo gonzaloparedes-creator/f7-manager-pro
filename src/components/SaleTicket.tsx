@@ -1,11 +1,14 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatPYG } from "@/lib/orders";
+import { warrantyDocumentLine } from "@/lib/deviceWarranty";
 
 interface TicketLineItem {
   product_name: string;
   quantity: number;
   unit_price: number;
+  imei?: string | null;
+  warranty_days?: number | null;
 }
 
 export interface TicketSale {
@@ -14,6 +17,8 @@ export interface TicketSale {
   payment_method: string | null;
   items: TicketLineItem[];
   trade_in?: { device_name: string; value: number } | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
 }
 
 interface TicketOptions {
@@ -131,9 +136,18 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
   addGap(1);
   addDashed();
   addRow(`Ticket #${ticketNumber}`, dateLabel, fontSmall);
+  const buyerName = sale.customer_name?.trim();
+  if (buyerName) addWrapped(`Cliente: ${buyerName}`, fontSmall);
   addDashed();
+  let hasWarranty = false;
   for (const item of sale.items) {
     addWrapped(item.product_name, fontBody);
+    if (item.imei) addWrapped(`IMEI ${item.imei}`, fontSmall);
+    const warrantyLine = warrantyDocumentLine(sale.created_at, item.warranty_days);
+    if (warrantyLine) {
+      addWrapped(warrantyLine, fontSmall);
+      if (Number(item.warranty_days) > 0) hasWarranty = true;
+    }
     addRow(`${item.quantity} x ${formatPYG(item.unit_price)}`, formatPYG(item.quantity * Number(item.unit_price || 0)), fontBody);
     addGap(0.8);
   }
@@ -149,6 +163,7 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
   }
   addRow("Pago", sale.payment_method || "—", fontSmall);
   addDashed();
+  if (hasWarranty) addWrapped("Conserve este ticket: es su comprobante de garantía.", fontSmall);
   addCenter("¡Gracias por su compra!", fontSmall);
   addGap(1);
 

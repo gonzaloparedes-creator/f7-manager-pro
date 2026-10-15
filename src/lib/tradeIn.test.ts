@@ -73,5 +73,29 @@ describe("buildTradeInSaleParams", () => {
     expect(params.items).toEqual([{ inventory_item_id: "item-1", quantity: 1, unit_price: 3000000 }]);
     expect(params.trade_in.purchase_price).toBe(500000);
     expect(params.trade_in.branch_id).toBeNull();
+    expect(params.warranty_days).toBeNull();
+    expect(params.customer_name).toBeNull();
+    expect(params.customer_phone).toBeNull();
+  });
+
+  it("incluye la garantía y los datos del comprador cuando se piden", () => {
+    const form = {
+      ...emptyDevicePurchaseForm("branch-1"),
+      device_name: "iPhone 11",
+      imei: "356938035643809",
+      seller_name: "Ana",
+      seller_cedula: "1.234.567",
+      purchase_price: "500.000",
+    };
+    const params = buildTradeInSaleParams({
+      saleGroupId: "grp-1",
+      paymentMethod: "Efectivo",
+      lines: [{ inventory_item_id: "item-1", quantity: 1, unit_price: 3000000 }],
+      draft: { form, params: buildDevicePurchaseParams(form, []) },
+      warranty: { warranty_days: 90, customer_name: "Luis", customer_phone: "0981 123 456" },
+    });
+    expect(params.warranty_days).toBe(90);
+    expect(params.customer_name).toBe("Luis");
+    expect(params.customer_phone).toBe("0981 123 456");
   });
 });

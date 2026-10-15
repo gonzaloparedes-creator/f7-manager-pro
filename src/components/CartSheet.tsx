@@ -8,11 +8,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
-import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2, MessageCircle, ArrowLeftRight } from "lucide-react";
+import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2, MessageCircle, ArrowLeftRight, ShieldCheck } from "lucide-react";
 import { formatPYG, isCashLabel } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import QuantityStepper from "@/components/QuantityStepper";
 import BuyDeviceDialog from "@/components/BuyDeviceDialog";
+import WarrantySelector from "@/components/WarrantySelector";
+import { DEFAULT_DEVICE_WARRANTY_DAYS, clampWarrantyDays, warrantyDocumentLine } from "@/lib/deviceWarranty";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useCashRegisterGate } from "@/hooks/useCashRegisterGate";
 import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice";
@@ -29,12 +31,15 @@ export type CompletedCartSale = {
   created_at: string;
   payment_method: string | null;
   branch_id: string | null;
-  items: { product_name: string; quantity: number; unit_price: number }[];
+  /** `imei` y `warranty_days` solo vienen en las líneas de equipos. */
+  items: { product_name: string; quantity: number; unit_price: number; imei?: string | null; warranty_days?: number | null }[];
+  customer_name?: string | null;
+  customer_phone?: string | null;
   /** Equipo que el cliente entregó como parte de pago; `record` es su comprobante de compra. */
   trade_in?: { device_name: string; value: number; record?: DevicePurchaseRecord } | null;
 };
 
-type CartProduct = { id: string; name: string; stock: number; cost_price: number };
+type CartProduct = { id: string; name: string; stock: number; cost_price: number; is_device?: boolean };
 
 export default function CartSheet({
   open,
@@ -69,10 +74,14 @@ export default function CartSheet({
   const [receivedCash, setReceivedCash] = useState("");
   const [tradeIn, setTradeIn] = useState<TradeInDraft | null>(null);
   const [tradeInOpen, setTradeInOpen] = useState(false);
+  const [warrantyDays, setWarrantyDays] = useState(DEFAULT_DEVICE_WARRANTY_DAYS);
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerPhone, setBuyerPhone] = useState("");
 
   const lines = Object.entries(cart)
     .map(([id, line]) => ({ id, product: products.find((p) => p.id === id), ...line }))
     .filter((l): l is typeof l & { product: CartProduct } => !!l.product);
+  const hasDevice = lines.some((l) => l.product.is_device);
 
   const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
   const discountInput = parseFloat(discountValue) || 0;
@@ -122,6 +131,9 @@ export default function CartSheet({
     setDiscountUnit("percent");
     setReceivedCash("");
     setTradeIn(null);
+    setWarrantyDays(DEFAULT_DEVICE_WARRANTY_DAYS);
+    setBuyerName("");
+    setBuyerPhone("");
   };
 
   const checkout = async () => {
@@ -145,7 +157,21 @@ export default function CartSheet({
       const finalPrice = (l: (typeof lines)[number]) =>
         discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice;
 
-      type InsertedRow = { id: string; product_name: string; quantity: number; unit_price: number; payment_method: string | null; created_at: string; branch_id: string | null };
+      // La garantía y los datos del comprador solo aplican a los equipos: el
+      // servidor los descarta en cualquier otra línea.
+      const warranty = hasDevice
+        ? {
+            warranty_days: clampWarrantyDays(warrantyDays),
+            customer_name: buyerName.trim() || null,
+            customer_phone: buyerPhone.trim() || null,
+          }
+        : { warranty_days: null, customer_name: null, customer_phone: null };
+
+      type InsertedRow = {
+        id: string; product_name: string; quantity: number; unit_price: number; payment_method: string | null;
+        created_at: string; branch_id: string | null;
+        imei: string | null; warranty_days: number | null; customer_name: string | null; customer_phone: string | null;
+      };
       let inserted: InsertedRow[];
       let tradeInInfo: CompletedCartSale["trade_in"] = null;
 
@@ -160,6 +186,7 @@ export default function CartSheet({
             paymentMethod,
             lines: lines.map((l) => ({ inventory_item_id: l.id, quantity: l.quantity, unit_price: finalPrice(l) })),
             draft: tradeIn,
+            warranty,
           }),
         });
         if (error) throw error;
@@ -200,22 +227,32 @@ export default function CartSheet({
           payment_method: paymentMethod,
           created_by: user.id,
           sale_group_id: saleGroupId,
+          ...warranty,
         }));
         const { data, error } = await (supabase as any)
           .from("product_sales")
           .insert(rows)
-          .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id");
+          .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id, imei, warranty_days, customer_name, customer_phone");
         if (error) throw error;
         inserted = (data as InsertedRow[]) ?? [];
       }
 
       toast.success(`Venta registrada: ${formatPYG(total)}`);
+      const buyerRow = inserted.find((r) => r.customer_name || r.customer_phone);
       setCompletedSale({
         id: saleGroupId,
         created_at: inserted[0]?.created_at ?? new Date().toISOString(),
         payment_method: paymentMethod,
         branch_id: inserted[0]?.branch_id ?? null,
-        items: inserted.map((r) => ({ product_name: r.product_name, quantity: r.quantity, unit_price: r.unit_price })),
+        items: inserted.map((r) => ({
+          product_name: r.product_name,
+          quantity: r.quantity,
+          unit_price: r.unit_price,
+          imei: r.imei,
+          warranty_days: r.warranty_days,
+        })),
+        customer_name: buyerRow?.customer_name ?? null,
+        customer_phone: buyerRow?.customer_phone ?? null,
         trade_in: tradeInInfo,
       });
       setTradeIn(null);
@@ -261,6 +298,25 @@ export default function CartSheet({
                   >
                     <Printer className="h-4 w-4" /> Imprimir comprobante del canje
                   </Button>
+                )}
+              </div>
+            )}
+            {completedSale.items.some((i) => i.warranty_days !== null && i.warranty_days !== undefined) && (
+              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm" data-testid="warranty-done">
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <ShieldCheck className="h-4 w-4 text-primary" /> Garantía registrada
+                </div>
+                {completedSale.items
+                  .filter((i) => i.warranty_days !== null && i.warranty_days !== undefined)
+                  .map((i, idx) => (
+                    <div key={idx} className="text-muted-foreground">
+                      {i.product_name}{i.imei ? ` · IMEI ${i.imei}` : ""} · {warrantyDocumentLine(completedSale.created_at, i.warranty_days)}
+                    </div>
+                  ))}
+                {(completedSale.customer_name || completedSale.customer_phone) && (
+                  <div className="text-muted-foreground">
+                    Comprador: {[completedSale.customer_name, completedSale.customer_phone].filter(Boolean).join(" · ")}
+                  </div>
                 )}
               </div>
             )}
@@ -320,6 +376,44 @@ export default function CartSheet({
                   </div>
                 </div>
               ))}
+
+              {hasDevice && (
+                <div className="space-y-3 rounded-md border border-primary/30 bg-primary/5 p-3" data-testid="device-warranty-section">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <ShieldCheck className="h-4 w-4 text-primary" /> Garantía del equipo
+                  </div>
+                  <WarrantySelector value={warrantyDays} onChange={(d) => setWarrantyDays(clampWarrantyDays(d))} className="w-full" />
+                  <div className="grid gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="cart-buyer-name" className="text-xs">Comprador (opcional)</Label>
+                      <Input
+                        id="cart-buyer-name"
+                        value={buyerName}
+                        maxLength={120}
+                        onChange={(e) => setBuyerName(e.target.value)}
+                        placeholder="Nombre y apellido"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="cart-buyer-phone" className="text-xs">WhatsApp del comprador (opcional)</Label>
+                      <Input
+                        id="cart-buyer-phone"
+                        type="tel"
+                        inputMode="tel"
+                        value={buyerPhone}
+                        maxLength={40}
+                        onChange={(e) => setBuyerPhone(e.target.value)}
+                        placeholder="0981 123 456"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Queda guardado con el IMEI: después la garantía se consulta en Productos › Garantías.
+                  </p>
+                </div>
+              )}
             </div>
 
             {lines.length > 0 && (
