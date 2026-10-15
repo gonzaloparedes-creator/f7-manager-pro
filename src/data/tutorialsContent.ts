@@ -402,6 +402,15 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "equipos-detenidos",
+        title: "Equipos detenidos y días en stock",
+        body: [
+          "Cada celular que tenés en stock muestra en su tarjeta hace cuántos días entró al catálogo (\"Ingresó hoy\", \"12 días en stock\"). Pasados los 30 días la etiqueta se pinta de naranja: es un equipo que se está quedando sin moverse.",
+          "Cuando tenés al menos un equipo en stock, arriba aparece la tarjeta \"Equipos detenidos 30+ días\" con la cantidad y el costo inmovilizado: cuánta plata tenés parada en esos celulares, calculada con lo que te costaron. Tocá la tarjeta para ver solo esos equipos y volvé a tocarla (o a la etiqueta \"Filtrando\") para ver todo de nuevo.",
+          "Los días se cuentan desde que el equipo entró al catálogo, sea por \"Comprar a cliente\", por canje o cargado a mano. Los productos que no son equipos (fundas, vidrios, cargadores) y los equipos ya vendidos no cuentan. Si tu usuario no tiene permiso para ver el stock, estos datos tampoco se muestran.",
+        ],
+      },
+      {
         id: "vender",
         title: "Vender con el carrito (POS)",
         body: [

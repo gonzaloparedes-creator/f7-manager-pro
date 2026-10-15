@@ -13,6 +13,7 @@ import BuyDeviceDialog from "@/components/BuyDeviceDialog";
 import { printPurchaseReceipt } from "@/lib/devicePurchaseReceipt";
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
 import { tradeInOfSale } from "@/lib/tradeIn";
+import { STALE_DEVICE_DAYS, daysInStock, daysInStockLabel, hasDevicesInStock, isStaleDevice, staleDeviceSummary } from "@/lib/deviceStock";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
@@ -48,6 +49,7 @@ export type Product = {
   repair_cost: number;
   repair_details: string | null;
   notes: string | null;
+  created_at?: string;
 };
 
 type Sale = {
@@ -100,7 +102,7 @@ export default function Products() {
   const [previewItem, setPreviewItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
-  const [stockFilter, setStockFilter] = useState<"all" | "low">("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "low" | "stale">("all");
   const [activeTab, setActiveTab] = useState("catalogo");
   const [cart, setCart] = useState<Cart>(() => {
     try {
@@ -183,7 +185,7 @@ export default function Products() {
     const [{ data: productsData, error: pErr }, { data: salesData, error: sErr }] = await Promise.all([
       (supabase as any)
         .from("inventory_items")
-        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, purchase_cost, repair_cost, repair_details, notes")
+        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, purchase_cost, repair_cost, repair_details, notes, created_at")
         .eq("company_id", companyId)
         .eq("is_for_sale", true)
         .order("created_at", { ascending: false }),
@@ -259,6 +261,7 @@ export default function Products() {
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null;
   const subcategoryName = (id: string | null) => subcategories.find((s) => s.id === id)?.name ?? null;
 
+  const now = new Date();
   const isSearching = search.trim().length > 0;
   const isLowOrOutOfStock = (i: Product) => i.stock <= 0 || i.stock <= i.min_stock_alert;
 
@@ -266,15 +269,24 @@ export default function Products() {
     const q = search.toLowerCase();
     const matchesSearch = i.name.toLowerCase().includes(q) || (!!i.imei && i.imei.includes(search.trim()));
     const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
-    const matchesStock = stockFilter === "all" || isLowOrOutOfStock(i);
+    const matchesStock =
+      stockFilter === "all" ||
+      (stockFilter === "low" ? isLowOrOutOfStock(i) : isStaleDevice(i, now));
     return matchesSearch && matchesBranch && matchesStock;
   });
   const outOfStockCount = items.filter((i) => i.stock <= 0).length;
   const lowStockCount = items.filter((i) => i.stock > 0 && i.stock <= i.min_stock_alert).length;
+  const showDeviceAging = canViewStock && hasDevicesInStock(items);
+  const staleSummary = staleDeviceSummary(items, now);
 
   const toggleStockFilter = () => {
     setActiveTab("catalogo");
     setStockFilter((f) => (f === "low" ? "all" : "low"));
+  };
+
+  const toggleStaleFilter = () => {
+    setActiveTab("catalogo");
+    setStockFilter((f) => (f === "stale" ? "all" : "stale"));
   };
 
   // Mientras no se esté buscando ni filtrando por stock, se agrupa por
@@ -341,6 +353,8 @@ export default function Products() {
     const lowStock = canViewStock && !outOfStock && i.stock <= i.min_stock_alert;
     const cat = categoryName(i.category_id);
     const sub = subcategoryName(i.subcategory_id);
+    const stockDays = i.is_device && !outOfStock && canViewStock ? daysInStock(i.created_at, now) : null;
+    const stale = isStaleDevice(i, now);
     return (
       <Card
         key={i.id}
@@ -385,6 +399,15 @@ export default function Products() {
               {i.is_device && (
                 <Badge variant="outline" className="gap-1 border-primary/40 text-[11px] text-primary">
                   <Smartphone className="h-3 w-3" /> Equipo
+                </Badge>
+              )}
+              {stockDays !== null && (
+                <Badge
+                  variant="outline"
+                  data-testid="days-in-stock"
+                  className={cn("text-[11px]", stale ? "border-secondary/50 bg-secondary/10 text-secondary" : "text-muted-foreground")}
+                >
+                  {daysInStockLabel(stockDays)}
                 </Badge>
               )}
               {cat && <Badge variant="outline" className="text-[11px]">{cat}</Badge>}
@@ -469,7 +492,7 @@ export default function Products() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className={cn("grid grid-cols-2 gap-3", showDeviceAging ? "lg:grid-cols-5" : "lg:grid-cols-4")}>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Total productos</div>
           <div className="mt-1 text-2xl font-bold">{items.length}</div>
@@ -505,6 +528,37 @@ export default function Products() {
             </div>
           )}
         </Card>
+        {showDeviceAging && (
+          <Card
+            data-testid="stale-devices-card"
+            className={cn(
+              "p-4 text-left transition-colors",
+              staleSummary.count > 0 && "cursor-pointer hover:border-secondary/50",
+              stockFilter === "stale" && "border-secondary bg-secondary/10"
+            )}
+            role={staleSummary.count > 0 ? "button" : undefined}
+            tabIndex={staleSummary.count > 0 ? 0 : undefined}
+            onClick={staleSummary.count > 0 ? toggleStaleFilter : undefined}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && staleSummary.count > 0) {
+                e.preventDefault();
+                toggleStaleFilter();
+              }
+            }}
+          >
+            <div className="text-xs text-muted-foreground">Equipos detenidos {STALE_DEVICE_DAYS}+ días</div>
+            <div className={cn("mt-1 text-2xl font-bold", staleSummary.count > 0 && "text-secondary")}>
+              {staleSummary.count}
+            </div>
+            {staleSummary.count > 0 ? (
+              <div className="mt-1 text-[11px] font-medium text-secondary">
+                {formatPYG(staleSummary.immobilizedCost)} inmovilizado · {stockFilter === "stale" ? "Mostrando estos ↓" : "Ver cuáles →"}
+              </div>
+            ) : (
+              <div className="mt-1 text-[11px] text-muted-foreground">Ninguno sin moverse</div>
+            )}
+          </Card>
+        )}
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Ventas de hoy</div>
           <div className="mt-1 text-2xl font-bold text-success">{formatPYG(totalToday)}</div>
@@ -546,6 +600,17 @@ export default function Products() {
                 <span className="ml-0.5 font-bold">✕</span>
               </Badge>
             )}
+            {stockFilter === "stale" && (
+              <Badge
+                variant="outline"
+                className="w-fit cursor-pointer gap-1.5 border-secondary/40 text-secondary hover:bg-secondary/10"
+                onClick={() => setStockFilter("all")}
+              >
+                <AlertTriangle className="h-3 w-3" />
+                Filtrando: equipos detenidos {STALE_DEVICE_DAYS}+ días
+                <span className="ml-0.5 font-bold">✕</span>
+              </Badge>
+            )}
             {hasMultipleBranches && (
               <Select value={branchFilter} onValueChange={setBranchFilter}>
                 <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
@@ -563,10 +628,14 @@ export default function Products() {
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
                 <ShoppingBag className="h-8 w-8" />
-                {stockFilter === "low" ? "Ningún producto con bajo o sin stock." : "Sin productos todavía."}
+                {stockFilter === "low"
+                  ? "Ningún producto con bajo o sin stock."
+                  : stockFilter === "stale"
+                    ? `Ningún equipo detenido ${STALE_DEVICE_DAYS}+ días.`
+                    : "Sin productos todavía."}
               </CardContent>
             </Card>
-          ) : isSearching || stockFilter === "low" ? (
+          ) : isSearching || stockFilter !== "all" ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map(renderProductCard)}
             </div>
