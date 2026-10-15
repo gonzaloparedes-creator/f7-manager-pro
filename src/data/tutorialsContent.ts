@@ -402,6 +402,15 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "bateria-origen",
+        title: "Batería % y origen de cada equipo",
+        body: [
+          "Cada celular puede llevar la salud de su batería en porcentaje (en iPhone: Ajustes → Batería → Estado de la batería) y su origen: Proveedor, Comprado a cliente, Canje, Stock propio o Consignado. Los dos datos son opcionales. Se cargan en \"Nuevo Producto\" cuando activás \"Es un equipo\", y se pueden corregir después desde \"Editar\" (por ejemplo, si le cambiás la batería).",
+          "En \"Comprar a cliente\" y en el canje hay un campo \"Batería %\": el valor queda en el equipo, en el comprobante impreso (como lo declaró quien lo entregó) y el origen se completa solo (\"Comprado a cliente\" o \"Canje\"). Los equipos que ya habías comprado o recibido en canje antes de esta función también quedaron con su origen.",
+          "La batería se ve en la tarjeta del equipo (naranja si está por debajo de 80%, que es cuando conviene cambiarla) y, junto con el origen, al tocar la tarjeta. Si la batería está en 0% se muestra igual: 0% es un dato, vacío significa que no se midió. Además aparece en la lista de precios para WhatsApp, por ejemplo \"iPhone 13 128GB · Batería 89%\". El origen nunca va en esa lista.",
+        ],
+      },
+      {
         id: "equipos-detenidos",
         title: "Equipos detenidos y días en stock",
         body: [
@@ -447,7 +456,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "En la pestaña \"Catálogo\", el botón \"Copiar lista para WhatsApp\" arma un texto con tus productos y sus precios de venta, listo para pegar en un chat, un grupo o un estado. Los productos van agrupados por categoría y ordenados por nombre, con el nombre del negocio y la fecha arriba.",
           "La lista respeta lo que estás viendo: si buscaste algo, filtraste por sucursal o tocaste la tarjeta \"Equipos detenidos 30+ días\" para armar una lista de ofertas, se copia solo eso. Para copiar todo el catálogo, dejá el buscador vacío y las sucursales en \"Todas\".",
-          "Quedan afuera los productos agotados y los que tienen precio de venta Gs. 0; al copiar, el aviso te cuenta cuántos fueron para que puedas corregirlos. La lista nunca incluye costos, IMEI ni cuántas unidades tenés en stock. Una vez pegada en WhatsApp podés editar el texto como cualquier mensaje.",
+          "Quedan afuera los productos agotados y los que tienen precio de venta Gs. 0; al copiar, el aviso te cuenta cuántos fueron para que puedas corregirlos. A los equipos que tienen batería cargada se les suma el dato (ej: \"iPhone 13 128GB · Batería 89%\"). La lista nunca incluye costos, IMEI, origen del equipo ni cuántas unidades tenés en stock. Una vez pegada en WhatsApp podés editar el texto como cualquier mensaje.",
         ],
       },
       {

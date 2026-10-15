@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingBag, ShoppingCart, AlertTriangle, EyeOff, Pencil, Trash2, X } from "lucide-react";
 import QuantityStepper from "@/components/QuantityStepper";
 import { formatPYG } from "@/lib/orders";
+import { isLowBattery, originLabel } from "@/lib/deviceSpecs";
 import type { Product } from "@/pages/Products";
 import type { CartLine } from "@/components/CartSheet";
 
@@ -37,6 +38,8 @@ export default function ProductPreviewDialog({
   if (!product) return null;
   const outOfStock = product.stock <= 0;
   const lowStock = canViewStock && !outOfStock && product.stock <= product.min_stock_alert;
+  const batteryText = product.battery_health != null ? `${product.battery_health}%` : null;
+  const originText = originLabel(product.origin);
 
   return (
     <Dialog open={!!product} onOpenChange={onOpenChange}>
@@ -74,10 +77,19 @@ export default function ProductPreviewDialog({
             </div>
           )}
 
-          {product.is_device && (product.imei || product.repair_details || product.notes) && (
+          {product.is_device && (product.imei || batteryText || originText || product.repair_details || product.notes) && (
             <div className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
               {product.imei && (
                 <div><span className="text-muted-foreground">IMEI: </span><span className="font-medium">{product.imei}</span></div>
+              )}
+              {batteryText && (
+                <div data-testid="preview-battery">
+                  <span className="text-muted-foreground">Batería: </span>
+                  <span className={isLowBattery(product.battery_health) ? "font-medium text-secondary" : "font-medium"}>{batteryText}</span>
+                </div>
+              )}
+              {originText && (
+                <div data-testid="preview-origin"><span className="text-muted-foreground">Origen: </span>{originText}</div>
               )}
               {product.repair_details && (
                 <div><span className="text-muted-foreground">Repuestos: </span>{product.repair_details}</div>

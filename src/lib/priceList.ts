@@ -1,10 +1,12 @@
 import { formatPYG } from "@/lib/orders";
+import { batteryLabel } from "@/lib/deviceSpecs";
 
 export type PriceListItem = {
   name: string;
   stock: number;
   selling_price: number | string | null;
   category_id: string | null;
+  battery_health?: number | string | null;
 };
 
 export type PriceListInput<T extends PriceListItem> = {
@@ -65,7 +67,8 @@ export function buildPriceList<T extends PriceListItem>(input: PriceListInput<T>
     lines.push(`*${group.label}*`);
     const rows = [...group.rows].sort((a, b) => a.name.localeCompare(b.name));
     for (const row of rows) {
-      lines.push(`• ${row.name.trim()} — ${formatPYG(Number(row.selling_price))}`);
+      const battery = batteryLabel(row.battery_health);
+      lines.push(`• ${row.name.trim()}${battery ? ` · ${battery}` : ""} — ${formatPYG(Number(row.selling_price))}`);
     }
   }
 

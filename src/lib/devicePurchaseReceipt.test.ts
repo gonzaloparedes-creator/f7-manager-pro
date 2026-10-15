@@ -77,6 +77,14 @@ describe("buildPurchaseReceiptHtml", () => {
     expect(html).toContain("A&amp;B");
   });
 
+  it("muestra la batería declarada, incluso 0%, y la omite si no se midió", () => {
+    const opts = { businessName: null, branchName: null };
+    expect(buildPurchaseReceiptHtml(record({ battery_health: 87 }), opts)).toContain("<th>Batería</th><td>87%</td>");
+    expect(buildPurchaseReceiptHtml(record({ battery_health: 0 }), opts)).toContain("<th>Batería</th><td>0%</td>");
+    expect(buildPurchaseReceiptHtml(record({ battery_health: null }), opts)).not.toContain("<th>Batería</th>");
+    expect(buildPurchaseReceiptHtml(record(), opts)).not.toContain("<th>Batería</th>");
+  });
+
   it("omite las filas sin dato y el estado si no se revisó nada", () => {
     const html = buildPurchaseReceiptHtml(record({ checklist: [], accessories: [], reason: null, seller_phone: null }), {
       businessName: null,

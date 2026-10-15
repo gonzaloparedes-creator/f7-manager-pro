@@ -17,7 +17,9 @@ import { Loader2, FolderPlus, Camera, Upload, X, Smartphone } from "lucide-react
 import { CameraCapture } from "@/components/CameraCapture";
 import { sanitizeFilenameForStorage } from "@/lib/utils";
 import { formatPYG } from "@/lib/orders";
+import { DEVICE_ORIGINS, DEVICE_ORIGIN_LABELS, isDeviceOrigin, parseBattery, type DeviceOrigin } from "@/lib/deviceSpecs";
 
+const NO_ORIGIN = "__none__";
 const CREATE_CATEGORY = "__create_category__";
 const CREATE_SUBCATEGORY = "__create_subcategory__";
 const NO_SUBCATEGORY = "__none__";
@@ -39,6 +41,8 @@ export interface EditableProduct {
   repair_cost: number;
   repair_details: string | null;
   notes: string | null;
+  battery_health?: number | null;
+  origin?: string | null;
 }
 
 export default function NewProductDialog({
@@ -69,6 +73,8 @@ export default function NewProductDialog({
   const [price, setPrice] = useState("0");
   const [isDevice, setIsDevice] = useState(false);
   const [imei, setImei] = useState("");
+  const [battery, setBattery] = useState("");
+  const [origin, setOrigin] = useState<DeviceOrigin | null>(null);
   const [purchaseCost, setPurchaseCost] = useState("0");
   const [repairCost, setRepairCost] = useState("0");
   const [repairDetails, setRepairDetails] = useState("");
@@ -99,7 +105,7 @@ export default function NewProductDialog({
   const reset = () => {
     setName(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
     setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setFile(null); setPreview(null);
-    setIsDevice(false); setImei(""); setPurchaseCost("0"); setRepairCost("0"); setRepairDetails(""); setNotes("");
+    setIsDevice(false); setImei(""); setBattery(""); setOrigin(null); setPurchaseCost("0"); setRepairCost("0"); setRepairDetails(""); setNotes("");
   };
 
   const toggleDevice = (on: boolean) => {
@@ -125,6 +131,8 @@ export default function NewProductDialog({
       setPrice(String(editItem.selling_price));
       setIsDevice(!!editItem.is_device);
       setImei(editItem.imei ?? "");
+      setBattery(editItem.battery_health != null ? String(editItem.battery_health) : "");
+      setOrigin(isDeviceOrigin(editItem.origin) ? editItem.origin : null);
       setPurchaseCost(String(editItem.purchase_cost ?? 0));
       setRepairCost(String(editItem.repair_cost ?? 0));
       setRepairDetails(editItem.repair_details ?? "");
@@ -178,6 +186,8 @@ export default function NewProductDialog({
   const submit = async () => {
     if (!user || !companyId) return;
     if (!name.trim()) { toast.error("Ingresa un nombre"); return; }
+    const parsedBattery = parseBattery(battery);
+    if (isDevice && parsedBattery.error) { toast.error(parsedBattery.error); return; }
     setLoading(true);
     try {
       let image_url: string | null = editItem?.image_url ?? null;
@@ -210,6 +220,8 @@ export default function NewProductDialog({
         image_url,
         is_device: isDevice,
         imei: isDevice ? imei.trim() || null : null,
+        battery_health: isDevice ? parsedBattery.value : null,
+        origin: isDevice ? origin : null,
         purchase_cost: isDevice ? parseFloat(purchaseCost) || 0 : 0,
         repair_cost: isDevice ? parseFloat(repairCost) || 0 : 0,
         repair_details: isDevice ? repairDetails.trim() || null : null,
@@ -289,17 +301,45 @@ export default function NewProductDialog({
           </div>
 
           {isDevice && (
-            <div className="grid gap-2">
-              <Label htmlFor="product-imei">IMEI</Label>
-              <Input
-                id="product-imei"
-                inputMode="numeric"
-                maxLength={20}
-                value={imei}
-                onChange={(e) => setImei(e.target.value)}
-                placeholder="Ej: 356938035643809"
-              />
-            </div>
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="product-imei">IMEI</Label>
+                <Input
+                  id="product-imei"
+                  inputMode="numeric"
+                  maxLength={20}
+                  value={imei}
+                  onChange={(e) => setImei(e.target.value)}
+                  placeholder="Ej: 356938035643809"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="product-battery">Batería % (opcional)</Label>
+                  <Input
+                    id="product-battery"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={battery}
+                    onChange={(e) => setBattery(e.target.value)}
+                    placeholder="Ej: 89"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="product-origin">Origen (opcional)</Label>
+                  <Select
+                    value={origin ?? NO_ORIGIN}
+                    onValueChange={(v) => setOrigin(isDeviceOrigin(v) ? v : null)}
+                  >
+                    <SelectTrigger id="product-origin"><SelectValue placeholder="Sin dato" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_ORIGIN}>Sin dato</SelectItem>
+                      {DEVICE_ORIGINS.map((o) => <SelectItem key={o} value={o}>{DEVICE_ORIGIN_LABELS[o]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="grid grid-cols-2 gap-3">

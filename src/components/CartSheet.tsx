@@ -205,6 +205,7 @@ export default function CartSheet({
             branch_id: result.purchase.branch_id,
             device_name: params.device_name,
             imei: params.imei,
+            battery_health: params.battery_health,
             seller_name: params.seller_name,
             seller_cedula: params.seller_cedula,
             seller_phone: params.seller_phone || null,

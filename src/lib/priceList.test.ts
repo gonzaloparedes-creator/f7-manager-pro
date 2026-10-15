@@ -75,6 +75,23 @@ describe("buildPriceList", () => {
     expect(text).not.toContain("7");
   });
 
+  it("agrega la batería % de los equipos que la tienen, incluso 0%", () => {
+    const { text } = buildPriceList({
+      items: [
+        item({ name: "iPhone 13 128GB", selling_price: 3500000, battery_health: 89 }),
+        item({ name: "iPhone 11 64GB", selling_price: 1800000, battery_health: null }),
+        item({ name: "iPhone X", selling_price: 900000, battery_health: 0 }),
+        item({ name: "iPhone XR", selling_price: 1000000 }),
+      ],
+      categoryName,
+      now,
+    });
+    expect(text).toContain("• iPhone 13 128GB · Batería 89% — Gs. 3.500.000");
+    expect(text).toContain("• iPhone 11 64GB — Gs. 1.800.000");
+    expect(text).toContain("• iPhone X · Batería 0% — Gs. 900.000");
+    expect(text).toContain("• iPhone XR — Gs. 1.000.000");
+  });
+
   it("muestra la sucursal en el encabezado cuando se indica", () => {
     const { text } = buildPriceList({ items: [item({ name: "A" })], categoryName, branchName: "Casa Central", now });
     expect(text.split("\n")[1]).toBe("Casa Central · 15/10/2026");

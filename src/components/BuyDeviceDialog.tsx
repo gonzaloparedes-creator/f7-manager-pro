@@ -161,6 +161,7 @@ export default function BuyDeviceDialog({
         branch_id: effectiveBranchId,
         device_name: params.device_name,
         imei: params.imei,
+        battery_health: params.battery_health,
         seller_name: params.seller_name,
         seller_cedula: params.seller_cedula,
         seller_phone: params.seller_phone || null,
@@ -227,6 +228,18 @@ export default function BuyDeviceDialog({
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {imeiMessage}
                     </p>
                   )}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="buy-device-battery">Batería % (opcional)</Label>
+                  <Input
+                    id="buy-device-battery"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={form.battery_health}
+                    onChange={(e) => set({ battery_health: e.target.value })}
+                    placeholder="Ej: 89"
+                  />
+                  <p className="text-xs text-muted-foreground">En iPhone: Ajustes → Batería → Estado de la batería.</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">

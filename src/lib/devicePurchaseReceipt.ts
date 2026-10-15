@@ -1,5 +1,6 @@
 import { formatPYG } from "@/lib/orders";
 import { summarizeChecklist, type DevicePurchaseRecord } from "@/lib/devicePurchase";
+import { parseBattery } from "@/lib/deviceSpecs";
 
 export interface PurchaseReceiptOptions {
   businessName: string | null;
@@ -31,6 +32,8 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
   });
   const business = [options.businessName, options.branchName].filter(Boolean).join(" · ");
   const canje = record.kind === "canje";
+  const battery = parseBattery(record.battery_health).value;
+  const batteryText = battery === null ? null : `${battery}%`;
 
   const condition = record.checklist.length
     ? `<tr><th>Estado</th><td>${
@@ -57,6 +60,7 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
   <table>
     ${row("Equipo", record.device_name)}
     ${row("IMEI / N° de serie", record.imei)}
+    ${row("Batería", batteryText)}
     ${condition}
     ${row("Accesorios entregados", record.accessories.join(", "))}
     ${row(canje ? "Motivo del canje" : "Motivo de la venta", record.reason)}

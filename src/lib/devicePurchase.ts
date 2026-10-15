@@ -2,6 +2,8 @@
 // armado de los parámetros de la RPC register_device_purchase y resumen del
 // estado del equipo. Sin React ni Supabase para poder testearla directo.
 
+import { parseBattery } from "./deviceSpecs";
+
 export type ChecklistStatus = "ok" | "fail";
 
 export interface PurchaseChecklistItem {
@@ -12,6 +14,8 @@ export interface PurchaseChecklistItem {
 export interface DevicePurchaseForm {
   device_name: string;
   imei: string;
+  /** Salud de batería en % (texto del input); vacío = no se midió. */
+  battery_health: string;
   seller_name: string;
   seller_cedula: string;
   seller_phone: string;
@@ -38,6 +42,7 @@ export interface DevicePurchaseRecord {
   branch_id: string | null;
   device_name: string;
   imei: string | null;
+  battery_health?: number | null;
   seller_name: string;
   seller_cedula: string | null;
   seller_phone: string | null;
@@ -58,6 +63,7 @@ export function emptyDevicePurchaseForm(defaultBranchId: string | null = null): 
   return {
     device_name: "",
     imei: "",
+    battery_health: "",
     seller_name: "",
     seller_cedula: "",
     seller_phone: "",
@@ -84,7 +90,7 @@ export function validateDevicePurchase(form: DevicePurchaseForm, kind: DevicePur
   if (!form.seller_cedula.trim()) return canje ? "Ingresá la cédula del cliente que entrega el equipo" : "Ingresá la cédula de quien vende";
   if (parseGs(form.purchase_price) <= 0) return canje ? "Ingresá cuánto le reconocés por el equipo" : "Ingresá cuánto le pagás por el equipo";
   if (!canje && !form.payment_method.trim()) return "Elegí con qué medio le pagás";
-  return null;
+  return parseBattery(form.battery_health).error;
 }
 
 // Un IMEI tiene 15 dígitos y el último es un dígito de control (Luhn). Si el
@@ -128,6 +134,7 @@ export function buildDevicePurchaseParams(form: DevicePurchaseForm, checklistOrd
   return {
     device_name: form.device_name.trim(),
     imei: form.imei.trim(),
+    battery_health: parseBattery(form.battery_health).value,
     seller_name: form.seller_name.trim(),
     seller_cedula: form.seller_cedula.trim(),
     seller_phone: form.seller_phone.trim(),

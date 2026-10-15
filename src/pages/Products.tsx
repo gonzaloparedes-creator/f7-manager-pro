@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins, BatteryMedium } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import BuyDeviceDialog from "@/components/BuyDeviceDialog";
 import { printPurchaseReceipt } from "@/lib/devicePurchaseReceipt";
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
 import { tradeInOfSale } from "@/lib/tradeIn";
 import { buildPriceList } from "@/lib/priceList";
+import { batteryLabel, isLowBattery } from "@/lib/deviceSpecs";
 import { STALE_DEVICE_DAYS, daysInStock, daysInStockLabel, hasDevicesInStock, isStaleDevice, staleDeviceSummary } from "@/lib/deviceStock";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
@@ -51,6 +52,8 @@ export type Product = {
   repair_cost: number;
   repair_details: string | null;
   notes: string | null;
+  battery_health?: number | null;
+  origin?: string | null;
   created_at?: string;
 };
 
@@ -201,7 +204,7 @@ export default function Products() {
     const [{ data: productsData, error: pErr }, { data: salesData, error: sErr }] = await Promise.all([
       (supabase as any)
         .from("inventory_items")
-        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, purchase_cost, repair_cost, repair_details, notes, created_at")
+        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, battery_health, origin, purchase_cost, repair_cost, repair_details, notes, created_at")
         .eq("company_id", companyId)
         .eq("is_for_sale", true)
         .order("created_at", { ascending: false }),
@@ -225,7 +228,7 @@ export default function Products() {
     if (!companyId) return;
     const { data, error } = await (supabase as any)
       .from("device_purchases")
-      .select("id, receipt_number, created_at, branch_id, device_name, imei, seller_name, seller_cedula, seller_phone, purchase_price, payment_method, reason, checklist, accessories, notes, kind, sale_group_id")
+      .select("id, receipt_number, created_at, branch_id, device_name, imei, battery_health, seller_name, seller_cedula, seller_phone, purchase_price, payment_method, reason, checklist, accessories, notes, kind, sale_group_id")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -451,6 +454,15 @@ export default function Products() {
                   className={cn("text-[11px]", stale ? "border-secondary/50 bg-secondary/10 text-secondary" : "text-muted-foreground")}
                 >
                   {daysInStockLabel(stockDays)}
+                </Badge>
+              )}
+              {i.is_device && batteryLabel(i.battery_health) && (
+                <Badge
+                  variant="outline"
+                  data-testid="battery-badge"
+                  className={cn("gap-1 text-[11px]", isLowBattery(i.battery_health) ? "border-secondary/50 bg-secondary/10 text-secondary" : "text-muted-foreground")}
+                >
+                  <BatteryMedium className="h-3 w-3" /> {i.battery_health}%
                 </Badge>
               )}
               {cat && <Badge variant="outline" className="text-[11px]">{cat}</Badge>}

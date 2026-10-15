@@ -47,6 +47,12 @@ describe("validateDevicePurchase", () => {
   it("el precio de venta y el teléfono son opcionales", () => {
     expect(validateDevicePurchase(complete({ selling_price: "", seller_phone: "" }))).toBeNull();
   });
+  it("la batería es opcional pero tiene que ser un porcentaje válido", () => {
+    expect(validateDevicePurchase(complete({ battery_health: "" }))).toBeNull();
+    expect(validateDevicePurchase(complete({ battery_health: "89" }))).toBeNull();
+    expect(validateDevicePurchase(complete({ battery_health: "150" }))).toMatch(/entre 0 y 100/);
+    expect(validateDevicePurchase(complete({ battery_health: "abc" }), "canje")).toMatch(/entre 0 y 100/);
+  });
   it("en un canje no se pide medio de pago pero sí el valor reconocido", () => {
     expect(validateDevicePurchase(complete({ payment_method: "" }), "canje")).toBeNull();
     expect(validateDevicePurchase(complete({ purchase_price: "" }), "canje")).toMatch(/reconocés/);
@@ -113,6 +119,11 @@ describe("buildDevicePurchaseParams", () => {
       branch_id: "b1",
       checklist: [{ label: "Pantalla", status: "ok" }],
       accessories: ["Cargador"],
+      battery_health: null,
     });
+  });
+  it("manda la batería como número, o null si no se midió", () => {
+    expect(buildDevicePurchaseParams(complete({ battery_health: " 87% " }), []).battery_health).toBe(87);
+    expect(buildDevicePurchaseParams(complete({ battery_health: "" }), []).battery_health).toBeNull();
   });
 });
