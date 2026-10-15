@@ -52,6 +52,19 @@ describe("buildPurchaseReceiptHtml", () => {
     expect(html).toContain("Copia de la tienda");
   });
 
+  it("en un canje el comprobante habla del cliente y del valor descontado", () => {
+    const html = buildPurchaseReceiptHtml(
+      record({ kind: "canje", sale_group_id: "g1", payment_method: "Canje" }),
+      { businessName: "Seven Store", branchName: null }
+    );
+    expect(html).toContain("Comprobante de equipo recibido en canje");
+    expect(html).toContain("Cliente que entrega el equipo");
+    expect(html).toContain("Valor reconocido");
+    expect(html).toContain("Descontado del precio de la venta");
+    expect(html).toContain("Copia del cliente");
+    expect(html).not.toContain("Monto pagado");
+  });
+
   it("no deja pasar HTML en los datos cargados por el usuario", () => {
     const html = buildPurchaseReceiptHtml(
       record({ seller_name: `<script>alert(1)</script>`, notes: `"><img src=x onerror=alert(2)>`, device_name: "A&B" }),

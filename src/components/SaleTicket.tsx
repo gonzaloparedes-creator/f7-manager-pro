@@ -13,6 +13,7 @@ export interface TicketSale {
   created_at: string;
   payment_method: string | null;
   items: TicketLineItem[];
+  trade_in?: { device_name: string; value: number } | null;
 }
 
 interface TicketOptions {
@@ -137,7 +138,15 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
     addGap(0.8);
   }
   addDashed();
-  addRow("TOTAL", formatPYG(total), fontTotal);
+  if (sale.trade_in && sale.trade_in.value > 0) {
+    const toPay = Math.max(0, total - sale.trade_in.value);
+    addRow("Subtotal", formatPYG(total), fontBody);
+    addWrapped(`Equipo recibido: ${sale.trade_in.device_name}`, fontSmall);
+    addRow("Canje", `-${formatPYG(sale.trade_in.value)}`, fontBody);
+    addRow("A PAGAR", formatPYG(toPay), fontTotal);
+  } else {
+    addRow("TOTAL", formatPYG(total), fontTotal);
+  }
   addRow("Pago", sale.payment_method || "—", fontSmall);
   addDashed();
   addCenter("¡Gracias por su compra!", fontSmall);

@@ -7,6 +7,17 @@ export function saleTotal(sale: TicketSale): number {
   return sale.items.reduce((sum, item) => sum + item.quantity * Number(item.unit_price || 0), 0);
 }
 
+function totalLines(sale: TicketSale): string[] {
+  const total = saleTotal(sale);
+  const tradeIn = sale.trade_in;
+  if (!tradeIn || !(tradeIn.value > 0)) return [`*Total: ${formatPYG(total)}*`];
+  return [
+    `Subtotal: ${formatPYG(total)}`,
+    `Equipo recibido (${tradeIn.device_name}): -${formatPYG(tradeIn.value)}`,
+    `*A pagar: ${formatPYG(Math.max(0, total - tradeIn.value))}*`,
+  ];
+}
+
 // Mismo número de ticket que imprime SaleTicket, para que el comprobante por
 // WhatsApp y el de papel se puedan relacionar.
 export function buildSaleReceiptMessage(
@@ -24,7 +35,7 @@ export function buildSaleReceiptMessage(
     "",
     ...lines,
     "",
-    `*Total: ${formatPYG(saleTotal(sale))}*`,
+    ...totalLines(sale),
     ...(sale.payment_method ? [`Pago: ${sale.payment_method}`] : []),
     "",
     "¡Gracias por tu compra!",

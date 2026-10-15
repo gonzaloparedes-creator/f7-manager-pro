@@ -8,13 +8,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
-import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2, MessageCircle } from "lucide-react";
+import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2, MessageCircle, ArrowLeftRight } from "lucide-react";
 import { formatPYG, isCashLabel } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import QuantityStepper from "@/components/QuantityStepper";
+import BuyDeviceDialog from "@/components/BuyDeviceDialog";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useCashRegisterGate } from "@/hooks/useCashRegisterGate";
 import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice";
+import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
+import { amountToCollect, buildTradeInSaleParams, validateTradeInValue, type TradeInDraft } from "@/lib/tradeIn";
 
 type DiscountUnit = "percent" | "amount";
 
@@ -27,6 +30,8 @@ export type CompletedCartSale = {
   payment_method: string | null;
   branch_id: string | null;
   items: { product_name: string; quantity: number; unit_price: number }[];
+  /** Equipo que el cliente entregó como parte de pago; `record` es su comprobante de compra. */
+  trade_in?: { device_name: string; value: number; record?: DevicePurchaseRecord } | null;
 };
 
 type CartProduct = { id: string; name: string; stock: number; cost_price: number };
@@ -40,6 +45,7 @@ export default function CartSheet({
   onSold,
   onPrintRequest,
   onReceiptRequest,
+  onPrintTradeIn,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -49,6 +55,7 @@ export default function CartSheet({
   onSold?: () => void;
   onPrintRequest?: (sale: CompletedCartSale) => void;
   onReceiptRequest?: (sale: CompletedCartSale) => void;
+  onPrintTradeIn?: (record: DevicePurchaseRecord) => void;
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
@@ -60,6 +67,8 @@ export default function CartSheet({
   const [discountValue, setDiscountValue] = useState("");
   const [discountUnit, setDiscountUnit] = useState<DiscountUnit>("percent");
   const [receivedCash, setReceivedCash] = useState("");
+  const [tradeIn, setTradeIn] = useState<TradeInDraft | null>(null);
+  const [tradeInOpen, setTradeInOpen] = useState(false);
 
   const lines = Object.entries(cart)
     .map(([id, line]) => ({ id, product: products.find((p) => p.id === id), ...line }))
@@ -76,9 +85,13 @@ export default function CartSheet({
   const discountAmount = Math.min(subtotal, Math.round(discountRaw));
   const discountFraction = subtotal > 0 ? discountAmount / subtotal : 0;
   const total = subtotal - discountAmount;
+  const tradeInValue = tradeIn?.params.purchase_price ?? 0;
+  const tradeInProblem = tradeIn ? validateTradeInValue(tradeInValue, total) : null;
+  // Con canje, el cliente paga el total menos el valor del equipo que entrega.
+  const toCollect = amountToCollect(total, tradeInValue);
   const receivedNum = Math.round(Number(receivedCash)) || 0;
-  const vuelto = receivedNum - total;
-  const showVuelto = isCashLabel(paymentMethod) && receivedCash.trim() !== "";
+  const vuelto = receivedNum - toCollect;
+  const showVuelto = isCashLabel(paymentMethod) && receivedCash.trim() !== "" && toCollect > 0;
 
   const setQty = (id: string, qty: number) => {
     setCart((prev) => {
@@ -108,6 +121,7 @@ export default function CartSheet({
     setDiscountValue("");
     setDiscountUnit("percent");
     setReceivedCash("");
+    setTradeIn(null);
   };
 
   const checkout = async () => {
@@ -125,27 +139,76 @@ export default function CartSheet({
         return;
       }
       const saleGroupId = crypto.randomUUID();
-      const rows = lines.map((l) => ({
-        company_id: companyId,
-        inventory_item_id: l.id,
-        product_name: l.product.name,
-        quantity: l.quantity,
-        // El descuento queda "adentro" del precio unitario vendido, así
-        // Reportes (que suma quantity*unit_price) ya refleja la venta real
-        // sin tocar nada del lado del cálculo de ingresos/ganancia.
-        unit_price: discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice,
-        unit_cost: l.product.cost_price,
-        payment_method: paymentMethod,
-        created_by: user.id,
-        sale_group_id: saleGroupId,
-      }));
-      const { data, error } = await (supabase as any)
-        .from("product_sales")
-        .insert(rows)
-        .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id");
-      if (error) throw error;
+      // El descuento queda "adentro" del precio unitario vendido, así
+      // Reportes (que suma quantity*unit_price) ya refleja la venta real
+      // sin tocar nada del lado del cálculo de ingresos/ganancia.
+      const finalPrice = (l: (typeof lines)[number]) =>
+        discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice;
 
-      const inserted = (data as { id: string; product_name: string; quantity: number; unit_price: number; payment_method: string | null; created_at: string; branch_id: string | null }[]) ?? [];
+      type InsertedRow = { id: string; product_name: string; quantity: number; unit_price: number; payment_method: string | null; created_at: string; branch_id: string | null };
+      let inserted: InsertedRow[];
+      let tradeInInfo: CompletedCartSale["trade_in"] = null;
+
+      if (tradeIn) {
+        const problem = validateTradeInValue(tradeInValue, total);
+        if (problem) { toast.error(problem); return; }
+        // Venta y equipo recibido en una sola transacción: si algo falla no queda
+        // una venta sin su canje ni un equipo en el catálogo sin su venta.
+        const { data, error } = await (supabase as any).rpc("register_sale_with_trade_in", {
+          p: buildTradeInSaleParams({
+            saleGroupId,
+            paymentMethod,
+            lines: lines.map((l) => ({ inventory_item_id: l.id, quantity: l.quantity, unit_price: finalPrice(l) })),
+            draft: tradeIn,
+          }),
+        });
+        if (error) throw error;
+        const result = data as { rows: InsertedRow[]; purchase: { purchase_id: string; receipt_number: string; branch_id: string | null } };
+        inserted = result.rows ?? [];
+        const params = tradeIn.params;
+        tradeInInfo = {
+          device_name: params.device_name,
+          value: params.purchase_price,
+          record: {
+            id: result.purchase.purchase_id,
+            receipt_number: result.purchase.receipt_number,
+            created_at: inserted[0]?.created_at ?? new Date().toISOString(),
+            kind: "canje",
+            sale_group_id: saleGroupId,
+            branch_id: result.purchase.branch_id,
+            device_name: params.device_name,
+            imei: params.imei,
+            seller_name: params.seller_name,
+            seller_cedula: params.seller_cedula,
+            seller_phone: params.seller_phone || null,
+            purchase_price: params.purchase_price,
+            payment_method: "Canje",
+            reason: params.reason || null,
+            checklist: params.checklist,
+            accessories: params.accessories,
+            notes: params.notes || null,
+          },
+        };
+      } else {
+        const rows = lines.map((l) => ({
+          company_id: companyId,
+          inventory_item_id: l.id,
+          product_name: l.product.name,
+          quantity: l.quantity,
+          unit_price: finalPrice(l),
+          unit_cost: l.product.cost_price,
+          payment_method: paymentMethod,
+          created_by: user.id,
+          sale_group_id: saleGroupId,
+        }));
+        const { data, error } = await (supabase as any)
+          .from("product_sales")
+          .insert(rows)
+          .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id");
+        if (error) throw error;
+        inserted = (data as InsertedRow[]) ?? [];
+      }
+
       toast.success(`Venta registrada: ${formatPYG(total)}`);
       setCompletedSale({
         id: saleGroupId,
@@ -153,7 +216,9 @@ export default function CartSheet({
         payment_method: paymentMethod,
         branch_id: inserted[0]?.branch_id ?? null,
         items: inserted.map((r) => ({ product_name: r.product_name, quantity: r.quantity, unit_price: r.unit_price })),
+        trade_in: tradeInInfo,
       });
+      setTradeIn(null);
       setCart({});
       onSold?.();
     } catch (e: any) {
@@ -177,6 +242,28 @@ export default function CartSheet({
                 {formatPYG(completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0))}
               </SheetDescription>
             </SheetHeader>
+            {completedSale.trade_in && (
+              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm" data-testid="trade-in-done">
+                <div className="font-medium text-foreground">Equipo recibido en canje</div>
+                <div className="text-muted-foreground">
+                  {completedSale.trade_in.device_name} · {formatPYG(completedSale.trade_in.value)}
+                  {completedSale.trade_in.record ? ` · ${completedSale.trade_in.record.receipt_number}` : ""}
+                </div>
+                <div className="text-muted-foreground">
+                  Cobrado: {formatPYG(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - completedSale.trade_in.value))}
+                </div>
+                {completedSale.trade_in.record && onPrintTradeIn && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 gap-2"
+                    onClick={() => completedSale.trade_in?.record && onPrintTradeIn(completedSale.trade_in.record)}
+                  >
+                    <Printer className="h-4 w-4" /> Imprimir comprobante del canje
+                  </Button>
+                )}
+              </div>
+            )}
             <SheetFooter className="mt-auto">
               <Button variant="outline" onClick={close}>Cerrar</Button>
               {onReceiptRequest && (
@@ -301,12 +388,41 @@ export default function CartSheet({
                     </>
                   )}
 
+                  {tradeIn ? (
+                    <div className="space-y-1 rounded-md border border-border bg-muted/30 p-3 text-sm" data-testid="trade-in-card">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 font-medium text-foreground">
+                          <ArrowLeftRight className="h-4 w-4 text-primary" /> Equipo recibido
+                        </span>
+                        <span className="font-semibold text-secondary">-{formatPYG(tradeInValue)}</span>
+                      </div>
+                      <div className="truncate text-muted-foreground">
+                        {tradeIn.params.device_name} · IMEI {tradeIn.params.imei}
+                      </div>
+                      {tradeInProblem && <p className="text-xs text-destructive">{tradeInProblem}</p>}
+                      <div className="flex gap-2 pt-1">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setTradeInOpen(true)}>Editar</Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setTradeIn(null)}>Quitar</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" className="w-full gap-2" onClick={() => setTradeInOpen(true)}>
+                      <ArrowLeftRight className="h-4 w-4" /> Recibir un equipo como parte de pago
+                    </Button>
+                  )}
+
                   <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-4 py-3">
                     <span className="text-sm text-muted-foreground">Total</span>
                     <span className="text-xl font-bold text-primary">{formatPYG(total)}</span>
                   </div>
+                  {tradeIn && !tradeInProblem && (
+                    <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-4 py-3">
+                      <span className="text-sm text-muted-foreground">A cobrar (total − equipo recibido)</span>
+                      <span className="text-xl font-bold text-primary" data-testid="to-collect">{formatPYG(toCollect)}</span>
+                    </div>
+                  )}
 
-                  {isCashLabel(paymentMethod) && (
+                  {isCashLabel(paymentMethod) && toCollect > 0 && (
                     <div className="space-y-2">
                       <Label htmlFor="cart-received">¿Con cuánto te paga? (Gs.)</Label>
                       <Input
@@ -332,7 +448,7 @@ export default function CartSheet({
                 </div>
                 <SheetFooter className="flex-col gap-2 sm:flex-col sm:justify-start sm:space-x-0">
                   {cashGate.blocked && <CashRegisterRequiredNotice what="vender" />}
-                  <Button onClick={checkout} disabled={loading || cashGate.blocked} size="lg" className="w-full">
+                  <Button onClick={checkout} disabled={loading || cashGate.blocked || !!tradeInProblem} size="lg" className="w-full">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Confirmar venta
                   </Button>
@@ -342,6 +458,14 @@ export default function CartSheet({
           </>
         )}
       </SheetContent>
+      <BuyDeviceDialog
+        open={tradeInOpen}
+        onOpenChange={setTradeInOpen}
+        mode="canje"
+        maxValue={total}
+        initialForm={tradeIn?.form ?? null}
+        onCollect={setTradeIn}
+      />
     </Sheet>
   );
 }

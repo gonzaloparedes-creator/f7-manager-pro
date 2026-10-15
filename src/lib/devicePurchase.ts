@@ -26,10 +26,15 @@ export interface DevicePurchaseForm {
   accessories: string[];
 }
 
+export type DevicePurchaseKind = "compra" | "canje";
+
 export interface DevicePurchaseRecord {
   id: string;
   receipt_number: string;
   created_at: string;
+  /** "canje" = equipo recibido como parte de pago de una venta. */
+  kind?: DevicePurchaseKind;
+  sale_group_id?: string | null;
   branch_id: string | null;
   device_name: string;
   imei: string | null;
@@ -68,14 +73,17 @@ export function emptyDevicePurchaseForm(defaultBranchId: string | null = null): 
   };
 }
 
-// Primer error que impide guardar, o null si el formulario está completo.
-export function validateDevicePurchase(form: DevicePurchaseForm): string | null {
+// Primer error que impide guardar, o null si el formulario está completo. En un
+// canje el equipo no se paga con plata: no hay medio de pago y el valor es el
+// descuento que se le reconoce al cliente en su compra.
+export function validateDevicePurchase(form: DevicePurchaseForm, kind: DevicePurchaseKind = "compra"): string | null {
+  const canje = kind === "canje";
   if (!form.device_name.trim()) return "Ingresá el nombre del equipo";
   if (!form.imei.trim()) return "Ingresá el IMEI (o el número de serie si no tiene)";
-  if (!form.seller_name.trim()) return "Ingresá el nombre de quien vende";
-  if (!form.seller_cedula.trim()) return "Ingresá la cédula de quien vende";
-  if (parseGs(form.purchase_price) <= 0) return "Ingresá cuánto le pagás por el equipo";
-  if (!form.payment_method.trim()) return "Elegí con qué medio le pagás";
+  if (!form.seller_name.trim()) return canje ? "Ingresá el nombre del cliente que entrega el equipo" : "Ingresá el nombre de quien vende";
+  if (!form.seller_cedula.trim()) return canje ? "Ingresá la cédula del cliente que entrega el equipo" : "Ingresá la cédula de quien vende";
+  if (parseGs(form.purchase_price) <= 0) return canje ? "Ingresá cuánto le reconocés por el equipo" : "Ingresá cuánto le pagás por el equipo";
+  if (!canje && !form.payment_method.trim()) return "Elegí con qué medio le pagás";
   return null;
 }
 

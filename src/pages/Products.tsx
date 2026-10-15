@@ -12,6 +12,7 @@ import NewProductDialog from "@/components/NewProductDialog";
 import BuyDeviceDialog from "@/components/BuyDeviceDialog";
 import { printPurchaseReceipt } from "@/lib/devicePurchaseReceipt";
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
+import { tradeInOfSale } from "@/lib/tradeIn";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
@@ -58,6 +59,7 @@ type Sale = {
   created_at: string;
   branch_id: string | null;
   sale_group_id: string | null;
+  trade_in_value: number | null;
 };
 
 type SaleGroup = {
@@ -67,6 +69,7 @@ type SaleGroup = {
   created_at: string;
   payment_method: string | null;
   branch_id: string | null;
+  tradeInValue: number;
 };
 
 const ALL_BRANCHES = "__all__";
@@ -155,12 +158,16 @@ export default function Products() {
     });
   };
 
+  const tradeInDeviceName = (saleGroupId: string) =>
+    purchases.find((p) => p.kind === "canje" && p.sale_group_id === saleGroupId)?.device_name ?? "Equipo recibido";
+
   const toCompletedSale = (g: SaleGroup): CompletedCartSale => ({
     id: g.key,
     created_at: g.created_at,
     payment_method: g.payment_method,
     branch_id: g.branch_id,
     items: g.items.map((i) => ({ product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price })),
+    trade_in: g.tradeInValue > 0 ? { device_name: tradeInDeviceName(g.key), value: g.tradeInValue } : null,
   });
 
   const handleReceiptSale = (sale: CompletedCartSale) => {
@@ -182,7 +189,7 @@ export default function Products() {
         .order("created_at", { ascending: false }),
       (supabase as any)
         .from("product_sales")
-        .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id, sale_group_id")
+        .select("id, product_name, quantity, unit_price, trade_in_value, payment_method, created_at, branch_id, sale_group_id")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -200,7 +207,7 @@ export default function Products() {
     if (!companyId) return;
     const { data, error } = await (supabase as any)
       .from("device_purchases")
-      .select("id, receipt_number, created_at, branch_id, device_name, imei, seller_name, seller_cedula, seller_phone, purchase_price, payment_method, reason, checklist, accessories, notes")
+      .select("id, receipt_number, created_at, branch_id, device_name, imei, seller_name, seller_cedula, seller_phone, purchase_price, payment_method, reason, checklist, accessories, notes, kind, sale_group_id")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -315,6 +322,7 @@ export default function Products() {
         created_at: groupItems[0].created_at,
         payment_method: groupItems[0].payment_method,
         branch_id: groupItems[0].branch_id,
+        tradeInValue: tradeInOfSale(groupItems),
       }))
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [sales]);
@@ -604,6 +612,11 @@ export default function Products() {
                             : g.items.map((i) => i.product_name).join(", ")}
                           {g.payment_method ? ` · ${g.payment_method}` : ""}
                         </div>
+                        {g.tradeInValue > 0 && (
+                          <div className="truncate text-xs text-primary">
+                            Con canje: {tradeInDeviceName(g.key)} (-{formatPYG(g.tradeInValue)}) · cobrado {formatPYG(g.total - g.tradeInValue)}
+                          </div>
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="font-semibold text-foreground">{formatPYG(g.total)}</span>
@@ -649,6 +662,7 @@ export default function Products() {
                         <div className="truncate font-medium text-foreground">
                           {p.device_name}
                           <span className="ml-2 text-xs font-normal text-muted-foreground">{p.receipt_number}</span>
+                          {p.kind === "canje" && <Badge variant="secondary" className="ml-2 text-[10px]">Canje</Badge>}
                         </div>
                         <div className="truncate text-xs text-muted-foreground">
                           {new Date(p.created_at).toLocaleString("es-PY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -720,8 +734,9 @@ export default function Products() {
         products={items}
         cart={cart}
         setCart={setCart}
-        onSold={load}
+        onSold={handlePurchaseRegistered}
         onPrintRequest={handlePrintSale}
+        onPrintTradeIn={handlePrintPurchase}
         onReceiptRequest={handleReceiptSale}
       />
       <EnviarReciboDialog

@@ -30,6 +30,7 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
     minute: "2-digit",
   });
   const business = [options.businessName, options.branchName].filter(Boolean).join(" · ");
+  const canje = record.kind === "canje";
 
   const condition = record.checklist.length
     ? `<tr><th>Estado</th><td>${
@@ -43,7 +44,7 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
   <header>
     <div>
       <div class="biz">${escapeHtml(business || "Comprobante")}</div>
-      <h1>Comprobante de compra de equipo</h1>
+      <h1>${canje ? "Comprobante de equipo recibido en canje" : "Comprobante de compra de equipo"}</h1>
     </div>
     <div class="num">
       <div class="num-value">${escapeHtml(record.receipt_number)}</div>
@@ -58,29 +59,40 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
     ${row("IMEI / N° de serie", record.imei)}
     ${condition}
     ${row("Accesorios entregados", record.accessories.join(", "))}
-    ${row("Motivo de la venta", record.reason)}
+    ${row(canje ? "Motivo del canje" : "Motivo de la venta", record.reason)}
     ${row("Observaciones", record.notes)}
   </table>
 
-  <h2>Vendedor</h2>
+  <h2>${canje ? "Cliente que entrega el equipo" : "Vendedor"}</h2>
   <table>
     ${row("Nombre", record.seller_name)}
     ${row("Cédula", record.seller_cedula)}
     ${row("Teléfono", record.seller_phone)}
   </table>
 
-  <h2>Pago</h2>
+  <h2>${canje ? "Valor del canje" : "Pago"}</h2>
   <table>
-    ${row("Monto pagado", formatPYG(record.purchase_price))}
-    ${row("Medio de pago", record.payment_method)}
+    ${
+      canje
+        ? `${row("Valor reconocido", formatPYG(record.purchase_price))}
+    ${row("Forma de pago", "Descontado del precio de la venta")}`
+        : `${row("Monto pagado", formatPYG(record.purchase_price))}
+    ${row("Medio de pago", record.payment_method)}`
+    }
   </table>
 
-  <p class="decl">El vendedor declara ser el legítimo propietario del equipo descripto, que lo vende libre de
+  <p class="decl">${
+    canje
+      ? `El cliente declara ser el legítimo propietario del equipo descripto, que lo entrega libre de
   reclamos, deudas, bloqueos y de todo reporte de robo o hurto, y que los datos consignados son verdaderos.
-  Recibe el monto indicado a su entera conformidad.</p>
+  Acepta que el valor indicado se descuente del precio de su compra, a su entera conformidad.`
+      : `El vendedor declara ser el legítimo propietario del equipo descripto, que lo vende libre de
+  reclamos, deudas, bloqueos y de todo reporte de robo o hurto, y que los datos consignados son verdaderos.
+  Recibe el monto indicado a su entera conformidad.`
+  }</p>
 
   <div class="sign">
-    <div><span></span>Firma del vendedor</div>
+    <div><span></span>${canje ? "Firma del cliente" : "Firma del vendedor"}</div>
     <div><span></span>Firma de la tienda</div>
   </div>
 </section>`;
@@ -108,7 +120,7 @@ th { width: 38mm; font-weight: 600; color: #333; }
 .sign { display: flex; gap: 14mm; margin-top: 12mm; }
 .sign div { flex: 1; text-align: center; font-size: 10px; color: #333; }
 .sign span { display: block; border-top: 1px solid #111; margin-bottom: 1mm; }
-</style></head><body>${copy(record, options, "Copia del vendedor")}${copy(record, options, "Copia de la tienda")}</body></html>`;
+</style></head><body>${copy(record, options, record.kind === "canje" ? "Copia del cliente" : "Copia del vendedor")}${copy(record, options, "Copia de la tienda")}</body></html>`;
 }
 
 // Imprime en un iframe aislado (mismo criterio que el ticket de venta): el

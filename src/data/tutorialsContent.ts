@@ -412,6 +412,17 @@ export const tutorialCategories: TutorialCategory[] = [
         images: [{ file: "productos-vender-01.png", alt: "Carrito de venta (POS) en Productos" }],
       },
       {
+        id: "canje",
+        title: "Recibir un equipo como parte de pago (canje)",
+        body: [
+          "Si el cliente te entrega su celular usado como parte de pago de lo que compra, en el carrito tocá \"Recibir un equipo como parte de pago\". Cargás el equipo igual que en \"Comprar a cliente\" (IMEI, nombre y cédula de quien lo entrega, estado, accesorios) y el valor que le reconocés. Ese valor no puede superar el total de la venta.",
+          "El carrito te muestra el total, el equipo recibido restando y el monto \"A cobrar\". El \"¿Con cuánto te paga?\" y el vuelto se calculan sobre ese monto. El equipo no se guarda hasta que confirmás la venta: se registra todo junto, o no se registra nada.",
+          "Al confirmar, la venta queda por su precio completo (así Reportes calcula bien la ganancia del producto que vendiste) y el equipo recibido entra solo al catálogo, con el valor del canje como costo de compra, listo para revenderlo. Se genera un comprobante numerado (CMP-...) que podés imprimir desde la misma pantalla de la venta o desde la pestaña \"Compras de equipos\", donde figura con la etiqueta \"Canje\".",
+          "En Caja solo cuenta la plata que cobraste de verdad (el total menos el valor del canje): el equipo recibido no mueve el efectivo esperado. En Reportes, \"Ingresos por medio de pago\" muestra el valor del canje en una línea aparte, \"Canje (equipo recibido)\".",
+          "El ticket y el comprobante por WhatsApp de esa venta muestran el equipo recibido y lo que se pagó. Por ahora se puede recibir un solo equipo por venta, y un canje registrado no se puede editar ni borrar, porque es el respaldo del comprobante firmado.",
+        ],
+      },
+      {
         id: "ventas",
         title: "Ventas recientes y ticket imprimible",
         body: [

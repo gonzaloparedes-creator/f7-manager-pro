@@ -47,6 +47,11 @@ describe("validateDevicePurchase", () => {
   it("el precio de venta y el teléfono son opcionales", () => {
     expect(validateDevicePurchase(complete({ selling_price: "", seller_phone: "" }))).toBeNull();
   });
+  it("en un canje no se pide medio de pago pero sí el valor reconocido", () => {
+    expect(validateDevicePurchase(complete({ payment_method: "" }), "canje")).toBeNull();
+    expect(validateDevicePurchase(complete({ purchase_price: "" }), "canje")).toMatch(/reconocés/);
+    expect(validateDevicePurchase(complete({ seller_cedula: "" }), "canje")).toMatch(/cliente/);
+  });
 });
 
 describe("imeiWarning", () => {

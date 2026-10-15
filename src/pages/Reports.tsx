@@ -22,6 +22,7 @@ import { es } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { netSaleAmount } from "@/lib/tradeIn";
 
 interface CargoAdicional { motivo: string; monto: number }
 interface OrderRow {
@@ -56,6 +57,7 @@ interface SaleRow {
   quantity: number;
   unit_price: number;
   unit_cost: number;
+  trade_in_value?: number | null;
   payment_method: string | null;
   created_at: string;
   branch_id: string | null;
@@ -363,6 +365,8 @@ function salesByCategory(sales: SaleRow[], from: Date | null, to: Date | null) {
  * es la pregunta de caja: "cuánto entró por cada medio hoy", no la de
  * reconocimiento contable de la orden.
  */
+const TRADE_IN_BUCKET = "Canje (equipo recibido)";
+
 function revenueByPaymentMethod(payments: PaymentRow[], sales: SaleRow[], from: Date | null, to: Date | null) {
   const map = new Map<string, number>();
   const bump = (method: string | null, amount: number) => {
@@ -375,7 +379,9 @@ function revenueByPaymentMethod(payments: PaymentRow[], sales: SaleRow[], from: 
   }
   for (const s of sales) {
     if (!inRange(s.created_at, from, to)) continue;
-    bump(s.payment_method, s.quantity * Number(s.unit_price || 0));
+    const tradeIn = Number(s.trade_in_value || 0);
+    bump(s.payment_method, netSaleAmount(s));
+    if (tradeIn > 0) bump(TRADE_IN_BUCKET, tradeIn);
   }
   return map;
 }
@@ -489,7 +495,7 @@ export default function Reports() {
         if (!hasTienda) return;
         const { data: s, error: sErr } = await (supabase as any)
           .from("product_sales")
-          .select("product_name, quantity, unit_price, unit_cost, payment_method, created_at, branch_id, category_name, subcategory_name, created_by")
+          .select("product_name, quantity, unit_price, unit_cost, trade_in_value, payment_method, created_at, branch_id, category_name, subcategory_name, created_by")
           .eq("company_id", companyId);
         if (sErr) hadError = true;
         setSales((s ?? []) as SaleRow[]);

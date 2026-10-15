@@ -28,25 +28,41 @@ import {
   validateDevicePurchase,
   type ChecklistStatus,
   type DevicePurchaseForm,
+  type DevicePurchaseKind,
   type DevicePurchaseRecord,
 } from "@/lib/devicePurchase";
+import { validateTradeInValue, type TradeInDraft } from "@/lib/tradeIn";
 
 function formatThousands(s: string) {
   const n = parseGs(s);
   return n ? n.toLocaleString("es-PY") : "";
 }
 
+// Dos usos: "compra" registra el equipo y su comprobante al instante (le pagás
+// al cliente). "canje" solo recolecta los datos del equipo que el cliente
+// entrega como parte de pago: se guardan junto con la venta, en una sola
+// transacción (ver CartSheet / register_sale_with_trade_in).
 export default function BuyDeviceDialog({
   open,
   onOpenChange,
   onRegistered,
   onPrint,
+  mode = "compra",
+  maxValue,
+  initialForm,
+  onCollect,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onRegistered?: () => void;
-  onPrint: (record: DevicePurchaseRecord) => void;
+  onPrint?: (record: DevicePurchaseRecord) => void;
+  mode?: DevicePurchaseKind;
+  /** Canje: tope del valor reconocido (el total de la venta). */
+  maxValue?: number;
+  initialForm?: DevicePurchaseForm | null;
+  onCollect?: (draft: TradeInDraft) => void;
 }) {
+  const canje = mode === "canje";
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
@@ -54,7 +70,7 @@ export default function BuyDeviceDialog({
   const { presets: checklistPresets } = useChecklistPresets();
   const { presets: accessoryPresets } = useAccessoryPresets();
   const { presets: paymentMethods } = usePaymentMethodPresets();
-  const cashGate = useCashRegisterGate(open);
+  const cashGate = useCashRegisterGate(open && !canje);
 
   const [form, setForm] = useState<DevicePurchaseForm>(() => emptyDevicePurchaseForm());
   const [saving, setSaving] = useState(false);
@@ -64,8 +80,9 @@ export default function BuyDeviceDialog({
 
   useEffect(() => {
     if (!open) return;
-    setForm(emptyDevicePurchaseForm());
+    setForm(initialForm ?? emptyDevicePurchaseForm());
     setDone(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const set = (patch: Partial<DevicePurchaseForm>) => setForm((f) => ({ ...f, ...patch }));
@@ -99,9 +116,10 @@ export default function BuyDeviceDialog({
 
   const submit = async () => {
     if (!user || !companyId) return;
-    const problem = validateDevicePurchase(form);
+    const problem = validateDevicePurchase(form, mode)
+      ?? (canje && maxValue !== undefined ? validateTradeInValue(purchasePrice, maxValue) : null);
     if (problem) { toast.error(problem); return; }
-    if (await cashGate.check()) {
+    if (!canje && await cashGate.check()) {
       toast.error("La caja de hoy no está abierta. Abrila desde Caja para registrar la compra.");
       return;
     }
@@ -125,6 +143,11 @@ export default function BuyDeviceDialog({
       }
 
       const params = buildDevicePurchaseParams(form, checklistPresets.map((p) => p.label));
+      if (canje) {
+        onCollect?.({ form, params });
+        onOpenChange(false);
+        return;
+      }
       const { data, error } = await (supabase as any).rpc("register_device_purchase", {
         p: { ...params, branch_id: effectiveBranchId },
       });
@@ -173,7 +196,7 @@ export default function BuyDeviceDialog({
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-              <Button onClick={() => onPrint(done)} className="gap-2">
+              <Button onClick={() => onPrint?.(done)} className="gap-2">
                 <Printer className="h-4 w-4" /> Imprimir comprobante
               </Button>
             </DialogFooter>
@@ -181,9 +204,11 @@ export default function BuyDeviceDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Comprar equipo a un cliente</DialogTitle>
+              <DialogTitle>{canje ? "Equipo que recibís como parte de pago" : "Comprar equipo a un cliente"}</DialogTitle>
               <DialogDescription>
-                Deja un comprobante con los datos del vendedor y el estado del equipo, y lo suma al catálogo con su costo de compra.
+                {canje
+                  ? "Cargá los datos del equipo que te entrega el cliente. Se registra junto con la venta, con un comprobante, y entra al catálogo al valor que le reconozcas."
+                  : "Deja un comprobante con los datos del vendedor y el estado del equipo, y lo suma al catálogo con su costo de compra."}
               </DialogDescription>
             </DialogHeader>
 
@@ -214,7 +239,7 @@ export default function BuyDeviceDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  {hasMultipleBranches && (
+                  {hasMultipleBranches && !canje && (
                     <div className="grid gap-2">
                       <Label>Sucursal</Label>
                       <Select value={effectiveBranchId ?? ""} onValueChange={(v) => set({ branch_id: v || null })}>
@@ -229,7 +254,7 @@ export default function BuyDeviceDialog({
               </section>
 
               <section className="grid gap-3 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-foreground">Quién vende</h4>
+                <h4 className="text-sm font-semibold text-foreground">{canje ? "Quién entrega el equipo" : "Quién vende"}</h4>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="buy-seller-name">Nombre completo</Label>
@@ -308,8 +333,8 @@ export default function BuyDeviceDialog({
                 )}
 
                 <div className="grid gap-2">
-                  <Label htmlFor="buy-reason">Motivo de la venta (opcional)</Label>
-                  <Input id="buy-reason" value={form.reason} onChange={(e) => set({ reason: e.target.value })} placeholder="Ej: cambia de equipo, necesita el dinero" />
+                  <Label htmlFor="buy-reason">{canje ? "Motivo (opcional)" : "Motivo de la venta (opcional)"}</Label>
+                  <Input id="buy-reason" value={form.reason} onChange={(e) => set({ reason: e.target.value })} placeholder={canje ? "Ej: renueva su equipo" : "Ej: cambia de equipo, necesita el dinero"} />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="buy-notes">Observaciones (opcional)</Label>
@@ -318,10 +343,10 @@ export default function BuyDeviceDialog({
               </section>
 
               <section className="grid gap-3 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-foreground">Pago</h4>
+                <h4 className="text-sm font-semibold text-foreground">{canje ? "Valor del canje" : "Pago"}</h4>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="buy-price">Precio de compra (Gs.)</Label>
+                    <Label htmlFor="buy-price">{canje ? "Valor que le reconocés (Gs.)" : "Precio de compra (Gs.)"}</Label>
                     <Input id="buy-price" inputMode="numeric" placeholder="0" value={formatThousands(form.purchase_price)} onChange={(e) => set({ purchase_price: e.target.value })} />
                   </div>
                   <div className="grid gap-2">
@@ -334,27 +359,34 @@ export default function BuyDeviceDialog({
                     Ganancia estimada antes de repuestos: {formatPYG(sellingPrice - purchasePrice)}
                   </p>
                 )}
-                <div className="grid gap-2">
-                  <Label>Con qué le pagás</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {paymentMethods.map((m) => (
-                      <button key={m.id} type="button" onClick={() => set({ payment_method: m.label })} className={chipClass(form.payment_method === m.label)}>
-                        {m.label}
-                      </button>
-                    ))}
+                {canje ? (
+                  <p className="text-xs text-muted-foreground">
+                    No sale plata de la caja: este valor se descuenta de lo que paga el cliente por la venta, y es el costo del equipo cuando lo revendas.
+                    {maxValue !== undefined && ` Máximo: ${formatPYG(maxValue)} (el total de la venta).`}
+                  </p>
+                ) : (
+                  <div className="grid gap-2">
+                    <Label>Con qué le pagás</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {paymentMethods.map((m) => (
+                        <button key={m.id} type="button" onClick={() => set({ payment_method: m.label })} className={chipClass(form.payment_method === m.label)}>
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Sale de la caja de hoy. El costo no es un gasto del mes: se descuenta cuando vendas el equipo.</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">Sale de la caja de hoy. El costo no es un gasto del mes: se descuenta cuando vendas el equipo.</p>
-                </div>
+                )}
               </section>
 
-              {cashGate.blocked && <CashRegisterRequiredNotice what="registrar la compra" />}
+              {cashGate.blocked && !canje && <CashRegisterRequiredNotice what="registrar la compra" />}
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-              <Button onClick={submit} disabled={saving || cashGate.blocked}>
+              <Button onClick={submit} disabled={saving || (!canje && cashGate.blocked)}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Registrar compra
+                {canje ? "Usar como parte de pago" : "Registrar compra"}
               </Button>
             </DialogFooter>
           </>

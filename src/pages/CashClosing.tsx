@@ -21,6 +21,7 @@ import { es } from "date-fns/locale";
 import { CalendarDays, Wallet, CheckCircle2, AlertTriangle, Loader2, History, RotateCcw, DoorOpen, Landmark, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { netSaleAmount } from "@/lib/tradeIn";
 
 interface PaymentRow { amount: number; payment_method: string | null }
 interface AmountEvent extends PaymentRow { source: "orden" | "venta" }
@@ -250,8 +251,8 @@ export default function CashClosing() {
               .gte("created_at", from)
               .lte("created_at", to),
             (scopeBranchId
-              ? (supabase as any).from("product_sales").select("quantity, unit_price, payment_method").eq("branch_id", scopeBranchId)
-              : (supabase as any).from("product_sales").select("quantity, unit_price, payment_method"))
+              ? (supabase as any).from("product_sales").select("quantity, unit_price, trade_in_value, payment_method").eq("branch_id", scopeBranchId)
+              : (supabase as any).from("product_sales").select("quantity, unit_price, trade_in_value, payment_method"))
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
@@ -261,11 +262,11 @@ export default function CashClosing() {
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
-            // Equipos comprados a clientes: plata que sale de la caja hoy. Su costo
+            // Equipos comprados a clientes (no los recibidos en canje, que no mueven plata): salen de la caja hoy. Su costo
             // no es un gasto del mes — se descuenta del margen cuando se vende el equipo.
             (scopeBranchId
-              ? (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("branch_id", scopeBranchId)
-              : (supabase as any).from("device_purchases").select("purchase_price, payment_method"))
+              ? (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("kind", "compra").eq("branch_id", scopeBranchId)
+              : (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("kind", "compra"))
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
@@ -309,8 +310,8 @@ export default function CashClosing() {
             payment_method: p.payment_method,
             source: "orden" as const,
           })),
-          ...((sal ?? []) as { quantity: number; unit_price: number; payment_method: string | null }[]).map((s) => ({
-            amount: s.quantity * Number(s.unit_price || 0),
+          ...((sal ?? []) as { quantity: number; unit_price: number; trade_in_value: number | null; payment_method: string | null }[]).map((s) => ({
+            amount: netSaleAmount(s),
             payment_method: s.payment_method,
             source: "venta" as const,
           })),
