@@ -390,6 +390,18 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "comprar-equipos",
+        title: "Comprar un equipo a un cliente",
+        body: [
+          "Con el botón \"Comprar a cliente\" (arriba, al lado de \"Nuevo Producto\") registrás la compra de un celular usado: cargás el equipo con su IMEI, los datos de quien te lo vende (nombre y cédula), el estado del equipo, los accesorios que entrega, el motivo de la venta, cuánto le pagás y con qué medio.",
+          "El estado se marca con el mismo checklist que usás al recibir una reparación, pero acá cada ítem se marca como \"OK\" o \"Defecto\". Lo que no marques queda como no revisado, no como funcionando. Los ítems y accesorios disponibles se configuran en Configuración.",
+          "Al registrar, el equipo aparece solo en el catálogo con el precio que pagaste como costo de compra (y el precio de venta si lo cargaste), y se genera un comprobante numerado (CMP-0001, CMP-0002...) para imprimir en dos copias: una para el vendedor y otra para la tienda, con espacio para las firmas. Si el IMEI tiene solo números y no cierra (no son 15 dígitos o falla la verificación), el sistema avisa que puede haber un error de tipeo, pero te deja seguir.",
+          "Si el IMEI ya está en stock, el sistema no deja registrar la compra. Si ese IMEI ya pasó antes por tu tienda y se vendió, te avisa pero te deja continuar.",
+          "La plata que le pagás sale de la caja de hoy: en Caja → Cierre aparece como \"Compras de equipos a clientes\" y baja el efectivo esperado (o el saldo virtual, si pagaste por transferencia). No es un gasto del mes: el costo del equipo se descuenta recién cuando lo vendés, así la ganancia de cada celular sale bien en Reportes. Si la caja de hoy no está abierta y tu empresa exige abrirla, primero abrila desde Caja.",
+          "La pestaña \"Compras de equipos\" lista las compras registradas con un botón para reimprimir el comprobante. Una compra registrada no se puede editar ni borrar, porque es el respaldo del pago y del comprobante firmado. Revisá bien los datos antes de confirmar.",
+        ],
+      },
+      {
         id: "vender",
         title: "Vender con el carrito (POS)",
         body: [

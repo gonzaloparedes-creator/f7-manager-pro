@@ -180,6 +180,7 @@ export default function CashClosing() {
   // Cierre (solo admin)
   const [breakdownRows, setBreakdownRows] = useState<AmountEvent[]>([]);
   const [expenseRows, setExpenseRows] = useState<PaymentRow[]>([]);
+  const [purchaseRows, setPurchaseRows] = useState<PaymentRow[]>([]);
   const [existingClosing, setExistingClosing] = useState<ClosingRow | null>(null);
   const [closingHistory, setClosingHistory] = useState<ClosingRow[]>([]);
   const [countedCash, setCountedCash] = useState("");
@@ -260,6 +261,14 @@ export default function CashClosing() {
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
+            // Equipos comprados a clientes: plata que sale de la caja hoy. Su costo
+            // no es un gasto del mes — se descuenta del margen cuando se vende el equipo.
+            (scopeBranchId
+              ? (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("branch_id", scopeBranchId)
+              : (supabase as any).from("device_purchases").select("purchase_price, payment_method"))
+              .eq("company_id", companyId)
+              .gte("created_at", from)
+              .lte("created_at", to),
             byBranch(
               (supabase as any)
                 .from("cash_closings")
@@ -293,7 +302,7 @@ export default function CashClosing() {
       setOpeningNotes("");
 
       if (canCloseCaja) {
-        const [{ data: pay }, { data: sal }, { data: exp }, { data: closing }, { data: hist }] = adminRes;
+        const [{ data: pay }, { data: sal }, { data: exp }, { data: purch }, { data: closing }, { data: hist }] = adminRes;
         const rows: AmountEvent[] = [
           ...((pay ?? []) as { amount: number; payment_method: string | null }[]).map((p) => ({
             amount: Number(p.amount || 0),
@@ -310,6 +319,10 @@ export default function CashClosing() {
         setExpenseRows(((exp ?? []) as { amount: number; payment_method: string | null }[]).map((e) => ({
           amount: Number(e.amount || 0),
           payment_method: e.payment_method,
+        })));
+        setPurchaseRows(((purch ?? []) as { purchase_price: number; payment_method: string | null }[]).map((p) => ({
+          amount: Number(p.purchase_price || 0),
+          payment_method: p.payment_method,
         })));
         setExistingClosing((closing as ClosingRow) ?? null);
         setClosingHistory((hist ?? []) as ClosingRow[]);
@@ -333,6 +346,7 @@ export default function CashClosing() {
     [breakdownRows]
   );
   const breakdownByGastos = useMemo(() => groupByMethod(expenseRows), [expenseRows]);
+  const breakdownByCompras = useMemo(() => groupByMethod(purchaseRows), [purchaseRows]);
 
   const cashIncome = useMemo(
     () => breakdown.reduce((s, [method, amount]) => s + (isCashLabel(method) ? amount : 0), 0),
@@ -342,18 +356,27 @@ export default function CashClosing() {
     () => breakdownByGastos.reduce((s, [method, amount]) => s + (isCashLabel(method) ? amount : 0), 0),
     [breakdownByGastos]
   );
+  const cashPurchases = useMemo(
+    () => breakdownByCompras.reduce((s, [method, amount]) => s + (isCashLabel(method) ? amount : 0), 0),
+    [breakdownByCompras]
+  );
   const totalIncome = useMemo(() => breakdown.reduce((s, [, amount]) => s + amount, 0), [breakdown]);
   const totalExpenses = useMemo(() => breakdownByGastos.reduce((s, [, amount]) => s + amount, 0), [breakdownByGastos]);
+  const totalPurchases = useMemo(() => breakdownByCompras.reduce((s, [, amount]) => s + amount, 0), [breakdownByCompras]);
+  // Gastos y compras de equipos son salidas de plata por igual para la caja.
+  const cashOutflow = cashExpenses + cashPurchases;
+  const totalOutflow = totalExpenses + totalPurchases;
   const openingCashForDate = existingOpening?.opening_cash ?? 0;
-  const expectedCash = openingCashForDate + cashIncome - cashExpenses;
+  const expectedCash = openingCashForDate + cashIncome - cashOutflow;
 
   const counted = Math.round(Number(countedCash) || 0);
   const difference = counted - expectedCash;
 
   const virtualIncome = totalIncome - cashIncome;
   const virtualExpenses = totalExpenses - cashExpenses;
+  const virtualPurchases = totalPurchases - cashPurchases;
   const openingVirtualForDate = existingOpening?.opening_virtual ?? 0;
-  const expectedVirtual = openingVirtualForDate + virtualIncome - virtualExpenses;
+  const expectedVirtual = openingVirtualForDate + virtualIncome - virtualExpenses - virtualPurchases;
   const virtualCounted = countedVirtual.trim() ? Math.round(Number(countedVirtual) || 0) : null;
   const differenceVirtual = virtualCounted === null ? null : virtualCounted - expectedVirtual;
 
@@ -410,6 +433,7 @@ export default function CashClosing() {
       ordenes: Object.fromEntries(breakdownByOrdenes),
       ventas: Object.fromEntries(breakdownByVentas),
       gastos: Object.fromEntries(breakdownByGastos),
+      compras_equipos: Object.fromEntries(breakdownByCompras),
       apertura: openingCashForDate,
       ...(virtualEnabled ? { apertura_virtual: openingVirtualForDate } : {}),
     };
@@ -661,7 +685,7 @@ export default function CashClosing() {
                 <Card>
                   <CardContent className="space-y-3 p-5">
                     <div className="text-sm font-semibold text-foreground">Ingresos del día por medio de pago</div>
-                    {breakdown.length === 0 && breakdownByGastos.length === 0 ? (
+                    {breakdown.length === 0 && breakdownByGastos.length === 0 && breakdownByCompras.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No hubo movimientos ese día.</p>
                     ) : (
                       <div className="space-y-4">
@@ -716,20 +740,33 @@ export default function CashClosing() {
                           )}
                         </div>
 
+                        {breakdownByCompras.length > 0 && (
+                          <div className="space-y-1.5 border-t border-border/60 pt-3">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compras de equipos a clientes</div>
+                            {breakdownByCompras.map(([label, amount]) => (
+                              <MethodLine key={label} label={label} amount={amount} negative virtualEnabled={virtualEnabled} />
+                            ))}
+                            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                              <span>Subtotal compras</span>
+                              <span className="text-destructive">-{formatPYG(totalPurchases)}</span>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="space-y-1.5 border-t border-border pt-2">
                           <div className="flex items-center justify-between text-sm font-semibold">
-                            <span>Total (ingresos - gastos)</span>
-                            <span>{formatPYG(totalIncome - totalExpenses)}</span>
+                            <span>{breakdownByCompras.length > 0 ? "Total (ingresos - gastos y compras)" : "Total (ingresos - gastos)"}</span>
+                            <span>{formatPYG(totalIncome - totalOutflow)}</span>
                           </div>
                           {virtualEnabled && (
                             <>
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Neto por caja física</span>
-                                <span>{formatPYG(cashIncome - cashExpenses)}</span>
+                                <span>{formatPYG(cashIncome - cashOutflow)}</span>
                               </div>
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" /> Neto por caja virtual</span>
-                                <span>{formatPYG(virtualIncome - virtualExpenses)}</span>
+                                <span>{formatPYG(virtualIncome - virtualExpenses - virtualPurchases)}</span>
                               </div>
                             </>
                           )}
@@ -757,6 +794,7 @@ export default function CashClosing() {
                               { label: "+ Reparaciones en efectivo", amount: sumBox(breakdownByOrdenes, true) },
                               { label: "+ Ventas en efectivo", amount: sumBox(breakdownByVentas, true) },
                               { label: "- Gastos en efectivo", amount: cashExpenses },
+                              ...(breakdownByCompras.length > 0 ? [{ label: "- Compras de equipos en efectivo", amount: cashPurchases }] : []),
                             ]}
                             expectedLabel="Efectivo esperado"
                             expected={expectedCash}
@@ -775,6 +813,7 @@ export default function CashClosing() {
                                 { label: "+ Reparaciones por banco", amount: sumBox(breakdownByOrdenes, false) },
                                 { label: "+ Ventas por banco", amount: sumBox(breakdownByVentas, false) },
                                 { label: "- Gastos por banco", amount: virtualExpenses },
+                                ...(breakdownByCompras.length > 0 ? [{ label: "- Compras de equipos por banco", amount: virtualPurchases }] : []),
                               ]}
                               expectedLabel="Saldo virtual esperado"
                               expected={expectedVirtual}
@@ -797,6 +836,7 @@ export default function CashClosing() {
                             { label: "Apertura", amount: openingCashForDate },
                             { label: "+ Ingresos en efectivo", amount: cashIncome },
                             { label: "- Gastos en efectivo", amount: cashExpenses },
+                            ...(breakdownByCompras.length > 0 ? [{ label: "- Compras de equipos en efectivo", amount: cashPurchases }] : []),
                           ]}
                           expectedLabel="Efectivo esperado"
                           expected={expectedCash}

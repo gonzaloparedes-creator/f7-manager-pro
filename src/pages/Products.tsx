@@ -7,8 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
+import BuyDeviceDialog from "@/components/BuyDeviceDialog";
+import { printPurchaseReceipt } from "@/lib/devicePurchaseReceipt";
+import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
@@ -109,6 +112,8 @@ export default function Products() {
   const [ticketWidthMm, setTicketWidthMm] = useState(80);
   const [receiptSale, setReceiptSale] = useState<CompletedCartSale | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [purchases, setPurchases] = useState<DevicePurchaseRecord[]>([]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -190,6 +195,29 @@ export default function Products() {
   };
 
   useEffect(() => { load(); }, [companyId]);
+
+  const loadPurchases = async () => {
+    if (!companyId) return;
+    const { data, error } = await (supabase as any)
+      .from("device_purchases")
+      .select("id, receipt_number, created_at, branch_id, device_name, imei, seller_name, seller_cedula, seller_phone, purchase_price, payment_method, reason, checklist, accessories, notes")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) return toast.error(error.message);
+    setPurchases(((data ?? []) as DevicePurchaseRecord[]).map((p) => ({ ...p, purchase_price: Number(p.purchase_price) })));
+  };
+
+  useEffect(() => { loadPurchases(); }, [companyId]);
+
+  const handlePurchaseRegistered = () => { load(); loadPurchases(); };
+
+  const handlePrintPurchase = (record: DevicePurchaseRecord) => {
+    printPurchaseReceipt(record, {
+      businessName,
+      branchName: hasMultipleBranches ? branches.find((b) => b.id === record.branch_id)?.name ?? null : null,
+    });
+  };
 
   const remove = async (item: Product) => {
     setDeleting(true);
@@ -421,10 +449,16 @@ export default function Products() {
             Catálogo de venta al público — separado de los repuestos de reparación.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Nuevo Producto
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button variant="outline" onClick={() => setBuyOpen(true)}>
+            <HandCoins className="h-4 w-4" />
+            Comprar a cliente
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -477,11 +511,12 @@ export default function Products() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+        <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto">
           <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
           <TabsTrigger value="ventas">
             Ventas recientes{saleGroups.length > 0 ? ` (${saleGroups.length})` : ""}
           </TabsTrigger>
+          <TabsTrigger value="compras">Compras de equipos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalogo" className="space-y-4">
@@ -598,6 +633,50 @@ export default function Products() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="compras">
+          <Card>
+            <CardContent className="space-y-3 p-4">
+              {purchases.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Todavía no compraste ningún equipo a un cliente. Usá "Comprar a cliente" para registrar la primera.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {purchases.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-foreground">
+                          {p.device_name}
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">{p.receipt_number}</span>
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {new Date(p.created_at).toLocaleString("es-PY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          {` · ${p.seller_name}`}
+                          {p.imei ? ` · IMEI ${p.imei}` : ""}
+                          {p.payment_method ? ` · ${p.payment_method}` : ""}
+                          {hasMultipleBranches && p.branch_id ? ` · ${branches.find((b) => b.id === p.branch_id)?.name ?? "Sucursal"}` : ""}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="font-semibold text-foreground">{formatPYG(p.purchase_price)}</span>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-10 w-10"
+                          aria-label="Reimprimir comprobante"
+                          onClick={() => handlePrintPurchase(p)}
+                        >
+                          <Printer className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {cartCount > 0 && (
@@ -615,6 +694,12 @@ export default function Products() {
       )}
 
       <NewProductDialog open={open} onOpenChange={closeDialog} onCreated={handleSaved} editItem={editItem} />
+      <BuyDeviceDialog
+        open={buyOpen}
+        onOpenChange={setBuyOpen}
+        onRegistered={handlePurchaseRegistered}
+        onPrint={handlePrintPurchase}
+      />
       <ProductPreviewDialog
         product={previewItem}
         onOpenChange={(o) => !o && setPreviewItem(null)}
