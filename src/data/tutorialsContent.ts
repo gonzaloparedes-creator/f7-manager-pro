@@ -442,6 +442,15 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "lista-whatsapp",
+        title: "Copiar la lista de precios para WhatsApp",
+        body: [
+          "En la pestaña \"Catálogo\", el botón \"Copiar lista para WhatsApp\" arma un texto con tus productos y sus precios de venta, listo para pegar en un chat, un grupo o un estado. Los productos van agrupados por categoría y ordenados por nombre, con el nombre del negocio y la fecha arriba.",
+          "La lista respeta lo que estás viendo: si buscaste algo, filtraste por sucursal o tocaste la tarjeta \"Equipos detenidos 30+ días\" para armar una lista de ofertas, se copia solo eso. Para copiar todo el catálogo, dejá el buscador vacío y las sucursales en \"Todas\".",
+          "Quedan afuera los productos agotados y los que tienen precio de venta Gs. 0; al copiar, el aviso te cuenta cuántos fueron para que puedas corregirlos. La lista nunca incluye costos, IMEI ni cuántas unidades tenés en stock. Una vez pegada en WhatsApp podés editar el texto como cualquier mensaje.",
+        ],
+      },
+      {
         id: "ventas",
         title: "Ventas recientes y ticket imprimible",
         body: [

@@ -13,6 +13,7 @@ import BuyDeviceDialog from "@/components/BuyDeviceDialog";
 import { printPurchaseReceipt } from "@/lib/devicePurchaseReceipt";
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
 import { tradeInOfSale } from "@/lib/tradeIn";
+import { buildPriceList } from "@/lib/priceList";
 import { STALE_DEVICE_DAYS, daysInStock, daysInStockLabel, hasDevicesInStock, isStaleDevice, staleDeviceSummary } from "@/lib/deviceStock";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
@@ -293,6 +294,31 @@ export default function Products() {
   const lowStockCount = items.filter((i) => i.stock > 0 && i.stock <= i.min_stock_alert).length;
   const showDeviceAging = canViewStock && hasDevicesInStock(items);
   const staleSummary = staleDeviceSummary(items, now);
+
+  const copyPriceList = async () => {
+    const list = buildPriceList({
+      items: filtered,
+      categoryName,
+      businessName,
+      branchName: hasMultipleBranches && branchFilter !== ALL_BRANCHES ? branches.find((b) => b.id === branchFilter)?.name : null,
+    });
+    if (list.included === 0) {
+      toast.error("No hay artículos con stock y precio de venta para copiar.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(list.text);
+      const skipped = [
+        list.withoutStock > 0 ? `${list.withoutStock} sin stock` : null,
+        list.withoutPrice > 0 ? `${list.withoutPrice} sin precio` : null,
+      ].filter(Boolean);
+      toast.success(`Lista copiada: ${list.included} artículo${list.included !== 1 ? "s" : ""}`, {
+        description: skipped.length > 0 ? `Quedaron afuera: ${skipped.join(", ")}. Pegala en WhatsApp.` : "Pegala en WhatsApp.",
+      });
+    } catch {
+      toast.error("No se pudo copiar: el navegador no permitió acceder al portapapeles.");
+    }
+  };
 
   const toggleStockFilter = () => {
     setActiveTab("catalogo");
@@ -638,6 +664,16 @@ export default function Products() {
                 </SelectContent>
               </Select>
             )}
+            <Button
+              variant="outline"
+              className="w-full sm:ml-auto sm:w-auto"
+              data-testid="copy-price-list"
+              disabled={loading || filtered.length === 0}
+              onClick={copyPriceList}
+            >
+              <MessageCircle className="h-4 w-4" />
+              Copiar lista para WhatsApp
+            </Button>
           </div>
 
           {loading ? (
