@@ -782,8 +782,8 @@ export default function Reports() {
               label="Costo de Repuestos"
               hint="Costo de los repuestos de las órdenes cuyo cobro final cayó en el período, con el costo que tenía cada repuesto cuando se agregó a la orden (no el costo actual del inventario)."
               value={costoRepuestos}
-              accent="text-secondary"
-              iconBg="bg-secondary/10 text-secondary"
+              accent="text-foreground"
+              iconBg="bg-muted text-muted-foreground"
               prefix="-"
             />
             <SummaryCard
@@ -812,8 +812,8 @@ export default function Reports() {
               label="Costo de Productos"
               hint="Costo de los productos vendidos en el período, con el costo que tenían en el momento de la venta."
               value={costoProductosVendidos}
-              accent="text-secondary"
-              iconBg="bg-secondary/10 text-secondary"
+              accent="text-foreground"
+              iconBg="bg-muted text-muted-foreground"
               prefix="-"
             />
             <SummaryCard

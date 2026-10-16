@@ -694,7 +694,7 @@ export default function Products() {
         >
           <div className="text-xs text-muted-foreground">Sin / bajo stock</div>
           {canViewStock ? (
-            <div className="mt-1 flex items-center gap-2 text-2xl font-bold text-secondary">
+            <div className={cn("mt-1 flex items-center gap-2 text-2xl font-bold", outOfStockCount + lowStockCount > 0 && "text-secondary")}>
               {outOfStockCount + lowStockCount}
               {outOfStockCount + lowStockCount > 0 && <AlertTriangle className="h-5 w-5" />}
             </div>

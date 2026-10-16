@@ -1,11 +1,16 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Plus, ClipboardList, ShoppingCart, FileText, Layers } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { usePlan } from "@/hooks/usePlan";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 
-// Botón flotante accesible desde cualquier pantalla mobile — antes "Nueva
+// Pantallas donde crear una orden/venta es una acción natural. En el resto
+// (Caja, Gastos, Reportes, Configuración, ayuda, detalle de orden) el botón
+// tapaba acciones propias de la página, así que no se muestra.
+const FAB_ROUTES = ["/dashboard", "/clientes", "/avisos", "/inventario", "/productos"];
+
+// Botón flotante accesible desde las pantallas operativas en mobile — antes "Nueva
 // Orden" solo vivía arriba de la página de Órdenes, así que si estabas en
 // Clientes o Inventario había que volver y scrollear. Vive en la esquina
 // inferior derecha (zona natural del pulgar a una mano) y por encima de la
@@ -16,6 +21,7 @@ import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 export default function QuickActionsFab() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { isBusiness, isRetail } = usePlan();
   const { canViewProducts } = useStaffPermissions();
   const hasStore = (isBusiness || isRetail) && canViewProducts;
@@ -52,6 +58,8 @@ export default function QuickActionsFab() {
         }]
       : []),
   ];
+
+  if (!FAB_ROUTES.includes(pathname)) return null;
 
   const handleTap = () => {
     if (actions.length === 1) { actions[0].run(); return; }
