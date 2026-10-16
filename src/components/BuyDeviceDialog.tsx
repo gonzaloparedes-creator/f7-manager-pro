@@ -38,16 +38,21 @@ function formatThousands(s: string) {
   return n ? n.toLocaleString("es-PY") : "";
 }
 
+export type BuyDestination = "reventa" | "piezas";
+
 // Dos usos: "compra" registra el equipo y su comprobante al instante (le pagás
-// al cliente). "canje" solo recolecta los datos del equipo que el cliente
-// entrega como parte de pago: se guardan junto con la venta, en una sola
-// transacción (ver CartSheet / register_sale_with_trade_in).
+// al cliente), ya sea para revenderlo o para desarmarlo y sacarle piezas
+// (destino "piezas": no entra al catálogo, queda en la Chatarra). "canje" solo
+// recolecta los datos del equipo que el cliente entrega como parte de pago: se
+// guardan junto con la venta, en una sola transacción (ver CartSheet /
+// register_sale_with_trade_in).
 export default function BuyDeviceDialog({
   open,
   onOpenChange,
   onRegistered,
   onPrint,
   mode = "compra",
+  initialDestination = "reventa",
   maxValue,
   deposit = 0,
   initialForm,
@@ -57,7 +62,9 @@ export default function BuyDeviceDialog({
   onOpenChange: (o: boolean) => void;
   onRegistered?: () => void;
   onPrint?: (record: DevicePurchaseRecord) => void;
-  mode?: DevicePurchaseKind;
+  mode?: Exclude<DevicePurchaseKind, "piezas">;
+  /** Compra: destino con el que abre el diálogo (se puede cambiar adentro). */
+  initialDestination?: BuyDestination;
   /** Canje: tope del valor reconocido (el total de la venta). */
   maxValue?: number;
   /** Canje: seña ya abonada de equipos reservados en la misma venta; se descuenta del tope. */
@@ -78,6 +85,9 @@ export default function BuyDeviceDialog({
   const [form, setForm] = useState<DevicePurchaseForm>(() => emptyDevicePurchaseForm());
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<DevicePurchaseRecord | null>(null);
+  const [destination, setDestination] = useState<BuyDestination>(initialDestination);
+  const piezas = !canje && destination === "piezas";
+  const kind: DevicePurchaseKind = canje ? "canje" : piezas ? "piezas" : "compra";
 
   const effectiveBranchId = form.branch_id ?? defaultBranchId;
 
@@ -85,6 +95,7 @@ export default function BuyDeviceDialog({
     if (!open) return;
     setForm(initialForm ?? emptyDevicePurchaseForm());
     setDone(null);
+    setDestination(initialDestination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -119,7 +130,7 @@ export default function BuyDeviceDialog({
 
   const submit = async () => {
     if (!user || !companyId) return;
-    const problem = validateDevicePurchase(form, mode)
+    const problem = validateDevicePurchase(form, kind)
       ?? (canje && maxValue !== undefined ? validateTradeInValue(purchasePrice, maxValue, deposit) : null);
     if (problem) { toast.error(problem); return; }
     if (!canje && await cashGate.check()) {
@@ -130,29 +141,31 @@ export default function BuyDeviceDialog({
     setSaving(true);
     try {
       const imei = form.imei.trim();
-      const { data: sameImei } = await (supabase as any)
-        .from("inventory_items")
-        .select("name, stock")
-        .eq("company_id", companyId)
-        .eq("imei", imei)
-        .limit(5);
-      const inStock = ((sameImei ?? []) as { name: string; stock: number }[]).find((i) => i.stock > 0);
-      if (inStock) {
-        toast.error(`Ya tenés este IMEI en stock ("${inStock.name}"). Si lo recompraste, primero vendelo o editá el anterior.`);
-        return;
-      }
-      if ((sameImei ?? []).length > 0) {
-        toast.warning("Este IMEI ya pasó antes por tu tienda (se vendió). Verificá que sea realmente el mismo equipo.");
+      if (imei) {
+        const { data: sameImei } = await (supabase as any)
+          .from("inventory_items")
+          .select("name, stock")
+          .eq("company_id", companyId)
+          .eq("imei", imei)
+          .limit(5);
+        const inStock = ((sameImei ?? []) as { name: string; stock: number }[]).find((i) => i.stock > 0);
+        if (inStock) {
+          toast.error(`Ya tenés este IMEI en stock ("${inStock.name}"). Si lo recompraste, primero vendelo o editá el anterior.`);
+          return;
+        }
+        if ((sameImei ?? []).length > 0) {
+          toast.warning("Este IMEI ya pasó antes por tu tienda (se vendió). Verificá que sea realmente el mismo equipo.");
+        }
       }
 
-      const params = buildDevicePurchaseParams(form, checklistPresets.map((p) => p.label));
+      const params = buildDevicePurchaseParams(form, checklistPresets.map((p) => p.label), kind);
       if (canje) {
         onCollect?.({ form, params });
         onOpenChange(false);
         return;
       }
       const { data, error } = await (supabase as any).rpc("register_device_purchase", {
-        p: { ...params, branch_id: effectiveBranchId },
+        p: { ...params, branch_id: effectiveBranchId, kind },
       });
       if (error) throw error;
 
@@ -161,6 +174,7 @@ export default function BuyDeviceDialog({
         id: result.purchase_id,
         receipt_number: result.receipt_number,
         created_at: new Date().toISOString(),
+        kind,
         branch_id: effectiveBranchId,
         device_name: params.device_name,
         imei: params.imei,
@@ -195,7 +209,10 @@ export default function BuyDeviceDialog({
               </DialogTitle>
               <DialogDescription>
                 Comprobante <span className="font-semibold text-foreground">{done.receipt_number}</span> — {done.device_name} por{" "}
-                {formatPYG(done.purchase_price)}. El equipo ya está en el catálogo de Productos.
+                {formatPYG(done.purchase_price)}.{" "}
+                {done.kind === "piezas"
+                  ? "El equipo quedó en la Chatarra de Productos > Equipos: desde ahí cargás las piezas que le saques."
+                  : "El equipo ya está en el catálogo de Productos."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -208,23 +225,41 @@ export default function BuyDeviceDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{canje ? "Equipo que recibís como parte de pago" : "Comprar equipo a un cliente"}</DialogTitle>
+              <DialogTitle>
+                {canje ? "Equipo que recibís como parte de pago" : piezas ? "Comprar equipo para piezas" : "Comprar equipo a un cliente"}
+              </DialogTitle>
               <DialogDescription>
                 {canje
                   ? "Cargá los datos del equipo que te entrega el cliente. Se registra junto con la venta, con un comprobante, y entra al catálogo al valor que le reconozcas."
-                  : "Deja un comprobante con los datos del vendedor y el estado del equipo, y lo suma al catálogo con su costo de compra."}
+                  : piezas
+                    ? "Deja un comprobante con los datos del vendedor y lo guarda en la Chatarra. No entra al catálogo: después cargás las piezas que le sacás y se reparte entre ellas lo que pagaste."
+                    : "Deja un comprobante con los datos del vendedor y el estado del equipo, y lo suma al catálogo con su costo de compra."}
               </DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-5">
-              <section className="grid gap-3">
+              {!canje && (
+                <div className="grid gap-2">
+                  <Label>¿Para qué lo comprás?</Label>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Destino del equipo">
+                    <button type="button" aria-pressed={!piezas} onClick={() => setDestination("reventa")} className={chipClass(!piezas)}>
+                      Para revender
+                    </button>
+                    <button type="button" aria-pressed={piezas} onClick={() => setDestination("piezas")} className={chipClass(piezas)}>
+                      Para piezas (chatarra)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <section className="grid gap-3 border-t border-border pt-4 first:border-t-0 first:pt-0">
                 <h4 className="text-sm font-semibold text-foreground">Equipo</h4>
                 <div className="grid gap-2">
                   <Label htmlFor="buy-device-name">Nombre del equipo</Label>
                   <Input id="buy-device-name" value={form.device_name} onChange={(e) => set({ device_name: e.target.value })} placeholder="Ej: iPhone 13 128GB negro" />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="buy-device-imei">IMEI o número de serie</Label>
+                  <Label htmlFor="buy-device-imei">{piezas ? "IMEI o número de serie (opcional)" : "IMEI o número de serie"}</Label>
                   <Input id="buy-device-imei" inputMode="text" maxLength={20} value={form.imei} onChange={(e) => set({ imei: e.target.value })} placeholder="Ej: 356938035643809" />
                   {imeiMessage && (
                     <p className="flex items-start gap-1.5 text-xs text-secondary" data-testid="imei-warning">
@@ -232,29 +267,33 @@ export default function BuyDeviceDialog({
                     </p>
                   )}
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="buy-device-battery">Batería % (opcional)</Label>
-                  <Input
-                    id="buy-device-battery"
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={form.battery_health}
-                    onChange={(e) => set({ battery_health: e.target.value })}
-                    placeholder="Ej: 89"
-                  />
-                  <p className="text-xs text-muted-foreground">En iPhone: Ajustes → Batería → Estado de la batería.</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                {!piezas && (
                   <div className="grid gap-2">
-                    <Label>Categoría (opcional)</Label>
-                    <Select value={form.category_id ?? "__none__"} onValueChange={(v) => set({ category_id: v === "__none__" ? null : v })}>
-                      <SelectTrigger><SelectValue placeholder="Sin categoría" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Sin categoría</SelectItem>
-                        {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="buy-device-battery">Batería % (opcional)</Label>
+                    <Input
+                      id="buy-device-battery"
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={form.battery_health}
+                      onChange={(e) => set({ battery_health: e.target.value })}
+                      placeholder="Ej: 89"
+                    />
+                    <p className="text-xs text-muted-foreground">En iPhone: Ajustes → Batería → Estado de la batería.</p>
                   </div>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {!piezas && (
+                    <div className="grid gap-2">
+                      <Label>Categoría (opcional)</Label>
+                      <Select value={form.category_id ?? "__none__"} onValueChange={(v) => set({ category_id: v === "__none__" ? null : v })}>
+                        <SelectTrigger><SelectValue placeholder="Sin categoría" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Sin categoría</SelectItem>
+                          {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   {hasMultipleBranches && !canje && (
                     <div className="grid gap-2">
                       <Label>Sucursal</Label>
@@ -288,7 +327,7 @@ export default function BuyDeviceDialog({
               </section>
 
               <section className="grid gap-3 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-foreground">Estado del equipo</h4>
+                <h4 className="text-sm font-semibold text-foreground">{piezas ? "Estado en que lo comprás" : "Estado del equipo"}</h4>
                 {checklistPresets.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No hay ítems de checklist configurados. Agregalos en Configuración → Accesorios.</p>
                 ) : (
@@ -365,12 +404,14 @@ export default function BuyDeviceDialog({
                     <Label htmlFor="buy-price">{canje ? "Valor que le reconocés (Gs.)" : "Precio de compra (Gs.)"}</Label>
                     <Input id="buy-price" inputMode="numeric" placeholder="0" value={formatThousands(form.purchase_price)} onChange={(e) => set({ purchase_price: e.target.value })} />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="buy-selling">Precio de venta (Gs., opcional)</Label>
-                    <Input id="buy-selling" inputMode="numeric" placeholder="0" value={formatThousands(form.selling_price)} onChange={(e) => set({ selling_price: e.target.value })} />
-                  </div>
+                  {!piezas && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="buy-selling">Precio de venta (Gs., opcional)</Label>
+                      <Input id="buy-selling" inputMode="numeric" placeholder="0" value={formatThousands(form.selling_price)} onChange={(e) => set({ selling_price: e.target.value })} />
+                    </div>
+                  )}
                 </div>
-                {purchasePrice > 0 && sellingPrice > 0 && (
+                {!piezas && purchasePrice > 0 && sellingPrice > 0 && (
                   <p className={cn("text-xs", sellingPrice - purchasePrice < 0 ? "text-destructive" : "text-muted-foreground")}>
                     Ganancia estimada antes de repuestos: {formatPYG(sellingPrice - purchasePrice)}
                   </p>
@@ -392,7 +433,11 @@ export default function BuyDeviceDialog({
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground">Sale de la caja de hoy. El costo no es un gasto del mes: se descuenta cuando vendas el equipo.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {piezas
+                        ? "Sale de la caja de hoy. No es un gasto del mes: lo que pagaste se reparte entre las piezas que le saques y se descuenta cuando las uses en una reparación."
+                        : "Sale de la caja de hoy. El costo no es un gasto del mes: se descuenta cuando vendas el equipo."}
+                    </p>
                   </div>
                 )}
               </section>

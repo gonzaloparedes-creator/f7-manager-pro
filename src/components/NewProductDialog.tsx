@@ -52,12 +52,15 @@ export default function NewProductDialog({
   onOpenChange,
   onCreated,
   editItem,
+  defaultIsDevice = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onCreated?: () => void;
   /** Si se pasa, el diálogo edita este producto en vez de crear uno nuevo. */
   editItem?: EditableProduct | null;
+  /** Al crear, abre con "Es un equipo" ya activado (atajo "Registrar equipo" del panel de Equipos). */
+  defaultIsDevice?: boolean;
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
@@ -145,7 +148,9 @@ export default function NewProductDialog({
       setPreview(editItem.image_url);
     } else {
       reset();
+      if (defaultIsDevice) { setIsDevice(true); setStock("1"); }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editItem]);
 
   const onFile = (f: File | null) => {

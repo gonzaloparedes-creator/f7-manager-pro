@@ -65,6 +65,16 @@ describe("buildPurchaseReceiptHtml", () => {
     expect(html).not.toContain("Monto pagado");
   });
 
+  it("una compra para piezas aclara que el equipo se desarma y no se revende", () => {
+    const html = buildPurchaseReceiptHtml(record({ kind: "piezas" }), { businessName: "Seven Store", branchName: null });
+    expect(html).toContain("Comprobante de compra de equipo para repuestos");
+    expect(html).toContain("Se desarma para repuestos");
+    expect(html).toContain("Monto pagado");
+    expect(html).toContain("Copia del vendedor");
+    const normal = buildPurchaseReceiptHtml(record(), { businessName: "Seven Store", branchName: null });
+    expect(normal).not.toContain("Se desarma para repuestos");
+  });
+
   it("no deja pasar HTML en los datos cargados por el usuario", () => {
     const html = buildPurchaseReceiptHtml(
       record({ seller_name: `<script>alert(1)</script>`, notes: `"><img src=x onerror=alert(2)>`, device_name: "A&B" }),

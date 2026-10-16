@@ -263,11 +263,11 @@ export default function CashClosing() {
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
-            // Equipos comprados a clientes (no los recibidos en canje, que no mueven plata): salen de la caja hoy. Su costo
-            // no es un gasto del mes — se descuenta del margen cuando se vende el equipo.
+            // Equipos comprados a clientes, para revender o para piezas (no los recibidos en canje, que no mueven plata): salen
+            // de la caja hoy. Su costo no es un gasto del mes — se descuenta del margen cuando se vende el equipo o las piezas.
             (scopeBranchId
-              ? (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("kind", "compra").eq("branch_id", scopeBranchId)
-              : (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("kind", "compra"))
+              ? (supabase as any).from("device_purchases").select("purchase_price, payment_method").in("kind", ["compra", "piezas"]).eq("branch_id", scopeBranchId)
+              : (supabase as any).from("device_purchases").select("purchase_price, payment_method").in("kind", ["compra", "piezas"]))
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),

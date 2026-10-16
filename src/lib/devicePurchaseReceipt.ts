@@ -32,6 +32,7 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
   });
   const business = [options.businessName, options.branchName].filter(Boolean).join(" · ");
   const canje = record.kind === "canje";
+  const piezas = record.kind === "piezas";
   const battery = parseBattery(record.battery_health).value;
   const batteryText = battery === null ? null : `${battery}%`;
 
@@ -47,7 +48,7 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
   <header>
     <div>
       <div class="biz">${escapeHtml(business || "Comprobante")}</div>
-      <h1>${canje ? "Comprobante de equipo recibido en canje" : "Comprobante de compra de equipo"}</h1>
+      <h1>${canje ? "Comprobante de equipo recibido en canje" : piezas ? "Comprobante de compra de equipo para repuestos" : "Comprobante de compra de equipo"}</h1>
     </div>
     <div class="num">
       <div class="num-value">${escapeHtml(record.receipt_number)}</div>
@@ -61,6 +62,7 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
     ${row("Equipo", record.device_name)}
     ${row("IMEI / N° de serie", record.imei)}
     ${row("Batería", batteryText)}
+    ${row("Destino", piezas ? "Se desarma para repuestos (no se revende)" : null)}
     ${condition}
     ${row("Accesorios entregados", record.accessories.join(", "))}
     ${row(canje ? "Motivo del canje" : "Motivo de la venta", record.reason)}

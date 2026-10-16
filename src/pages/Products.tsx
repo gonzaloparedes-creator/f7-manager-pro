@@ -9,7 +9,19 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins, BatteryMedium, CalendarClock } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
-import BuyDeviceDialog from "@/components/BuyDeviceDialog";
+import BuyDeviceDialog, { type BuyDestination } from "@/components/BuyDeviceDialog";
+import DevicesHub from "@/components/DevicesHub";
+import ScrapDevicesPanel from "@/components/ScrapDevicesPanel";
+import ExtractPartDialog from "@/components/ExtractPartDialog";
+import { useScrapDevices } from "@/hooks/useScrapDevices";
+import {
+  CATALOG_FILTER_EMPTY,
+  CATALOG_FILTER_LABEL,
+  hasDeviceActivity,
+  matchesDataFilter,
+  type CatalogFilter,
+  type HubAlertTarget,
+} from "@/lib/devicesHub";
 import ReserveDeviceDialog from "@/components/ReserveDeviceDialog";
 import CancelReservationDialog from "@/components/CancelReservationDialog";
 import ExtendReservationDialog from "@/components/ExtendReservationDialog";
@@ -125,7 +137,7 @@ export default function Products() {
   const [dossierItem, setDossierItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
-  const [stockFilter, setStockFilter] = useState<"all" | "low" | "stale">("all");
+  const [stockFilter, setStockFilter] = useState<CatalogFilter>("all");
   const [activeTab, setActiveTab] = useState("catalogo");
   const [cart, setCart] = useState<Cart>(() => {
     try {
@@ -141,7 +153,11 @@ export default function Products() {
   const [receiptSale, setReceiptSale] = useState<CompletedCartSale | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [buyOpen, setBuyOpen] = useState(false);
+  const [buyDestination, setBuyDestination] = useState<BuyDestination>("reventa");
+  const [registerAsDevice, setRegisterAsDevice] = useState(false);
+  const [extractId, setExtractId] = useState<string | null>(null);
   const [purchases, setPurchases] = useState<DevicePurchaseRecord[]>([]);
+  const { devices: scrapDevices, totals: scrapSummary, loaded: scrapLoaded, reload: reloadScrap } = useScrapDevices();
   const { reservations, activeByItem, loaded: reservationsLoaded, reload: reloadReservations } = useDeviceReservations();
   const [reserveItem, setReserveItem] = useState<Product | null>(null);
   const [cancelTarget, setCancelTarget] = useState<DeviceReservation | null>(null);
@@ -264,6 +280,8 @@ export default function Products() {
       .from("device_purchases")
       .select("id, receipt_number, created_at, branch_id, device_name, imei, battery_health, seller_name, seller_cedula, seller_phone, purchase_price, payment_method, reason, checklist, accessories, notes, kind, sale_group_id")
       .eq("company_id", companyId)
+      // Las compras para piezas viven en la pestaña Chatarra; así no gastan el tope de 50 de esta lista.
+      .neq("kind", "piezas")
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) return toast.error(error.message);
@@ -272,7 +290,10 @@ export default function Products() {
 
   useEffect(() => { loadPurchases(); }, [companyId]);
 
-  const handlePurchaseRegistered = () => { load(); loadPurchases(); void reloadReservations(); };
+  const handlePurchaseRegistered = () => { load(); loadPurchases(); void reloadReservations(); void reloadScrap(); };
+
+  const openBuy = (destination: BuyDestination) => { setBuyDestination(destination); setBuyOpen(true); };
+  const openRegisterDevice = () => { setEditItem(null); setRegisterAsDevice(true); setOpen(true); };
 
   const handlePrintPurchase = (record: DevicePurchaseRecord) => {
     printPurchaseReceipt(record, {
@@ -351,7 +372,11 @@ export default function Products() {
     const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
     const matchesStock =
       stockFilter === "all" ||
-      (stockFilter === "low" ? isLowOrOutOfStock(i) : isStaleDevice(i, now));
+      (stockFilter === "low"
+        ? isLowOrOutOfStock(i)
+        : stockFilter === "stale"
+          ? isStaleDevice(i, now)
+          : matchesDataFilter(i, stockFilter));
     return matchesSearch && matchesBranch && matchesStock;
   });
   const outOfStockCount = items.filter((i) => i.stock <= 0).length;
@@ -393,6 +418,18 @@ export default function Products() {
   const toggleStaleFilter = () => {
     setActiveTab("catalogo");
     setStockFilter((f) => (f === "stale" ? "all" : "stale"));
+  };
+
+  const showDevicesHub = hasDeviceActivity({
+    items,
+    purchaseCount: purchases.length + scrapSummary.count,
+    reservationCount: reservations.length,
+  });
+  const extractDevice = scrapDevices.find((d) => d.purchase.id === extractId) ?? null;
+
+  const goToAlert = (target: HubAlertTarget) => {
+    setActiveTab(target.tab);
+    if (target.tab === "catalogo") setStockFilter(target.filter);
   };
 
   // Mientras no se esté buscando ni filtrando por stock, se agrupa por
@@ -448,9 +485,9 @@ export default function Products() {
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [sales]);
 
-  const openCreate = () => { setEditItem(null); setOpen(true); };
+  const openCreate = () => { setEditItem(null); setRegisterAsDevice(false); setOpen(true); };
   const openEdit = (item: Product) => { setEditItem(item); setOpen(true); };
-  const closeDialog = (o: boolean) => { setOpen(o); if (!o) setEditItem(null); };
+  const closeDialog = (o: boolean) => { setOpen(o); if (!o) { setEditItem(null); setRegisterAsDevice(false); } };
   // El diálogo puede crear una categoría nueva al vuelo con su propia
   // instancia de useCategories — esta página tiene la suya aparte, así que
   // sin este reload quedaba desactualizada (el producto recién creado caía
@@ -622,7 +659,7 @@ export default function Products() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="outline" onClick={() => setBuyOpen(true)}>
+          <Button variant="outline" onClick={() => openBuy("reventa")}>
             <HandCoins className="h-4 w-4" />
             Comprar a cliente
           </Button>
@@ -633,7 +670,7 @@ export default function Products() {
         </div>
       </div>
 
-      <div className={cn("grid grid-cols-2 gap-3", showDeviceAging ? "lg:grid-cols-5" : "lg:grid-cols-4")}>
+      <div className={cn("grid grid-cols-2 gap-3", showDeviceAging ? "lg:grid-cols-5" : "lg:grid-cols-4", activeTab === "resumen" && "hidden")}>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Total productos</div>
           <div className="mt-1 text-2xl font-bold">{items.length}</div>
@@ -715,6 +752,7 @@ export default function Products() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid h-auto w-full grid-cols-2 sm:inline-flex sm:h-10 sm:w-auto">
+          {showDevicesHub && <TabsTrigger value="resumen" data-testid="tab-resumen">Resumen</TabsTrigger>}
           <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
           <TabsTrigger value="ventas">
             Ventas recientes{saleGroups.length > 0 ? ` (${saleGroups.length})` : ""}
@@ -723,8 +761,30 @@ export default function Products() {
             Reservas{activeReservations.length > 0 ? ` (${activeReservations.length})` : ""}
           </TabsTrigger>
           <TabsTrigger value="compras">Compras de equipos</TabsTrigger>
+          {showDevicesHub && (
+            <TabsTrigger value="chatarra" data-testid="tab-chatarra">
+              Chatarra{scrapSummary.count > 0 ? ` (${scrapSummary.count})` : ""}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="garantias">Garantías</TabsTrigger>
         </TabsList>
+
+        {showDevicesHub && (
+          <TabsContent value="resumen">
+            <DevicesHub
+              items={items}
+              reservations={reservations}
+              scrapWithoutParts={scrapSummary.withoutParts}
+              canViewStock={canViewStock}
+              isAdmin={isAdmin}
+              onRegisterDevice={openRegisterDevice}
+              onBuyForResale={() => openBuy("reventa")}
+              onBuyForParts={() => openBuy("piezas")}
+              onGoCatalog={() => { setActiveTab("catalogo"); setStockFilter("all"); }}
+              onAlert={goToAlert}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="catalogo" className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -734,25 +794,15 @@ export default function Products() {
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
-            {stockFilter === "low" && (
+            {stockFilter !== "all" && (
               <Badge
                 variant="outline"
                 className="w-fit cursor-pointer gap-1.5 border-secondary/40 text-secondary hover:bg-secondary/10"
+                data-testid="catalog-filter-badge"
                 onClick={() => setStockFilter("all")}
               >
                 <AlertTriangle className="h-3 w-3" />
-                Filtrando: sin / bajo stock
-                <span className="ml-0.5 font-bold">✕</span>
-              </Badge>
-            )}
-            {stockFilter === "stale" && (
-              <Badge
-                variant="outline"
-                className="w-fit cursor-pointer gap-1.5 border-secondary/40 text-secondary hover:bg-secondary/10"
-                onClick={() => setStockFilter("all")}
-              >
-                <AlertTriangle className="h-3 w-3" />
-                Filtrando: equipos detenidos {STALE_DEVICE_DAYS}+ días
+                Filtrando: {CATALOG_FILTER_LABEL[stockFilter]}
                 <span className="ml-0.5 font-bold">✕</span>
               </Badge>
             )}
@@ -783,11 +833,7 @@ export default function Products() {
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
                 <ShoppingBag className="h-8 w-8" />
-                {stockFilter === "low"
-                  ? "Ningún producto con bajo o sin stock."
-                  : stockFilter === "stale"
-                    ? `Ningún equipo detenido ${STALE_DEVICE_DAYS}+ días.`
-                    : "Sin productos todavía."}
+                {stockFilter === "all" ? "Sin productos todavía." : CATALOG_FILTER_EMPTY[stockFilter]}
               </CardContent>
             </Card>
           ) : isSearching || stockFilter !== "all" ? (
@@ -933,6 +979,20 @@ export default function Products() {
           </Card>
         </TabsContent>
 
+        {showDevicesHub && (
+          <TabsContent value="chatarra">
+            <ScrapDevicesPanel
+              devices={scrapDevices}
+              totals={scrapSummary}
+              loaded={scrapLoaded}
+              branchName={(id) => (hasMultipleBranches ? branchNameOf(id) : null)}
+              onBuy={() => openBuy("piezas")}
+              onExtract={(d) => setExtractId(d.purchase.id)}
+              onPrint={handlePrintPurchase}
+            />
+          </TabsContent>
+        )}
+
         <TabsContent value="garantias">
           <WarrantyLookup />
         </TabsContent>
@@ -952,12 +1012,18 @@ export default function Products() {
         </button>
       )}
 
-      <NewProductDialog open={open} onOpenChange={closeDialog} onCreated={handleSaved} editItem={editItem} />
+      <NewProductDialog open={open} onOpenChange={closeDialog} onCreated={handleSaved} editItem={editItem} defaultIsDevice={registerAsDevice} />
       <BuyDeviceDialog
         open={buyOpen}
         onOpenChange={setBuyOpen}
+        initialDestination={buyDestination}
         onRegistered={handlePurchaseRegistered}
         onPrint={handlePrintPurchase}
+      />
+      <ExtractPartDialog
+        device={extractDevice}
+        onOpenChange={(o) => { if (!o) setExtractId(null); }}
+        onSaved={() => void reloadScrap()}
       />
       <ProductPreviewDialog
         product={previewItem}

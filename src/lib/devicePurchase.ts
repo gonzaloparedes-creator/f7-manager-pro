@@ -30,13 +30,13 @@ export interface DevicePurchaseForm {
   accessories: string[];
 }
 
-export type DevicePurchaseKind = "compra" | "canje";
+export type DevicePurchaseKind = "compra" | "canje" | "piezas";
 
 export interface DevicePurchaseRecord {
   id: string;
   receipt_number: string;
   created_at: string;
-  /** "canje" = equipo recibido como parte de pago de una venta. */
+  /** "canje" = recibido como parte de pago de una venta; "piezas" = comprado para desarmar (chatarra). */
   kind?: DevicePurchaseKind;
   sale_group_id?: string | null;
   branch_id: string | null;
@@ -81,16 +81,19 @@ export function emptyDevicePurchaseForm(defaultBranchId: string | null = null): 
 
 // Primer error que impide guardar, o null si el formulario está completo. En un
 // canje el equipo no se paga con plata: no hay medio de pago y el valor es el
-// descuento que se le reconoce al cliente en su compra.
+// descuento que se le reconoce al cliente en su compra. Un equipo para piezas se
+// paga igual que una compra, pero el IMEI es opcional (un equipo muy dañado puede
+// no tenerlo legible) y no tiene batería: nunca se revende.
 export function validateDevicePurchase(form: DevicePurchaseForm, kind: DevicePurchaseKind = "compra"): string | null {
   const canje = kind === "canje";
+  const piezas = kind === "piezas";
   if (!form.device_name.trim()) return "Ingresá el nombre del equipo";
-  if (!form.imei.trim()) return "Ingresá el IMEI (o el número de serie si no tiene)";
+  if (!piezas && !form.imei.trim()) return "Ingresá el IMEI (o el número de serie si no tiene)";
   if (!form.seller_name.trim()) return canje ? "Ingresá el nombre del cliente que entrega el equipo" : "Ingresá el nombre de quien vende";
   if (!form.seller_cedula.trim()) return canje ? "Ingresá la cédula del cliente que entrega el equipo" : "Ingresá la cédula de quien vende";
   if (parseGs(form.purchase_price) <= 0) return canje ? "Ingresá cuánto le reconocés por el equipo" : "Ingresá cuánto le pagás por el equipo";
   if (!canje && !form.payment_method.trim()) return "Elegí con qué medio le pagás";
-  return parseBattery(form.battery_health).error;
+  return piezas ? null : parseBattery(form.battery_health).error;
 }
 
 // Un IMEI tiene 15 dígitos y el último es un dígito de control (Luhn). Si el
@@ -130,20 +133,25 @@ export function summarizeChecklist(items: PurchaseChecklistItem[]) {
   return { okCount: okLabels.length, failCount: failed.length, failed, okLabels };
 }
 
-export function buildDevicePurchaseParams(form: DevicePurchaseForm, checklistOrder: string[]) {
+export function buildDevicePurchaseParams(
+  form: DevicePurchaseForm,
+  checklistOrder: string[],
+  kind: DevicePurchaseKind = "compra"
+) {
+  const piezas = kind === "piezas";
   return {
     device_name: form.device_name.trim(),
     imei: form.imei.trim(),
-    battery_health: parseBattery(form.battery_health).value,
+    battery_health: piezas ? null : parseBattery(form.battery_health).value,
     seller_name: form.seller_name.trim(),
     seller_cedula: form.seller_cedula.trim(),
     seller_phone: form.seller_phone.trim(),
     purchase_price: parseGs(form.purchase_price),
-    selling_price: parseGs(form.selling_price),
+    selling_price: piezas ? 0 : parseGs(form.selling_price),
     payment_method: form.payment_method.trim(),
     reason: form.reason.trim(),
     notes: form.notes.trim(),
-    category_id: form.category_id,
+    category_id: piezas ? null : form.category_id,
     branch_id: form.branch_id,
     checklist: checklistToList(form.checklist, checklistOrder),
     accessories: form.accessories,

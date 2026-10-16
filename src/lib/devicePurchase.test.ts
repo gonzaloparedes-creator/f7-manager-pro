@@ -53,6 +53,13 @@ describe("validateDevicePurchase", () => {
     expect(validateDevicePurchase(complete({ battery_health: "150" }))).toMatch(/entre 0 y 100/);
     expect(validateDevicePurchase(complete({ battery_health: "abc" }), "canje")).toMatch(/entre 0 y 100/);
   });
+  it("un equipo para piezas puede no tener IMEI, pero se paga como una compra", () => {
+    expect(validateDevicePurchase(complete({ imei: "" }), "piezas")).toBeNull();
+    expect(validateDevicePurchase(complete({ battery_health: "abc" }), "piezas")).toBeNull();
+    expect(validateDevicePurchase(complete({ payment_method: "" }), "piezas")).toMatch(/medio/);
+    expect(validateDevicePurchase(complete({ seller_cedula: "" }), "piezas")).toMatch(/cédula/);
+    expect(validateDevicePurchase(complete({ purchase_price: "0" }), "piezas")).toMatch(/pagás/);
+  });
   it("en un canje no se pide medio de pago pero sí el valor reconocido", () => {
     expect(validateDevicePurchase(complete({ payment_method: "" }), "canje")).toBeNull();
     expect(validateDevicePurchase(complete({ purchase_price: "" }), "canje")).toMatch(/reconocés/);
@@ -121,6 +128,17 @@ describe("buildDevicePurchaseParams", () => {
       accessories: ["Cargador"],
       battery_health: null,
     });
+  });
+  it("un equipo para piezas no lleva batería, precio de venta ni categoría", () => {
+    const params = buildDevicePurchaseParams(
+      complete({ battery_health: "80", selling_price: "1.000.000", category_id: "cat-1" }),
+      [],
+      "piezas"
+    );
+    expect(params.battery_health).toBeNull();
+    expect(params.selling_price).toBe(0);
+    expect(params.category_id).toBeNull();
+    expect(params.purchase_price).toBe(2500000);
   });
   it("manda la batería como número, o null si no se midió", () => {
     expect(buildDevicePurchaseParams(complete({ battery_health: " 87% " }), []).battery_health).toBe(87);
