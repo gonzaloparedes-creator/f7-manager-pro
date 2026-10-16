@@ -1,10 +1,12 @@
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingBag, ShoppingCart, AlertTriangle, EyeOff, Pencil, Trash2, X } from "lucide-react";
+import { ShoppingBag, ShoppingCart, AlertTriangle, Eye, EyeOff, Pencil, Trash2, X } from "lucide-react";
 import QuantityStepper from "@/components/QuantityStepper";
 import { formatPYG } from "@/lib/orders";
 import { isLowBattery, originLabel } from "@/lib/deviceSpecs";
+import { toMinPrice } from "@/lib/devicePricing";
 import type { Product } from "@/pages/Products";
 import type { CartLine } from "@/components/CartSheet";
 
@@ -35,11 +37,16 @@ export default function ProductPreviewDialog({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [showMinPrice, setShowMinPrice] = useState(false);
+  const productId = product?.id;
+  useEffect(() => { setShowMinPrice(false); }, [productId]);
+
   if (!product) return null;
   const outOfStock = product.stock <= 0;
   const lowStock = canViewStock && !outOfStock && product.stock <= product.min_stock_alert;
   const batteryText = product.battery_health != null ? `${product.battery_health}%` : null;
   const originText = originLabel(product.origin);
+  const minPrice = product.is_device ? toMinPrice(product.min_price) : null;
 
   return (
     <Dialog open={!!product} onOpenChange={onOpenChange}>
@@ -77,7 +84,7 @@ export default function ProductPreviewDialog({
             </div>
           )}
 
-          {product.is_device && (product.imei || batteryText || originText || product.repair_details || product.notes) && (
+          {product.is_device && (product.imei || batteryText || originText || minPrice !== null || product.repair_details || product.notes) && (
             <div className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
               {product.imei && (
                 <div><span className="text-muted-foreground">IMEI: </span><span className="font-medium">{product.imei}</span></div>
@@ -90,6 +97,23 @@ export default function ProductPreviewDialog({
               )}
               {originText && (
                 <div data-testid="preview-origin"><span className="text-muted-foreground">Origen: </span>{originText}</div>
+              )}
+              {minPrice !== null && (
+                <div className="flex items-center gap-1.5" data-testid="preview-min-price">
+                  <span className="text-muted-foreground">Mínimo de negociación: </span>
+                  <span className="font-medium" data-testid="preview-min-price-value">
+                    {showMinPrice ? formatPYG(minPrice) : "Gs. ••••••"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMinPrice((v) => !v)}
+                    aria-label={showMinPrice ? "Ocultar el mínimo de negociación" : "Ver el mínimo de negociación"}
+                    aria-pressed={showMinPrice}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {showMinPrice ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               )}
               {product.repair_details && (
                 <div><span className="text-muted-foreground">Repuestos: </span>{product.repair_details}</div>

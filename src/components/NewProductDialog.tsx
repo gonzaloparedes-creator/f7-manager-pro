@@ -18,6 +18,7 @@ import { CameraCapture } from "@/components/CameraCapture";
 import { sanitizeFilenameForStorage } from "@/lib/utils";
 import { formatPYG } from "@/lib/orders";
 import { DEVICE_ORIGINS, DEVICE_ORIGIN_LABELS, isDeviceOrigin, parseBattery, type DeviceOrigin } from "@/lib/deviceSpecs";
+import { parseMinPrice } from "@/lib/devicePricing";
 
 const NO_ORIGIN = "__none__";
 const CREATE_CATEGORY = "__create_category__";
@@ -43,6 +44,7 @@ export interface EditableProduct {
   notes: string | null;
   battery_health?: number | null;
   origin?: string | null;
+  min_price?: number | null;
 }
 
 export default function NewProductDialog({
@@ -71,6 +73,7 @@ export default function NewProductDialog({
   const [minAlert, setMinAlert] = useState("0");
   const [cost, setCost] = useState("0");
   const [price, setPrice] = useState("0");
+  const [minPrice, setMinPrice] = useState("");
   const [isDevice, setIsDevice] = useState(false);
   const [imei, setImei] = useState("");
   const [battery, setBattery] = useState("");
@@ -104,7 +107,7 @@ export default function NewProductDialog({
 
   const reset = () => {
     setName(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
-    setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setFile(null); setPreview(null);
+    setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setMinPrice(""); setFile(null); setPreview(null);
     setIsDevice(false); setImei(""); setBattery(""); setOrigin(null); setPurchaseCost("0"); setRepairCost("0"); setRepairDetails(""); setNotes("");
   };
 
@@ -129,6 +132,7 @@ export default function NewProductDialog({
       setMinAlert(String(editItem.min_stock_alert));
       setCost(String(editItem.cost_price));
       setPrice(String(editItem.selling_price));
+      setMinPrice(editItem.min_price != null ? String(editItem.min_price) : "");
       setIsDevice(!!editItem.is_device);
       setImei(editItem.imei ?? "");
       setBattery(editItem.battery_health != null ? String(editItem.battery_health) : "");
@@ -182,12 +186,15 @@ export default function NewProductDialog({
 
   const deviceTotalCost = (parseFloat(purchaseCost) || 0) + (parseFloat(repairCost) || 0);
   const deviceProfit = (parseFloat(price) || 0) - deviceTotalCost;
+  const parsedMinPrice = parseMinPrice(minPrice, parseFloat(price) || 0);
+  const minPriceProfit = parsedMinPrice.value !== null ? parsedMinPrice.value - deviceTotalCost : null;
 
   const submit = async () => {
     if (!user || !companyId) return;
     if (!name.trim()) { toast.error("Ingresa un nombre"); return; }
     const parsedBattery = parseBattery(battery);
     if (isDevice && parsedBattery.error) { toast.error(parsedBattery.error); return; }
+    if (isDevice && parsedMinPrice.error) { toast.error(parsedMinPrice.error); return; }
     setLoading(true);
     try {
       let image_url: string | null = editItem?.image_url ?? null;
@@ -217,6 +224,7 @@ export default function NewProductDialog({
         min_stock_alert: isDevice ? 0 : parseInt(minAlert) || 0,
         cost_price: isDevice ? deviceTotalCost : parseFloat(cost) || 0,
         selling_price: parseFloat(price) || 0,
+        min_price: isDevice ? parsedMinPrice.value : null,
         image_url,
         is_device: isDevice,
         imei: isDevice ? imei.trim() || null : null,
@@ -440,6 +448,25 @@ export default function NewProductDialog({
                 <Label htmlFor="product-price">Precio venta (Gs.)</Label>
                 <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="product-min-price">Mínimo de negociación (Gs., opcional)</Label>
+                <Input
+                  id="product-min-price"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  placeholder="Hasta cuánto podés bajar"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Es solo para vos: no aparece en la lista de WhatsApp, el ticket ni los comprobantes, y en el detalle del equipo se ve tapado.
+                </p>
+                {parsedMinPrice.error && minPrice.trim() !== "" && (
+                  <p className="text-xs text-destructive" data-testid="min-price-error">{parsedMinPrice.error}</p>
+                )}
+              </div>
               <div className="grid gap-1 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Costo total (compra + repuestos)</span>
@@ -451,6 +478,14 @@ export default function NewProductDialog({
                     {formatPYG(deviceProfit)}
                   </span>
                 </div>
+                {minPriceProfit !== null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Ganancia si vendés al mínimo</span>
+                    <span id="device-min-profit" className={minPriceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
+                      {formatPYG(minPriceProfit)}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="product-notes">Notas (opcional)</Label>

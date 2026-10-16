@@ -20,6 +20,8 @@ import { useCashRegisterGate } from "@/hooks/useCashRegisterGate";
 import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice";
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
 import { amountToCollect, buildTradeInSaleParams, validateTradeInValue, type TradeInDraft } from "@/lib/tradeIn";
+import { belowMinPriceNames } from "@/lib/devicePricing";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type DiscountUnit = "percent" | "amount";
 
@@ -39,7 +41,7 @@ export type CompletedCartSale = {
   trade_in?: { device_name: string; value: number; record?: DevicePurchaseRecord } | null;
 };
 
-type CartProduct = { id: string; name: string; stock: number; cost_price: number; is_device?: boolean };
+type CartProduct = { id: string; name: string; stock: number; cost_price: number; is_device?: boolean; min_price?: number | null };
 
 export default function CartSheet({
   open,
@@ -77,6 +79,7 @@ export default function CartSheet({
   const [warrantyDays, setWarrantyDays] = useState(DEFAULT_DEVICE_WARRANTY_DAYS);
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
+  const [belowMinNames, setBelowMinNames] = useState<string[] | null>(null);
 
   const lines = Object.entries(cart)
     .map(([id, line]) => ({ id, product: products.find((p) => p.id === id), ...line }))
@@ -134,15 +137,28 @@ export default function CartSheet({
     setWarrantyDays(DEFAULT_DEVICE_WARRANTY_DAYS);
     setBuyerName("");
     setBuyerPhone("");
+    setBelowMinNames(null);
   };
 
-  const checkout = async () => {
+  // Precio unitario con el descuento ya repartido: es lo que realmente se cobra y se registra.
+  const finalPrice = (l: (typeof lines)[number]) =>
+    discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice;
+
+  const checkout = async (minPriceConfirmed = false) => {
     if (!user || !companyId) return;
     if (lines.length === 0) return;
     const overStock = lines.find((l) => l.quantity > l.product.stock);
     if (overStock) {
       toast.error(`Solo hay ${overStock.product.stock} de "${overStock.product.name}" en stock`);
       return;
+    }
+    // El mínimo de negociación es un aviso, no un bloqueo: se pregunta una vez
+    // y sin decir el monto, para no revelarlo si el cliente está mirando la pantalla.
+    if (!minPriceConfirmed) {
+      const below = belowMinPriceNames(
+        lines.filter((l) => l.product.is_device).map((l) => ({ name: l.product.name, unitPrice: finalPrice(l), minPrice: l.product.min_price })),
+      );
+      if (below.length > 0) { setBelowMinNames(below); return; }
     }
     setLoading(true);
     try {
@@ -151,11 +167,9 @@ export default function CartSheet({
         return;
       }
       const saleGroupId = crypto.randomUUID();
-      // El descuento queda "adentro" del precio unitario vendido, así
-      // Reportes (que suma quantity*unit_price) ya refleja la venta real
+      // El descuento queda "adentro" del precio unitario vendido (finalPrice),
+      // así Reportes (que suma quantity*unit_price) ya refleja la venta real
       // sin tocar nada del lado del cálculo de ingresos/ganancia.
-      const finalPrice = (l: (typeof lines)[number]) =>
-        discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice;
 
       // La garantía y los datos del comprador solo aplican a los equipos: el
       // servidor los descarta en cualquier otra línea.
@@ -543,7 +557,7 @@ export default function CartSheet({
                 </div>
                 <SheetFooter className="flex-col gap-2 sm:flex-col sm:justify-start sm:space-x-0">
                   {cashGate.blocked && <CashRegisterRequiredNotice what="vender" />}
-                  <Button onClick={checkout} disabled={loading || cashGate.blocked || !!tradeInProblem} size="lg" className="w-full">
+                  <Button onClick={() => checkout()} disabled={loading || cashGate.blocked || !!tradeInProblem} size="lg" className="w-full">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Confirmar venta
                   </Button>
@@ -560,6 +574,14 @@ export default function CartSheet({
         maxValue={total}
         initialForm={tradeIn?.form ?? null}
         onCollect={setTradeIn}
+      />
+      <ConfirmDialog
+        open={belowMinNames !== null}
+        onOpenChange={(o) => { if (!o) setBelowMinNames(null); }}
+        title="Precio por debajo de tu mínimo"
+        description={`Estás vendiendo por debajo del mínimo de negociación que cargaste: ${(belowMinNames ?? []).join(", ")}. ¿Querés vender igual?`}
+        confirmLabel="Vender igual"
+        onConfirm={() => { setBelowMinNames(null); void checkout(true); }}
       />
     </Sheet>
   );

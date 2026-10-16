@@ -54,6 +54,7 @@ export type Product = {
   notes: string | null;
   battery_health?: number | null;
   origin?: string | null;
+  min_price?: number | null;
   created_at?: string;
 };
 
@@ -204,7 +205,7 @@ export default function Products() {
     const [{ data: productsData, error: pErr }, { data: salesData, error: sErr }] = await Promise.all([
       (supabase as any)
         .from("inventory_items")
-        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, battery_health, origin, purchase_cost, repair_cost, repair_details, notes, created_at")
+        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, battery_health, origin, min_price, purchase_cost, repair_cost, repair_details, notes, created_at")
         .eq("company_id", companyId)
         .eq("is_for_sale", true)
         .order("created_at", { ascending: false }),

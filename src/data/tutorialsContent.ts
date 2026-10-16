@@ -411,6 +411,15 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "precio-minimo",
+        title: "Mínimo de negociación de cada equipo",
+        body: [
+          "En \"Nuevo Producto\" (o en \"Editar\"), cuando el producto es un equipo, el campo \"Mínimo de negociación\" guarda hasta cuánto estás dispuesto a bajar el precio de ese celular. Es opcional: vacío (o 0) significa que no definiste un mínimo. No puede ser mayor que el precio de venta, y debajo del formulario ves cuánta ganancia te queda si lo vendés justo en el mínimo (en rojo si quedás por debajo del costo).",
+          "El mínimo es un dato interno. No aparece en la tarjeta del equipo, ni en la lista de precios para WhatsApp, ni en el ticket, ni en los comprobantes. Al tocar la tarjeta se ve tapado (\"Gs. ••••••\") y solo se muestra cuando tocás el ojito, y se vuelve a tapar al cerrar el detalle o cambiar de equipo, así podés mostrarle el equipo al cliente sin que lo vea.",
+          "Al confirmar una venta, si algún equipo se vende por debajo de su mínimo (contando el descuento del carrito), el sistema te pregunta antes de registrar: \"¿Querés vender igual?\". El aviso nombra el equipo pero no dice el monto del mínimo. Es un aviso, no un bloqueo: la decisión final es de quien vende. Ojo: quienes pueden editar productos también pueden ver y cambiar el mínimo, igual que el costo.",
+        ],
+      },
+      {
         id: "equipos-detenidos",
         title: "Equipos detenidos y días en stock",
         body: [
@@ -456,7 +465,7 @@ export const tutorialCategories: TutorialCategory[] = [
         body: [
           "En la pestaña \"Catálogo\", el botón \"Copiar lista para WhatsApp\" arma un texto con tus productos y sus precios de venta, listo para pegar en un chat, un grupo o un estado. Los productos van agrupados por categoría y ordenados por nombre, con el nombre del negocio y la fecha arriba.",
           "La lista respeta lo que estás viendo: si buscaste algo, filtraste por sucursal o tocaste la tarjeta \"Equipos detenidos 30+ días\" para armar una lista de ofertas, se copia solo eso. Para copiar todo el catálogo, dejá el buscador vacío y las sucursales en \"Todas\".",
-          "Quedan afuera los productos agotados y los que tienen precio de venta Gs. 0; al copiar, el aviso te cuenta cuántos fueron para que puedas corregirlos. A los equipos que tienen batería cargada se les suma el dato (ej: \"iPhone 13 128GB · Batería 89%\"). La lista nunca incluye costos, IMEI, origen del equipo ni cuántas unidades tenés en stock. Una vez pegada en WhatsApp podés editar el texto como cualquier mensaje.",
+          "Quedan afuera los productos agotados y los que tienen precio de venta Gs. 0; al copiar, el aviso te cuenta cuántos fueron para que puedas corregirlos. A los equipos que tienen batería cargada se les suma el dato (ej: \"iPhone 13 128GB · Batería 89%\"). La lista nunca incluye costos, IMEI, origen del equipo, el mínimo de negociación ni cuántas unidades tenés en stock. Una vez pegada en WhatsApp podés editar el texto como cualquier mensaje.",
         ],
       },
       {
