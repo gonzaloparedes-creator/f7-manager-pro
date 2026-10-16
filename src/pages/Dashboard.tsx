@@ -379,12 +379,12 @@ export default function Dashboard() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold">{o.customer_name}</div>
-                      <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Smartphone className="h-3 w-3 shrink-0" />
+                        <span className="shrink-0 whitespace-nowrap font-mono text-[11px]">{o.order_number}</span>
                         <span className="truncate">
-                          {o.device_type}
+                          · {o.device_type}
                           {(o.marca || o.modelo) && ` · ${[o.marca, o.modelo].filter(Boolean).join(" ")}`}
-                          {" · "}{o.order_number}
                         </span>
                       </div>
                       {o.imei && (

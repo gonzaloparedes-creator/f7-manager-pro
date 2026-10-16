@@ -1249,7 +1249,7 @@ export default function OrderDetail() {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Saldo</span>
-                            <span className="font-bold text-primary">{formatPYG(sal)}</span>
+                            <span className={cn("font-bold", sal > 0 ? "text-secondary" : "text-foreground")}>{formatPYG(sal)}</span>
                           </div>
                         </div>
                       );
@@ -1324,7 +1324,7 @@ export default function OrderDetail() {
                       </div>
                       <div className="flex items-center justify-between border-t border-border pt-2">
                         <span className="text-sm font-semibold">Saldo</span>
-                        <span className="text-base font-bold text-primary">{formatPYG(saldo)}</span>
+                        <span className={cn("text-base font-bold", saldo > 0 ? "text-secondary" : "text-foreground")}>{formatPYG(saldo)}</span>
                       </div>
                     </div>
 
@@ -1668,12 +1668,6 @@ export default function OrderDetail() {
 
         <div className="space-y-6">
           <Card>
-            <CardContent className="p-4">
-              <OrderQRCode orderCode={order.order_number} trackingToken={order.tracking_token} />
-            </CardContent>
-          </Card>
-
-          <Card>
             <CardContent className="space-y-4 p-4">
               <div className="text-sm font-semibold">Historial</div>
               <ol className="space-y-4">
@@ -1710,6 +1704,12 @@ export default function OrderDetail() {
                   </li>
                 ))}
               </ol>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <OrderQRCode orderCode={order.order_number} trackingToken={order.tracking_token} />
             </CardContent>
           </Card>
         </div>
