@@ -19,6 +19,9 @@ import { sanitizeFilenameForStorage } from "@/lib/utils";
 import { formatPYG } from "@/lib/orders";
 import { DEVICE_ORIGINS, DEVICE_ORIGIN_LABELS, isDeviceOrigin, parseBattery, type DeviceOrigin } from "@/lib/deviceSpecs";
 import { parseMinPrice } from "@/lib/devicePricing";
+import { isDuplicateBarcodeError } from "@/lib/barcode";
+import { checkBarcodeForSave } from "@/lib/barcodeRemote";
+import BarcodeField from "@/components/BarcodeField";
 
 const NO_ORIGIN = "__none__";
 const CREATE_CATEGORY = "__create_category__";
@@ -45,6 +48,7 @@ export interface EditableProduct {
   battery_health?: number | null;
   origin?: string | null;
   min_price?: number | null;
+  barcode?: string | null;
 }
 
 export default function NewProductDialog({
@@ -67,6 +71,7 @@ export default function NewProductDialog({
   const { categories, subcategoriesFor, reload: reloadCategories } = useCategories();
   const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
   const [name, setName] = useState("");
+  const [barcode, setBarcode] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -109,7 +114,7 @@ export default function NewProductDialog({
   const [savingTaxonomy, setSavingTaxonomy] = useState(false);
 
   const reset = () => {
-    setName(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
+    setName(""); setBarcode(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
     setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setMinPrice(""); setFile(null); setPreview(null);
     setIsDevice(false); setImei(""); setBattery(""); setOrigin(null); setPurchaseCost("0"); setRepairCost("0"); setRepairDetails(""); setNotes("");
   };
@@ -128,6 +133,7 @@ export default function NewProductDialog({
     if (!open) return;
     if (editItem) {
       setName(editItem.name);
+      setBarcode(editItem.barcode ?? "");
       setCategoryId(editItem.category_id);
       setSubcategoryId(editItem.subcategory_id);
       setBranchId(editItem.branch_id);
@@ -202,6 +208,9 @@ export default function NewProductDialog({
     if (isDevice && parsedMinPrice.error) { toast.error(parsedMinPrice.error); return; }
     setLoading(true);
     try {
+      const checkedBarcode = await checkBarcodeForSave(companyId, barcode, editItem?.id);
+      if (checkedBarcode.error) { toast.error(checkedBarcode.error); return; }
+
       let image_url: string | null = editItem?.image_url ?? null;
       if (file) {
         setCompressing(true);
@@ -223,6 +232,7 @@ export default function NewProductDialog({
       const payload = {
         branch_id: effectiveBranchId,
         name: name.trim(),
+        barcode: checkedBarcode.value,
         category_id: categoryId,
         subcategory_id: subcategoryId,
         stock: parseInt(stock) || 0,
@@ -271,7 +281,7 @@ export default function NewProductDialog({
       onOpenChange(false);
       onCreated?.();
     } catch (e: any) {
-      toast.error(e.message || `Error al ${editItem ? "actualizar" : "crear"} el producto`);
+      toast.error(isDuplicateBarcodeError(e) ? "Ese código de barras ya lo tiene otro producto." : e.message || `Error al ${editItem ? "actualizar" : "crear"} el producto`);
     } finally {
       setLoading(false);
       setCompressing(false);
@@ -302,6 +312,8 @@ export default function NewProductDialog({
             <Label htmlFor="product-name">Nombre</Label>
             <Input id="product-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={isDevice ? "Ej: iPhone 13 128GB negro" : "Ej: Funda iPhone 13 transparente"} />
           </div>
+
+          <BarcodeField id="product-barcode" value={barcode} onChange={setBarcode} companyId={companyId} />
 
           <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5">
             <div className="min-w-0">

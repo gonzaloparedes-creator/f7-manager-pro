@@ -14,6 +14,9 @@ import imageCompression from "browser-image-compression";
 import { Loader2, FolderPlus, Camera, Upload, X } from "lucide-react";
 import { CameraCapture } from "@/components/CameraCapture";
 import { sanitizeFilenameForStorage } from "@/lib/utils";
+import { isDuplicateBarcodeError } from "@/lib/barcode";
+import { checkBarcodeForSave } from "@/lib/barcodeRemote";
+import BarcodeField from "@/components/BarcodeField";
 
 const CREATE_CATEGORY = "__create_category__";
 const CREATE_SUBCATEGORY = "__create_subcategory__";
@@ -30,6 +33,7 @@ export interface EditableInventoryItem {
   cost_price: number;
   selling_price: number;
   image_url: string | null;
+  barcode?: string | null;
 }
 
 export default function NewInventoryItemDialog({
@@ -49,6 +53,7 @@ export default function NewInventoryItemDialog({
   const { categories, subcategoriesFor, reload: reloadCategories } = useCategories();
   const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
   const [name, setName] = useState("");
+  const [barcode, setBarcode] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -82,7 +87,7 @@ export default function NewInventoryItemDialog({
   const [savingTaxonomy, setSavingTaxonomy] = useState(false);
 
   const reset = () => {
-    setName(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
+    setName(""); setBarcode(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
     setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setFile(null); setPreview(null);
   };
 
@@ -91,6 +96,7 @@ export default function NewInventoryItemDialog({
     if (!open) return;
     if (editItem) {
       setName(editItem.name);
+      setBarcode(editItem.barcode ?? "");
       setCategoryId(editItem.category_id);
       setSubcategoryId(editItem.subcategory_id);
       setBranchId(editItem.branch_id);
@@ -146,6 +152,9 @@ export default function NewInventoryItemDialog({
     if (!name.trim()) { toast.error("Ingresa un nombre"); return; }
     setLoading(true);
     try {
+      const checkedBarcode = await checkBarcodeForSave(companyId, barcode, editItem?.id);
+      if (checkedBarcode.error) { toast.error(checkedBarcode.error); return; }
+
       let image_url: string | null = editItem?.image_url ?? null;
       if (file) {
         setCompressing(true);
@@ -167,6 +176,7 @@ export default function NewInventoryItemDialog({
       const payload = {
         branch_id: effectiveBranchId,
         name: name.trim(),
+        barcode: checkedBarcode.value,
         category_id: categoryId,
         subcategory_id: subcategoryId,
         stock: parseInt(stock) || 0,
@@ -193,7 +203,7 @@ export default function NewInventoryItemDialog({
       onOpenChange(false);
       onCreated?.();
     } catch (e: any) {
-      toast.error(e.message || `Error al ${editItem ? "actualizar" : "crear"} el artículo`);
+      toast.error(isDuplicateBarcodeError(e) ? "Ese código de barras ya lo tiene otro artículo." : e.message || `Error al ${editItem ? "actualizar" : "crear"} el artículo`);
     } finally {
       setLoading(false);
       setCompressing(false);
@@ -209,7 +219,7 @@ export default function NewInventoryItemDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editItem ? "Editar Artículo" : "Nuevo Artículo"}</DialogTitle>
           <DialogDescription>
@@ -224,6 +234,8 @@ export default function NewInventoryItemDialog({
             <Label>Nombre</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Pantalla iPhone 12" />
           </div>
+
+          <BarcodeField id="inventory-barcode" value={barcode} onChange={setBarcode} companyId={companyId} />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">

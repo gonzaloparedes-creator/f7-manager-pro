@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Package, AlertTriangle, Trash2, EyeOff, Pencil } from "lucide-react";
+import { Plus, Package, AlertTriangle, Trash2, EyeOff, Pencil, Tag } from "lucide-react";
 import NewInventoryItemDialog from "@/components/NewInventoryItemDialog";
+import PrintLabelDialog from "@/components/PrintLabelDialog";
+import { matchesBarcodeQuery } from "@/lib/barcode";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { useCompany } from "@/hooks/useCompany";
@@ -32,6 +34,7 @@ type Item = {
   cost_price: number;
   selling_price: number;
   image_url: string | null;
+  barcode: string | null;
 };
 
 const ALL_CATEGORIES = "__all__";
@@ -52,6 +55,7 @@ export default function Inventory() {
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Item | null>(null);
+  const [labelItem, setLabelItem] = useState<Item | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
@@ -61,7 +65,7 @@ export default function Inventory() {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from("inventory_items")
-      .select("id,name,category_id,subcategory_id,branch_id,stock,min_stock_alert,cost_price,selling_price,image_url")
+      .select("id,name,category_id,subcategory_id,branch_id,stock,min_stock_alert,cost_price,selling_price,image_url,barcode")
       .eq("company_id", companyId)
       .eq("is_for_repair", true)
       .order("created_at", { ascending: false });
@@ -91,7 +95,8 @@ export default function Inventory() {
     const matchesSearch = !q ||
       i.name.toLowerCase().includes(q) ||
       (categoryName(i.category_id) ?? "").toLowerCase().includes(q) ||
-      (subcategoryName(i.subcategory_id) ?? "").toLowerCase().includes(q);
+      (subcategoryName(i.subcategory_id) ?? "").toLowerCase().includes(q) ||
+      matchesBarcodeQuery(i, search);
     const matchesCategory = categoryFilter === ALL_CATEGORIES || i.category_id === categoryFilter;
     const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
     return matchesSearch && matchesCategory && matchesBranch;
@@ -106,6 +111,15 @@ export default function Inventory() {
   // instancia de useCategories — esta página tiene la suya aparte, así que
   // sin este reload quedaba desactualizada hasta refrescar a mano.
   const handleSaved = () => { load(); reloadCategories(); };
+  const handleLabelAssigned = (id: string, code: string) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, barcode: code } : i)));
+    setLabelItem((p) => (p && p.id === id ? { ...p, barcode: code } : p));
+  };
+  // Un lector USB/Bluetooth escribe el código en el buscador y manda Enter.
+  const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const code = search.trim();
+    if (e.key === "Enter" && code && !loading && filtered.length === 0) toast.error(`No hay ningún artículo con el código ${code}.`);
+  };
 
   if (!planLoading && isStarter) return <Navigate to="/dashboard" replace />;
 
@@ -152,9 +166,10 @@ export default function Inventory() {
       <Card className="p-4">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Input
-            placeholder="Buscar por nombre o categoría..."
+            placeholder="Buscar por nombre, categoría o código..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchEnter}
             className="max-w-sm"
           />
           {categories.length > 0 && (
@@ -206,6 +221,15 @@ export default function Inventory() {
                               size="icon"
                               variant="ghost"
                               className="h-9 w-9"
+                              onClick={() => setLabelItem(i)}
+                              aria-label={`Etiqueta de ${i.name}`}
+                            >
+                              <Tag className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-9 w-9"
                               onClick={() => openEdit(i)}
                               aria-label={`Editar ${i.name}`}
                             >
@@ -237,6 +261,7 @@ export default function Inventory() {
                             <span className="text-xs text-muted-foreground">· {branchName(i.branch_id)}</span>
                           )}
                         </div>
+                        {i.barcode && <div className="mt-1 font-mono text-xs text-muted-foreground">{i.barcode}</div>}
                       </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2 text-sm">
@@ -294,7 +319,10 @@ export default function Inventory() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="font-medium text-foreground">{i.name}</TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          {i.name}
+                          {i.barcode && <div className="font-mono text-xs font-normal text-muted-foreground">{i.barcode}</div>}
+                        </TableCell>
                         <TableCell>
                           {cat ? (
                             <div className="flex flex-wrap items-center gap-1">
@@ -326,6 +354,9 @@ export default function Inventory() {
                         <TableCell className="text-right">{formatPYG(i.selling_price)}</TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end">
+                            <Button size="icon" variant="ghost" onClick={() => setLabelItem(i)} aria-label={`Etiqueta de ${i.name}`}>
+                              <Tag className="h-4 w-4 text-muted-foreground" />
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(i)} aria-label={`Editar ${i.name}`}>
                               <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
@@ -347,6 +378,11 @@ export default function Inventory() {
       </Card>
 
       <NewInventoryItemDialog open={open} onOpenChange={closeDialog} onCreated={handleSaved} editItem={editItem} />
+      <PrintLabelDialog
+        item={labelItem}
+        onOpenChange={(o) => { if (!o) setLabelItem(null); }}
+        onBarcodeAssigned={handleLabelAssigned}
+      />
 
       <ConfirmDialog
         open={!!pendingDelete}

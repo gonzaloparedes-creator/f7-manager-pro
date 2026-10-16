@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingBag, ShoppingCart, AlertTriangle, CalendarClock, Eye, EyeOff, FileText, Pencil, Trash2, X } from "lucide-react";
+import { ShoppingBag, ShoppingCart, AlertTriangle, CalendarClock, Eye, EyeOff, FileText, Pencil, Tag, Trash2, X } from "lucide-react";
 import QuantityStepper from "@/components/QuantityStepper";
 import { formatPYG } from "@/lib/orders";
 import { balanceDue, depositOf, displayDate, expiryText, type DeviceReservation } from "@/lib/reservations";
@@ -25,6 +25,7 @@ export default function ProductPreviewDialog({
   onReserve,
   onSellReservation,
   onDossier,
+  onLabel,
   onUpdateQty,
   onEdit,
   onDelete,
@@ -43,6 +44,7 @@ export default function ProductPreviewDialog({
   onReserve?: () => void;
   onSellReservation?: () => void;
   onDossier?: () => void;
+  onLabel?: () => void;
   onUpdateQty: (qty: number) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -85,6 +87,12 @@ export default function ProductPreviewDialog({
             <DialogDescription className="sr-only">Detalle del producto</DialogDescription>
           </DialogHeader>
           <div className="text-2xl font-bold text-primary">{formatPYG(product.selling_price)}</div>
+          {product.barcode && (
+            <div className="text-sm" data-testid="preview-barcode">
+              <span className="text-muted-foreground">Código: </span>
+              <span className="font-mono font-medium">{product.barcode}</span>
+            </div>
+          )}
 
           {(categoryLabel || subcategoryLabel || branchLabel) && (
             <div className="flex flex-wrap items-center gap-1.5">
@@ -202,6 +210,11 @@ export default function ProductPreviewDialog({
           {product.is_device && onDossier && (
             <Button variant="outline" className="gap-2" onClick={onDossier} data-testid="preview-dossier">
               <FileText className="h-4 w-4" /> Dossier
+            </Button>
+          )}
+          {onLabel && (
+            <Button variant="outline" className="gap-2" onClick={onLabel} data-testid="preview-label">
+              <Tag className="h-4 w-4" /> Etiqueta
             </Button>
           )}
           {canDelete && (

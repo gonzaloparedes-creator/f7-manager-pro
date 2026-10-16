@@ -37,6 +37,8 @@ import { buildPriceList } from "@/lib/priceList";
 import { batteryLabel, isLowBattery } from "@/lib/deviceSpecs";
 import { STALE_DEVICE_DAYS, daysInStock, daysInStockLabel, hasDevicesInStock, isStaleDevice, staleDeviceSummary } from "@/lib/deviceStock";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
+import PrintLabelDialog from "@/components/PrintLabelDialog";
+import { findByBarcode, matchesBarcodeQuery } from "@/lib/barcode";
 import DeviceDossierDialog from "@/components/DeviceDossierDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
@@ -76,6 +78,7 @@ export type Product = {
   battery_health?: number | null;
   origin?: string | null;
   min_price?: number | null;
+  barcode?: string | null;
   created_at?: string;
 };
 
@@ -136,6 +139,7 @@ export default function Products() {
   const [editItem, setEditItem] = useState<Product | null>(null);
   const [previewItem, setPreviewItem] = useState<Product | null>(null);
   const [dossierItem, setDossierItem] = useState<Product | null>(null);
+  const [labelItem, setLabelItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [stockFilter, setStockFilter] = useState<CatalogFilter>("all");
@@ -255,7 +259,7 @@ export default function Products() {
     const [{ data: productsData, error: pErr }, { data: salesData, error: sErr }] = await Promise.all([
       (supabase as any)
         .from("inventory_items")
-        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, battery_health, origin, min_price, purchase_cost, repair_cost, repair_details, notes, created_at")
+        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, battery_health, origin, min_price, purchase_cost, repair_cost, repair_details, notes, barcode, created_at")
         .eq("company_id", companyId)
         .eq("is_for_sale", true)
         .order("created_at", { ascending: false }),
@@ -349,6 +353,34 @@ export default function Products() {
     });
   };
 
+  // Un lector USB/Bluetooth "tipea" el código en el buscador y cierra con Enter:
+  // si es exactamente el de un producto, va directo al carrito.
+  const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const code = search.trim();
+    if (!code || loading) return;
+    const hit = findByBarcode(items, code);
+    if (!hit) {
+      if (filtered.length === 0) toast.error(`No hay ningún producto con el código ${code}.`);
+      return;
+    }
+    e.preventDefault();
+    setSearch("");
+    if (activeByItem.get(hit.id)) { addToCart(hit); return; }
+    if (hit.stock <= 0) { toast.error(`«${hit.name}» no tiene stock.`); return; }
+    const line = cart[hit.id];
+    if (line && line.quantity >= hit.stock) { toast.error(`No hay más stock de «${hit.name}».`); return; }
+    if (line) updateCartQty(hit, line.quantity + 1);
+    else addToCart(hit);
+    toast.success(`«${hit.name}» agregado al carrito`);
+  };
+
+  const handleLabelAssigned = (id: string, code: string) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, barcode: code } : i)));
+    setPreviewItem((p) => (p && p.id === id ? { ...p, barcode: code } : p));
+    setLabelItem((p) => (p && p.id === id ? { ...p, barcode: code } : p));
+  };
+
   const branchNameOf = (id: string | null) => (id ? branches.find((b) => b.id === id)?.name ?? null : null);
 
   const reservationWhatsApp = (r: DeviceReservation) => {
@@ -369,7 +401,7 @@ export default function Products() {
 
   const filtered = items.filter((i) => {
     const q = search.toLowerCase();
-    const matchesSearch = i.name.toLowerCase().includes(q) || (!!i.imei && i.imei.includes(search.trim()));
+    const matchesSearch = i.name.toLowerCase().includes(q) || (!!i.imei && i.imei.includes(search.trim())) || matchesBarcodeQuery(i, search);
     const matchesBranch = branchFilter === ALL_BRANCHES || i.branch_id === branchFilter;
     const matchesStock =
       stockFilter === "all" ||
@@ -790,9 +822,11 @@ export default function Products() {
         <TabsContent value="catalogo" className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
-              placeholder="Buscar producto..."
+              placeholder="Buscar o escanear código..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchEnter}
+              autoFocus={typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches}
               className="max-w-sm"
             />
             {stockFilter !== "all" && (
@@ -1040,9 +1074,15 @@ export default function Products() {
         onReserve={() => { if (previewItem) { setReserveItem(previewItem); setPreviewItem(null); } }}
         onSellReservation={() => { const r = previewItem && activeByItem.get(previewItem.id); if (r) sellReservation(r); }}
         onDossier={() => previewItem && setDossierItem(previewItem)}
+        onLabel={() => previewItem && setLabelItem(previewItem)}
         onUpdateQty={(q) => previewItem && updateCartQty(previewItem, q)}
         onEdit={() => { if (previewItem) { openEdit(previewItem); setPreviewItem(null); } }}
         onDelete={() => { if (previewItem) { setPendingDelete(previewItem); setPreviewItem(null); } }}
+      />
+      <PrintLabelDialog
+        item={labelItem}
+        onOpenChange={(o) => { if (!o) setLabelItem(null); }}
+        onBarcodeAssigned={handleLabelAssigned}
       />
       <DeviceDossierDialog
         device={dossierItem}
