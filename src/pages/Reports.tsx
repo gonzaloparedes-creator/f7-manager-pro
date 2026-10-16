@@ -11,7 +11,7 @@ import { formatPYG, interruptionReasonLabel } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, Info } from "lucide-react";
+import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, Info, BarChart3 } from "lucide-react";
 import KpiHint from "@/components/KpiHint";
 import ReportsInsights from "@/components/ReportsInsights";
 import { usePlan } from "@/hooks/usePlan";
@@ -670,7 +670,10 @@ export default function Reports() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reportes financieros</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
+            <BarChart3 className="h-6 w-6 text-primary" />
+            Reportes financieros
+          </h1>
           <p className="text-sm text-muted-foreground">
             {hasTaller && hasTienda
               ? "Taller y tienda, juntos: ingresos, costos y ganancia real."

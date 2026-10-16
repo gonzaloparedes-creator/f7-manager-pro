@@ -16,7 +16,7 @@ import {
   PRIORITY_LABELS, normalizePriority, priorityBadgeClasses, priorityRank,
 } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
-import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays, Flag } from "lucide-react";
+import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays, Flag, LayoutDashboard } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
 import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
@@ -230,7 +230,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Órdenes de reparación</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
+            <LayoutDashboard className="h-6 w-6 text-primary" />
+            Órdenes de reparación
+          </h1>
           <p className="text-sm text-muted-foreground">Gestioná todas tus reparaciones desde un solo lugar.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, ScrollTabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { PlayCircle } from "lucide-react";
+import { BookOpen, PlayCircle } from "lucide-react";
 import { tutorialCategories, videoPlaceholders } from "@/data/tutorialsContent";
 import TutorialImage from "@/components/TutorialImage";
 
@@ -15,14 +15,17 @@ export default function HowToUse() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cómo usar F7 Manager Pro</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
+          <BookOpen className="h-6 w-6 text-primary" />
+          Cómo usar F7 Manager Pro
+        </h1>
         <p className="text-sm text-muted-foreground">
           Guía paso a paso de cada módulo, organizada por tema, con capturas reales de la app.
         </p>
       </div>
 
       <Tabs defaultValue={tutorialCategories[0].id} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-10">
+        <ScrollTabsList>
           {tutorialCategories.map((cat) => (
             <TabsTrigger key={cat.id} value={cat.id} className="h-9">
               <cat.icon className="mr-1 h-4 w-4" /> {cat.label}
@@ -31,7 +34,7 @@ export default function HowToUse() {
           <TabsTrigger value="videos" className="h-9">
             <PlayCircle className="mr-1 h-4 w-4" /> Videos
           </TabsTrigger>
-        </TabsList>
+        </ScrollTabsList>
 
         {tutorialCategories.map((cat) => (
           <TabsContent key={cat.id} value={cat.id} className="space-y-4">

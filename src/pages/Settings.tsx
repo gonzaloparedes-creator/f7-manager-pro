@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, ScrollTabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -20,7 +20,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff, ShoppingBag, Receipt, Wallet, Landmark } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Building2, Users, Crown, Lock, ShieldCheck, Tags, Percent, PackageCheck, FileText, ImagePlus, ListChecks, Printer, EyeOff, ShoppingBag, Receipt, Wallet, Landmark, UserCircle, MessageCircle, Settings as SettingsIcon } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -123,14 +123,17 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
+          <SettingsIcon className="h-6 w-6 text-primary" />
+          Configuración
+        </h1>
         <p className="text-sm text-muted-foreground">Gestioná tu taller, sucursales y usuarios.</p>
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className={`grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 ${isStarterPlan ? "lg:grid-cols-10" : "lg:grid-cols-11"}`}>
-          <TabsTrigger value="perfil" className="h-9">Perfil</TabsTrigger>
-          <TabsTrigger value="whatsapp" className="h-9">WhatsApp</TabsTrigger>
+        <ScrollTabsList>
+          <TabsTrigger value="perfil" className="h-9"><UserCircle className="mr-1 h-4 w-4" /> Perfil</TabsTrigger>
+          <TabsTrigger value="whatsapp" className="h-9"><MessageCircle className="mr-1 h-4 w-4" /> WhatsApp</TabsTrigger>
           <TabsTrigger value="sucursales" className="h-9"><Building2 className="mr-1 h-4 w-4" /> Sucursales</TabsTrigger>
           {!isStarterPlan && (
             <TabsTrigger value="categorias" className="h-9"><Tags className="mr-1 h-4 w-4" /> Categorías</TabsTrigger>
@@ -142,7 +145,7 @@ export default function Settings() {
           <TabsTrigger value="terminos" className="h-9"><FileText className="mr-1 h-4 w-4" /> Términos</TabsTrigger>
           <TabsTrigger value="seguridad" className="h-9"><Lock className="mr-1 h-4 w-4" /> Seguridad</TabsTrigger>
           <TabsTrigger value="suscripcion" className="h-9"><Crown className="mr-1 h-4 w-4" /> Suscripción</TabsTrigger>
-        </TabsList>
+        </ScrollTabsList>
 
         <TabsContent value="perfil" className="space-y-6">
           <Card>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import LoadingState from "@/components/LoadingState";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -176,7 +177,7 @@ export default function Inventory() {
           )}
         </div>
         {loading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">Cargando...</div>
+          <LoadingState />
         ) : filtered.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">Sin artículos</div>
         ) : (

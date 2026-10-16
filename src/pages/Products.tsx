@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import LoadingState from "@/components/LoadingState";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, ScrollTabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins, BatteryMedium, CalendarClock } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
@@ -751,7 +752,7 @@ export default function Products() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid h-auto w-full grid-cols-2 sm:inline-flex sm:h-10 sm:w-auto">
+        <ScrollTabsList>
           {showDevicesHub && <TabsTrigger value="resumen" data-testid="tab-resumen">Resumen</TabsTrigger>}
           <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
           <TabsTrigger value="ventas">
@@ -767,7 +768,7 @@ export default function Products() {
             </TabsTrigger>
           )}
           <TabsTrigger value="garantias">Garantías</TabsTrigger>
-        </TabsList>
+        </ScrollTabsList>
 
         {showDevicesHub && (
           <TabsContent value="resumen">
@@ -828,7 +829,7 @@ export default function Products() {
           </div>
 
           {loading ? (
-            <p className="text-center text-sm text-muted-foreground">Cargando...</p>
+            <LoadingState />
           ) : filtered.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">

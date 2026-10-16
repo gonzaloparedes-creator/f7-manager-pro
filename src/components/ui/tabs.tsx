@@ -20,6 +20,23 @@ const TabsList = React.forwardRef<
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;
 
+// En mobile las pestañas van en una sola fila con scroll horizontal (la última
+// queda cortada a propósito, indica que hay más); desde md envuelven en filas.
+const ScrollTabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsList
+    ref={ref}
+    className={cn(
+      "flex h-auto w-fit max-w-full justify-start gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 md:flex-wrap md:overflow-visible",
+      className,
+    )}
+    {...props}
+  />
+));
+ScrollTabsList.displayName = "ScrollTabsList";
+
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
@@ -50,4 +67,4 @@ const TabsContent = React.forwardRef<
 ));
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export { Tabs, TabsList, ScrollTabsList, TabsTrigger, TabsContent };
