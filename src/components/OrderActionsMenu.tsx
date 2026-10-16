@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -26,7 +27,8 @@ import { cn } from "@/lib/utils";
 interface OrderActionsMenuProps {
   orderId: string;
   orderNumber?: string;
-  variant?: "icon" | "buttons";
+  variant?: "icon" | "buttons" | "menu";
+  extraItems?: React.ReactNode;
   onUpdated?: () => void;
   onDeleted?: () => void;
 }
@@ -35,6 +37,7 @@ export default function OrderActionsMenu({
   orderId,
   orderNumber,
   variant = "icon",
+  extraItems,
   onUpdated,
   onDeleted,
 }: OrderActionsMenuProps) {
@@ -44,7 +47,7 @@ export default function OrderActionsMenu({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  if (!isAdmin) return null;
+  if (!isAdmin && !(variant === "menu" && extraItems)) return null;
 
   const stop = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault();
@@ -72,39 +75,51 @@ export default function OrderActionsMenu({
 
   return (
     <>
-      {variant === "icon" ? (
+      {variant !== "buttons" ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={stop}
-            >
-              <MoreVertical className="h-4 w-4" />
-              <span className="sr-only">Opciones</span>
-            </Button>
+            {variant === "menu" ? (
+              <Button variant="outline" size="sm" className="gap-2" onClick={stop}>
+                <MoreHorizontal className="h-4 w-4" /> Más
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={stop}
+              >
+                <MoreVertical className="h-4 w-4" />
+                <span className="sr-only">Opciones</span>
+              </Button>
+            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={stop}>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setEditOpen(true);
-              }}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Editar Orden
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setConfirmOpen(true);
-              }}
-              className={cn("text-destructive focus:text-destructive")}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar Orden
-            </DropdownMenuItem>
+            {extraItems}
+            {extraItems && isAdmin && <DropdownMenuSeparator />}
+            {isAdmin && (
+              <>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setEditOpen(true);
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar Orden
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setConfirmOpen(true);
+                  }}
+                  className={cn("text-destructive focus:text-destructive")}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar Orden
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (

@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import {
@@ -104,6 +106,7 @@ export default function OrderDetail() {
   const { presets: statusPresets } = useOrderStatusPresets();
   const photoLimit = limits.photos;
   const { isAdmin } = useUserRole();
+  const isMobile = useIsMobile();
   const { restricted: branchRestricted } = useBranchRestriction();
   const [editingFinance, setEditingFinance] = useState(false);
   const [editQuote, setEditQuote] = useState<string>("");
@@ -880,19 +883,35 @@ export default function OrderDetail() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={copyTracking} className="gap-2">
-            <Copy className="h-4 w-4" /> Link tracking
-          </Button>
+          {!isMobile && (
+            <Button variant="outline" size="sm" onClick={copyTracking} className="gap-2">
+              <Copy className="h-4 w-4" /> Link tracking
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={openManualWhatsApp} className="gap-2">
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
-            <Printer className="h-4 w-4" /> Imprimir
-          </Button>
+          {!isMobile && (
+            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+              <Printer className="h-4 w-4" /> Imprimir
+            </Button>
+          )}
           <OrderActionsMenu
             orderId={order.id}
             orderNumber={order.order_number}
-            variant="buttons"
+            variant={isMobile ? "menu" : "buttons"}
+            extraItems={
+              isMobile ? (
+                <>
+                  <DropdownMenuItem onSelect={copyTracking}>
+                    <Copy className="mr-2 h-4 w-4" /> Link tracking
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTimeout(handlePrint, 200)}>
+                    <Printer className="mr-2 h-4 w-4" /> Imprimir
+                  </DropdownMenuItem>
+                </>
+              ) : undefined
+            }
             onUpdated={load}
             onDeleted={() => navigate("/dashboard")}
           />
@@ -950,7 +969,7 @@ export default function OrderDetail() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="flex flex-col gap-6 lg:col-span-2">
           <Card>
             <CardContent className="space-y-3 p-4">
               <div className="flex items-center justify-between gap-2">
@@ -1427,7 +1446,7 @@ export default function OrderDetail() {
             </Card>
           )}
 
-          <Card>
+          <Card className="order-first lg:order-none">
             <CardContent className="space-y-4 p-4">
               <div className="text-sm font-semibold">Actualizar estado</div>
               <div className="space-y-2">
