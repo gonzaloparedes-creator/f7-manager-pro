@@ -309,7 +309,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:-mx-1 md:px-1">
         {FILTERS.map((f) => (
           <button
             key={f.value}

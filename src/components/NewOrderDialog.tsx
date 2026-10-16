@@ -103,6 +103,7 @@ export default function NewOrderDialog({
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const chipRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].key);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   // Si la sección activa cambia a una cuyo chip quedó fuera de vista en la
   // fila horizontal (ej. "Firma" cuando arrancaste viendo "Cliente"), lo
   // centra solo — sin esto el usuario pierde de vista cuál está resaltada.
@@ -253,6 +254,7 @@ export default function NewOrderDialog({
     setClientSearch("");
     setShowSecondaryContact(false);
     setNotifyWhatsapp(true);
+    setSubmitAttempted(false);
     setFormKey((k) => k + 1);
     if (clearDraft) {
       try { localStorage.removeItem(DRAFT_KEY); } catch {}
@@ -267,30 +269,40 @@ export default function NewOrderDialog({
   const quote = useMemo(() => parseAmount(form.quote_amount), [form.quote_amount]);
   const deposit = useMemo(() => parseAmount(form.deposit_amount), [form.deposit_amount]);
 
+  // Secciones con datos obligatorios: "done" lo marca con un tilde en el chip;
+  // "pending" solo se muestra tras un intento de guardar, para no llenar de
+  // avisos un formulario que recién se abre. Financiero no es obligatorio,
+  // pero una seña mayor al presupuesto bloquea el guardado.
+  const sectionStatus = useMemo<Record<string, "done" | "pending" | undefined>>(() => {
+    const clienteOk = !!form.customer_name.trim() && !!form.customer_phone.trim();
+    const equipoOk = !!form.device_type.trim()
+      && form.problems.length > 0
+      && (!form.problems.includes("Otro") || !!form.problem_other.trim());
+    return {
+      cliente: clienteOk ? "done" : "pending",
+      equipo: equipoOk ? "done" : "pending",
+      financiero: deposit > quote ? "pending" : undefined,
+      firma: form.terms_accepted ? "done" : "pending",
+    };
+  }, [form.customer_name, form.customer_phone, form.device_type, form.problems, form.problem_other, form.terms_accepted, deposit, quote]);
+
+  const failValidation = (section: string, description: string, title = "Faltan datos") => {
+    setSubmitAttempted(true);
+    scrollToSection(section);
+    toast({ title, description, variant: "destructive" });
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    if (!form.device_type.trim()) {
-      toast({ title: "Faltan datos", description: "Indicá el equipo recibido.", variant: "destructive" });
-      return;
-    }
-    if (form.problems.length === 0) {
-      toast({ title: "Faltan datos", description: "Seleccioná al menos un problema.", variant: "destructive" });
-      return;
-    }
+    if (!form.device_type.trim()) return failValidation("equipo", "Indicá el equipo recibido.");
+    if (form.problems.length === 0) return failValidation("equipo", "Seleccioná al menos un problema.");
     if (form.problems.includes("Otro") && !form.problem_other.trim()) {
-      toast({ title: "Faltan datos", description: "Describí el problema 'Otro'.", variant: "destructive" });
-      return;
+      return failValidation("equipo", "Describí el problema 'Otro'.");
     }
-    if (deposit > quote) {
-      toast({ title: "Importes inválidos", description: "La seña no puede superar al presupuesto.", variant: "destructive" });
-      return;
-    }
-    if (!form.terms_accepted) {
-      toast({ title: "Faltan datos", description: "El cliente debe aceptar los términos del servicio.", variant: "destructive" });
-      return;
-    }
+    if (deposit > quote) return failValidation("financiero", "La seña no puede superar al presupuesto.", "Importes inválidos");
+    if (!form.terms_accepted) return failValidation("firma", "El cliente debe aceptar los términos del servicio.");
     setLoading(true);
     try {
       // Las fotos ya se comprimen apenas se agregan (ver addFiles), así que
@@ -491,6 +503,10 @@ export default function NewOrderDialog({
                 )}
               >
                 {s.label}
+                {sectionStatus[s.key] === "done" && <Check className="ml-1 inline h-3 w-3 align-[-1px]" aria-label="completo" />}
+                {sectionStatus[s.key] === "pending" && (submitAttempted || s.key === "financiero") && (
+                  <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-secondary align-middle" aria-label="falta completar" />
+                )}
               </button>
             ))}
           </div>
@@ -499,7 +515,7 @@ export default function NewOrderDialog({
             de este mismo box, así que las secciones no necesitan scroll-margin
             para no quedar tapadas por él. */}
         <div ref={setContentEl} className="flex-1 overflow-y-auto p-6 pt-4">
-        <form onSubmit={onSubmit} className="space-y-6">
+        <form onSubmit={onSubmit} onInvalidCapture={() => setSubmitAttempted(true)} className="space-y-6">
           {/* Sección: Cliente */}
           <section
             ref={(el) => { sectionRefs.current.cliente = el; }}
@@ -538,6 +554,8 @@ export default function NewOrderDialog({
                 <Button
                   type="button"
                   variant="secondary"
+                  aria-label="Buscar por cédula"
+                  title="Buscar por cédula"
                   onClick={searchByCedula}
                   disabled={searchingCedula || !form.customer_cedula.trim()}
                 >
