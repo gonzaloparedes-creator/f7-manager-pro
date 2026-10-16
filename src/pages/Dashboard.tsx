@@ -274,7 +274,7 @@ export default function Dashboard() {
 
       <EvolutionMigrationBanner />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <StatCard
           icon={Package} label="Total" value={stats.total}
           active={filter === "total"} onClick={() => setFilter((f) => (f === "total" ? "todos" : "total"))}
@@ -568,12 +568,12 @@ function StatCard({
         }
       }}
     >
-      <CardContent className="flex items-center justify-between p-4">
+      <CardContent className="flex items-center justify-between gap-2 p-3 sm:p-4">
         <div>
-          <div className="text-sm text-muted-foreground">{label}</div>
+          <div className="text-xs leading-tight text-muted-foreground sm:text-sm">{label}</div>
           <div className={cn("text-2xl font-bold", accent)}>{value}</div>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+        <div className="hidden h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground sm:flex">
           <Icon className="h-5 w-5" />
         </div>
       </CardContent>

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt, Cpu, MessageCircle } from "lucide-react";
+import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt, Cpu, MessageCircle, Menu } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -15,6 +15,7 @@ import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { PLAN_MESSAGES } from "@/lib/plans";
 import SuspendedAccount from "@/pages/SuspendedAccount";
 import UpgradeProDialog from "@/components/UpgradeProDialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import QuickActionsFab from "@/components/QuickActionsFab";
 import WhatsAppOfferProvider from "@/components/WhatsAppOfferProvider";
 import PendingMessagesProvider from "@/components/PendingMessagesProvider";
@@ -65,6 +66,7 @@ function AppLayoutContent() {
   const hasExternalInventory = isBusiness || isRetail;
   const navigate = useNavigate();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   useGenerateRecurringExpenses(canViewGastos && !isStarter && !planLoading);
   const nav = useMemo(() => {
     const items = isAdmin ? [...baseNav, ...adminNav] : baseNav;
@@ -82,12 +84,14 @@ function AppLayoutContent() {
   // La barra inferior mobile no entra con más de ~5 ítems (peor todavía con
   // el badge de bloqueo PRO/BUSINESS) — Configuración y Super Admin son de
   // uso poco frecuente comparado con Órdenes/Clientes/Inventario/Productos,
-  // así que en mobile viven como íconos en el header en vez de competir por
-  // espacio en la barra inferior. En desktop el sidebar tiene lugar de sobra.
+  // así que en mobile viven en el menú del header (con nombre, no solo ícono)
+  // en vez de competir por espacio en la barra inferior. En desktop el
+  // sidebar tiene lugar de sobra.
   const mobileNav = useMemo(
     () => nav.filter((i) => i.to !== "/configuracion" && i.to !== "/superadmin" && i.to !== "/como-usar" && i.to !== "/cierre-caja" && i.to !== "/gastos" && i.to !== "/panic-full"),
     [nav]
   );
+  const menuNav = useMemo(() => nav.filter((i) => !mobileNav.includes(i)), [nav, mobileNav]);
   useEffect(() => {
     if (!loading && !user) navigate("/login", { replace: true });
   }, [loading, user, navigate]);
@@ -156,7 +160,7 @@ function AppLayoutContent() {
         className={({ isActive }) =>
           cn(
             mobile
-              ? "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium"
+              ? "flex min-w-0 flex-1 flex-col items-center gap-1 px-0.5 py-3 text-[11px] font-medium"
               : "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
             mobile
               ? isActive ? "text-primary" : "text-muted-foreground"
@@ -172,6 +176,42 @@ function AppLayoutContent() {
         </span>
         {item.label}
         {item.to === "/avisos" && !mobile && <PendingBadge mobile={false} />}
+      </NavLink>
+    );
+  };
+
+  const menuRowClass = "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition-colors hover:bg-accent";
+  const renderMenuItem = (item: typeof baseNav[number]) => {
+    const businessLocked = item.businessOnly && !hasExternalInventory;
+    const locked = (item.proOnly && isStarter) || businessLocked;
+    if (locked) {
+      return (
+        <button
+          key={item.to}
+          onClick={() => {
+            setMenuOpen(false);
+            if (businessLocked) openUpgradeWhatsApp(PLAN_MESSAGES.business);
+            else setUpgradeOpen(true);
+          }}
+          className={cn(menuRowClass, "text-muted-foreground")}
+        >
+          <item.icon className="h-5 w-5" />
+          {item.label}
+          <span className="ml-auto rounded-sm bg-secondary px-1.5 py-0.5 text-[9px] font-bold leading-none text-secondary-foreground">
+            {businessLocked ? "BUSINESS" : "PRO"}
+          </span>
+        </button>
+      );
+    }
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        onClick={() => setMenuOpen(false)}
+        className={({ isActive }) => cn(menuRowClass, isActive && "bg-accent text-primary")}
+      >
+        <item.icon className="h-5 w-5" />
+        {item.label}
       </NavLink>
     );
   };
@@ -213,58 +253,29 @@ function AppLayoutContent() {
           <img src={f7Logo} alt="F7 Manager Pro" className="h-8 w-8 rounded-md object-contain" />
           <span className="font-bold">F7 Manager Pro</span>
         </Link>
-        <div className="-mr-2 flex items-center">
-          {isSuperAdmin && (
-            <Link
-              to="/superadmin"
-              aria-label="Super Admin"
-              className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <ShieldCheck className="h-5 w-5" />
-            </Link>
-          )}
-          {!isStarter && canViewCaja && (
-            <Link
-              to="/cierre-caja"
-              aria-label="Caja"
-              className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <Wallet className="h-5 w-5" />
-            </Link>
-          )}
-          {canViewGastos && !isStarter && (
-            <Link
-              to="/gastos"
-              aria-label="Gastos"
-              className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <Receipt className="h-5 w-5" />
-            </Link>
-          )}
-          {isAdmin && canManageCompany && (
-            <Link
-              to="/configuracion"
-              aria-label="Configuración"
-              className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <Settings className="h-5 w-5" />
-            </Link>
-          )}
-          <Link
-            to="/como-usar"
-            aria-label="Cómo usar"
-            className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <BookOpen className="h-5 w-5" />
-          </Link>
-          <button
-            onClick={signOut}
-            aria-label="Cerrar sesión"
-            className="rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
-        </div>
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Menú"
+          className="-mr-2 rounded-full p-2.5 text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <SheetContent side="right" className="flex w-72 flex-col p-4">
+            <SheetHeader className="pb-2 text-left">
+              <SheetTitle>Menú</SheetTitle>
+            </SheetHeader>
+            <nav className="flex-1 space-y-1 overflow-y-auto">
+              {menuNav.map((item) => renderMenuItem(item))}
+            </nav>
+            <div className="border-t pt-3 pb-[env(safe-area-inset-bottom)]">
+              <button onClick={signOut} className={cn(menuRowClass, "text-muted-foreground")}>
+                <LogOut className="h-5 w-5" />
+                Cerrar sesión
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </header>
 
       <main className="md:pl-64 pb-20 md:pb-0">

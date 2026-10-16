@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Plus, ClipboardList, ShoppingCart, FileText, Layers } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -25,6 +25,26 @@ export default function QuickActionsFab() {
   const { isBusiness, isRetail } = usePlan();
   const { canViewProducts } = useStaffPermissions();
   const hasStore = (isBusiness || isRetail) && canViewProducts;
+  const [scrolledDown, setScrolledDown] = useState(false);
+
+  // Se esconde al scrollear hacia abajo para no tapar los botones de las tarjetas
+  // (Cobrar saldo, editar) y vuelve al scrollear hacia arriba. El listener va en
+  // captura porque el scroll puede estar en la ventana o en un contenedor.
+  useEffect(() => {
+    let last = 0;
+    const onScroll = (e: Event) => {
+      const t = e.target;
+      const y = t instanceof Element ? t.scrollTop : (document.scrollingElement?.scrollTop ?? 0);
+      const delta = y - last;
+      last = y;
+      if (Math.abs(delta) < 6) return;
+      setScrolledDown(delta > 0 && y > 80);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, []);
+
+  useEffect(() => { setScrolledDown(false); }, [pathname]);
 
   const actions = [
     {
@@ -72,7 +92,7 @@ export default function QuickActionsFab() {
         type="button"
         onClick={handleTap}
         aria-label="Acciones rápidas"
-        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated ring-4 ring-background transition-transform active:scale-95 md:hidden"
+        className={`fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated ring-4 ring-background transition-all duration-200 active:scale-95 md:hidden ${scrolledDown ? "pointer-events-none translate-y-24 opacity-0" : ""}`}
       >
         <Plus className="h-6 w-6" />
       </button>

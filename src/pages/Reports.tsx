@@ -955,7 +955,7 @@ function SummaryCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center justify-between p-5">
+      <CardContent className="flex items-center justify-between p-4 sm:p-5">
         <div>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             {label}
@@ -965,7 +965,7 @@ function SummaryCard({
             {prefix}{formatPYG(value)}
           </div>
         </div>
-        <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${iconBg ?? "bg-accent text-accent-foreground"}`}>
+        <div className={`hidden h-11 w-11 items-center justify-center rounded-lg sm:flex ${iconBg ?? "bg-accent text-accent-foreground"}`}>
           <Icon className="h-5 w-5" />
         </div>
       </CardContent>

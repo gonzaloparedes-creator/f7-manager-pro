@@ -125,12 +125,12 @@ export default function Inventory() {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="p-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+        <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Total artículos</div>
           <div className="mt-1 text-2xl font-bold">{items.length}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Bajo stock</div>
           {canViewStock ? (
             <div className={cn("mt-1 flex items-center gap-2 text-2xl font-bold", lowStockCount > 0 && "text-secondary")}>
@@ -141,7 +141,7 @@ export default function Inventory() {
             <div className="mt-1 text-2xl font-bold text-muted-foreground">—</div>
           )}
         </Card>
-        <Card className="p-4">
+        <Card className="col-span-2 p-3 sm:col-span-1 sm:p-4">
           <div className="text-xs text-muted-foreground">Valor inventario (costo)</div>
           <div className="mt-1 text-2xl font-bold">
             {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
