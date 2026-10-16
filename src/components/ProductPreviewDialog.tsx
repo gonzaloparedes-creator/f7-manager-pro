@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingBag, ShoppingCart, AlertTriangle, CalendarClock, Eye, EyeOff, Pencil, Trash2, X } from "lucide-react";
+import { ShoppingBag, ShoppingCart, AlertTriangle, CalendarClock, Eye, EyeOff, FileText, Pencil, Trash2, X } from "lucide-react";
 import QuantityStepper from "@/components/QuantityStepper";
 import { formatPYG } from "@/lib/orders";
 import { balanceDue, depositOf, displayDate, expiryText, type DeviceReservation } from "@/lib/reservations";
@@ -24,6 +24,7 @@ export default function ProductPreviewDialog({
   onAddToCart,
   onReserve,
   onSellReservation,
+  onDossier,
   onUpdateQty,
   onEdit,
   onDelete,
@@ -41,6 +42,7 @@ export default function ProductPreviewDialog({
   onAddToCart: () => void;
   onReserve?: () => void;
   onSellReservation?: () => void;
+  onDossier?: () => void;
   onUpdateQty: (qty: number) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -193,10 +195,15 @@ export default function ProductPreviewDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2 border-t border-border p-4 sm:justify-start">
+        <DialogFooter className="flex-wrap gap-2 border-t border-border p-4 sm:justify-start">
           <Button variant="outline" className="gap-2" onClick={onEdit}>
             <Pencil className="h-4 w-4" /> Editar
           </Button>
+          {product.is_device && onDossier && (
+            <Button variant="outline" className="gap-2" onClick={onDossier} data-testid="preview-dossier">
+              <FileText className="h-4 w-4" /> Dossier
+            </Button>
+          )}
           {canDelete && (
             <Button variant="outline" className="gap-2 text-destructive hover:text-destructive" onClick={onDelete}>
               <Trash2 className="h-4 w-4" /> Eliminar

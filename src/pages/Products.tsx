@@ -24,6 +24,7 @@ import { buildPriceList } from "@/lib/priceList";
 import { batteryLabel, isLowBattery } from "@/lib/deviceSpecs";
 import { STALE_DEVICE_DAYS, daysInStock, daysInStockLabel, hasDevicesInStock, isStaleDevice, staleDeviceSummary } from "@/lib/deviceStock";
 import ProductPreviewDialog from "@/components/ProductPreviewDialog";
+import DeviceDossierDialog from "@/components/DeviceDossierDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
@@ -121,6 +122,7 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<Product | null>(null);
   const [previewItem, setPreviewItem] = useState<Product | null>(null);
+  const [dossierItem, setDossierItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "stale">("all");
@@ -970,9 +972,18 @@ export default function Products() {
         onAddToCart={() => previewItem && addToCart(previewItem)}
         onReserve={() => { if (previewItem) { setReserveItem(previewItem); setPreviewItem(null); } }}
         onSellReservation={() => { const r = previewItem && activeByItem.get(previewItem.id); if (r) sellReservation(r); }}
+        onDossier={() => previewItem && setDossierItem(previewItem)}
         onUpdateQty={(q) => previewItem && updateCartQty(previewItem, q)}
         onEdit={() => { if (previewItem) { openEdit(previewItem); setPreviewItem(null); } }}
         onDelete={() => { if (previewItem) { setPendingDelete(previewItem); setPreviewItem(null); } }}
+      />
+      <DeviceDossierDialog
+        device={dossierItem}
+        onOpenChange={(o) => { if (!o) setDossierItem(null); }}
+        companyId={companyId}
+        businessName={businessName}
+        branchName={hasMultipleBranches && dossierItem?.branch_id ? branches.find((b) => b.id === dossierItem.branch_id)?.name ?? null : null}
+        categoryLabel={dossierItem ? categoryName(dossierItem.category_id) : null}
       />
       <CartSheet
         open={cartOpen}
