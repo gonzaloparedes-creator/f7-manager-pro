@@ -17,6 +17,8 @@ export interface TicketSale {
   payment_method: string | null;
   items: TicketLineItem[];
   trade_in?: { device_name: string; value: number } | null;
+  /** Seña de una reserva que se descuenta de lo que se cobra. */
+  deposit?: number | null;
   customer_name?: string | null;
   customer_phone?: string | null;
 }
@@ -152,12 +154,16 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
     addGap(0.8);
   }
   addDashed();
-  if (sale.trade_in && sale.trade_in.value > 0) {
-    const toPay = Math.max(0, total - sale.trade_in.value);
+  const tradeInValue = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in.value : 0;
+  const depositValue = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
+  if (tradeInValue > 0 || depositValue > 0) {
     addRow("Subtotal", formatPYG(total), fontBody);
-    addWrapped(`Equipo recibido: ${sale.trade_in.device_name}`, fontSmall);
-    addRow("Canje", `-${formatPYG(sale.trade_in.value)}`, fontBody);
-    addRow("A PAGAR", formatPYG(toPay), fontTotal);
+    if (tradeInValue > 0 && sale.trade_in) {
+      addWrapped(`Equipo recibido: ${sale.trade_in.device_name}`, fontSmall);
+      addRow("Canje", `-${formatPYG(tradeInValue)}`, fontBody);
+    }
+    if (depositValue > 0) addRow("Seña abonada", `-${formatPYG(depositValue)}`, fontBody);
+    addRow("A PAGAR", formatPYG(Math.max(0, total - tradeInValue - depositValue)), fontTotal);
   } else {
     addRow("TOTAL", formatPYG(total), fontTotal);
   }

@@ -7,12 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins, BatteryMedium } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins, BatteryMedium, CalendarClock } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import BuyDeviceDialog from "@/components/BuyDeviceDialog";
+import ReserveDeviceDialog from "@/components/ReserveDeviceDialog";
+import CancelReservationDialog from "@/components/CancelReservationDialog";
+import ExtendReservationDialog from "@/components/ExtendReservationDialog";
+import ReservationsPanel from "@/components/ReservationsPanel";
+import { useDeviceReservations } from "@/hooks/useDeviceReservations";
+import { openWhatsApp, toWhatsAppPhone } from "@/lib/whatsapp";
+import { buildReservationMessage, expiryText, isOverdue, type DeviceReservation } from "@/lib/reservations";
 import { printPurchaseReceipt } from "@/lib/devicePurchaseReceipt";
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
-import { tradeInOfSale } from "@/lib/tradeIn";
+import { depositOfSale, tradeInOfSale } from "@/lib/tradeIn";
 import { buildPriceList } from "@/lib/priceList";
 import { batteryLabel, isLowBattery } from "@/lib/deviceSpecs";
 import { STALE_DEVICE_DAYS, daysInStock, daysInStockLabel, hasDevicesInStock, isStaleDevice, staleDeviceSummary } from "@/lib/deviceStock";
@@ -68,6 +75,7 @@ type Sale = {
   branch_id: string | null;
   sale_group_id: string | null;
   trade_in_value: number | null;
+  reservation_deposit: number | null;
   imei: string | null;
   warranty_days: number | null;
   customer_name: string | null;
@@ -82,6 +90,7 @@ type SaleGroup = {
   payment_method: string | null;
   branch_id: string | null;
   tradeInValue: number;
+  depositValue: number;
   customerName: string | null;
   customerPhone: string | null;
 };
@@ -131,6 +140,11 @@ export default function Products() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [buyOpen, setBuyOpen] = useState(false);
   const [purchases, setPurchases] = useState<DevicePurchaseRecord[]>([]);
+  const { reservations, activeByItem, loaded: reservationsLoaded, reload: reloadReservations } = useDeviceReservations();
+  const [reserveItem, setReserveItem] = useState<Product | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<DeviceReservation | null>(null);
+  const [extendTarget, setExtendTarget] = useState<DeviceReservation | null>(null);
+  const activeReservations = useMemo(() => reservations.filter((r) => r.status === "activa"), [reservations]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -161,6 +175,22 @@ export default function Products() {
     });
   }, [items]);
 
+  // Una línea del carrito que viene de una reserva deja de valer cuando la reserva
+  // se cancela o se vende desde otro lado: se saca para no cobrar con una seña fantasma.
+  useEffect(() => {
+    if (!reservationsLoaded) return;
+    setCart((prev) => {
+      const activeIds = new Set(activeReservations.map((r) => r.id));
+      let changed = false;
+      const next: Cart = {};
+      for (const [id, line] of Object.entries(prev)) {
+        if (line.reservationId && !activeIds.has(line.reservationId)) changed = true;
+        else next[id] = line;
+      }
+      return changed ? next : prev;
+    });
+  }, [reservationsLoaded, activeReservations]);
+
   // El ticket se imprime en un documento aislado (ver printTicket): así el
   // trabajo de impresión contiene solo la imagen del ticket, sin el CSS de la
   // app que lo reescalaba y lo repetía en cada página.
@@ -188,6 +218,7 @@ export default function Products() {
       warranty_days: i.warranty_days,
     })),
     trade_in: g.tradeInValue > 0 ? { device_name: tradeInDeviceName(g.key), value: g.tradeInValue } : null,
+    deposit: g.depositValue > 0 ? g.depositValue : null,
     customer_name: g.customerName,
     customer_phone: g.customerPhone,
   });
@@ -211,7 +242,7 @@ export default function Products() {
         .order("created_at", { ascending: false }),
       (supabase as any)
         .from("product_sales")
-        .select("id, product_name, quantity, unit_price, trade_in_value, payment_method, created_at, branch_id, sale_group_id, imei, warranty_days, customer_name, customer_phone")
+        .select("id, product_name, quantity, unit_price, trade_in_value, reservation_deposit, payment_method, created_at, branch_id, sale_group_id, imei, warranty_days, customer_name, customer_phone")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -239,7 +270,7 @@ export default function Products() {
 
   useEffect(() => { loadPurchases(); }, [companyId]);
 
-  const handlePurchaseRegistered = () => { load(); loadPurchases(); };
+  const handlePurchaseRegistered = () => { load(); loadPurchases(); void reloadReservations(); };
 
   const handlePrintPurchase = (record: DevicePurchaseRecord) => {
     printPurchaseReceipt(record, {
@@ -259,7 +290,25 @@ export default function Products() {
   };
 
   const addToCart = (item: Product) => {
+    const reservation = activeByItem.get(item.id);
+    if (reservation) {
+      toast.error(`«${item.name}» está reservado para ${reservation.customer_name}. Vendelo desde la reserva.`);
+      return;
+    }
     setCart((prev) => ({ ...prev, [item.id]: { quantity: 1, unitPrice: item.selling_price } }));
+  };
+
+  // Un equipo reservado entra al carrito al precio acordado y con su reserva atada:
+  // al confirmar, la seña ya cobrada se descuenta de lo que paga el cliente.
+  const sellReservation = (r: DeviceReservation) => {
+    const item = items.find((i) => i.id === r.inventory_item_id);
+    if (!item) {
+      toast.error("El equipo de esta reserva ya no está en el catálogo.");
+      return;
+    }
+    setCart((prev) => ({ ...prev, [item.id]: { quantity: 1, unitPrice: Number(r.agreed_price), reservationId: r.id } }));
+    setPreviewItem(null);
+    setCartOpen(true);
   };
 
   const updateCartQty = (item: Product, qty: number) => {
@@ -268,11 +317,20 @@ export default function Products() {
         const { [item.id]: _removed, ...rest } = prev;
         return rest;
       }
+      const prevLine = prev[item.id];
       return {
         ...prev,
-        [item.id]: { quantity: Math.min(qty, item.stock), unitPrice: prev[item.id]?.unitPrice ?? item.selling_price },
+        [item.id]: { ...prevLine, quantity: Math.min(qty, item.stock), unitPrice: prevLine?.unitPrice ?? item.selling_price },
       };
     });
+  };
+
+  const branchNameOf = (id: string | null) => (id ? branches.find((b) => b.id === id)?.name ?? null : null);
+
+  const reservationWhatsApp = (r: DeviceReservation) => {
+    const phone = toWhatsAppPhone(r.customer_phone);
+    if (!phone) { toast.error("El teléfono de esta reserva no es válido para WhatsApp."); return; }
+    openWhatsApp(phone, buildReservationMessage(r, { businessName, branchName: hasMultipleBranches ? branchNameOf(r.branch_id) : null }));
   };
 
   const cartCount = Object.values(cart).reduce((s, l) => s + l.quantity, 0);
@@ -301,7 +359,7 @@ export default function Products() {
 
   const copyPriceList = async () => {
     const list = buildPriceList({
-      items: filtered,
+      items: filtered.map((i) => ({ ...i, reserved: activeByItem.has(i.id) })),
       categoryName,
       businessName,
       branchName: hasMultipleBranches && branchFilter !== ALL_BRANCHES ? branches.find((b) => b.id === branchFilter)?.name : null,
@@ -315,6 +373,7 @@ export default function Products() {
       const skipped = [
         list.withoutStock > 0 ? `${list.withoutStock} sin stock` : null,
         list.withoutPrice > 0 ? `${list.withoutPrice} sin precio` : null,
+        list.reserved > 0 ? `${list.reserved} reservado${list.reserved !== 1 ? "s" : ""}` : null,
       ].filter(Boolean);
       toast.success(`Lista copiada: ${list.included} artículo${list.included !== 1 ? "s" : ""}`, {
         description: skipped.length > 0 ? `Quedaron afuera: ${skipped.join(", ")}. Pegala en WhatsApp.` : "Pegala en WhatsApp.",
@@ -380,6 +439,7 @@ export default function Products() {
         payment_method: groupItems[0].payment_method,
         branch_id: groupItems[0].branch_id,
         tradeInValue: tradeInOfSale(groupItems),
+        depositValue: depositOfSale(groupItems),
         customerName: groupItems.find((i) => i.customer_name)?.customer_name ?? null,
         customerPhone: groupItems.find((i) => i.customer_phone)?.customer_phone ?? null,
       }))
@@ -402,6 +462,8 @@ export default function Products() {
     const sub = subcategoryName(i.subcategory_id);
     const stockDays = i.is_device && !outOfStock && canViewStock ? daysInStock(i.created_at, now) : null;
     const stale = isStaleDevice(i, now);
+    const reservation = activeByItem.get(i.id);
+    const reservationOverdue = !!reservation && isOverdue(reservation, now);
     return (
       <Card
         key={i.id}
@@ -446,6 +508,16 @@ export default function Products() {
               {i.is_device && (
                 <Badge variant="outline" className="gap-1 border-primary/40 text-[11px] text-primary">
                   <Smartphone className="h-3 w-3" /> Equipo
+                </Badge>
+              )}
+              {reservation && (
+                <Badge
+                  variant="outline"
+                  data-testid="reserved-badge"
+                  className={cn("gap-1 text-[11px]", reservationOverdue ? "border-secondary/60 bg-secondary/10 text-secondary" : "border-primary/40 bg-primary/5 text-primary")}
+                >
+                  <CalendarClock className="h-3 w-3" />
+                  {reservationOverdue ? "Reserva vencida" : "Reservado"} · {expiryText(reservation.expires_on, now)}
                 </Badge>
               )}
               {stockDays !== null && (
@@ -506,14 +578,25 @@ export default function Products() {
                   {formatPYG(cart[i.id].quantity * cart[i.id].unitPrice)}
                 </span>
               </div>
-            ) : (
-              <Button
-                className="w-full gap-2"
-                disabled={outOfStock}
-                onClick={() => addToCart(i)}
-              >
-                <ShoppingCart className="h-4 w-4" /> Agregar
+            ) : reservation ? (
+              <Button className="w-full gap-2" data-testid="sell-reservation" onClick={() => sellReservation(reservation)}>
+                <ShoppingCart className="h-4 w-4" /> Vender reserva
               </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 gap-2"
+                  disabled={outOfStock}
+                  onClick={() => addToCart(i)}
+                >
+                  <ShoppingCart className="h-4 w-4" /> Agregar
+                </Button>
+                {i.is_device && !outOfStock && (
+                  <Button variant="outline" className="gap-2" data-testid="reserve-device" onClick={() => setReserveItem(i)}>
+                    <CalendarClock className="h-4 w-4" /> Reservar
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </CardContent>
@@ -634,6 +717,9 @@ export default function Products() {
           <TabsTrigger value="ventas">
             Ventas recientes{saleGroups.length > 0 ? ` (${saleGroups.length})` : ""}
           </TabsTrigger>
+          <TabsTrigger value="reservas" data-testid="tab-reservas">
+            Reservas{activeReservations.length > 0 ? ` (${activeReservations.length})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="compras">Compras de equipos</TabsTrigger>
           <TabsTrigger value="garantias">Garantías</TabsTrigger>
         </TabsList>
@@ -750,7 +836,13 @@ export default function Products() {
                         </div>
                         {g.tradeInValue > 0 && (
                           <div className="truncate text-xs text-primary">
-                            Con canje: {tradeInDeviceName(g.key)} (-{formatPYG(g.tradeInValue)}) · cobrado {formatPYG(g.total - g.tradeInValue)}
+                            Con canje: {tradeInDeviceName(g.key)} (-{formatPYG(g.tradeInValue)}) · cobrado {formatPYG(g.total - g.tradeInValue - g.depositValue)}
+                          </div>
+                        )}
+                        {g.depositValue > 0 && (
+                          <div className="truncate text-xs text-primary" data-testid="sale-deposit">
+                            Con seña de reserva: -{formatPYG(g.depositValue)}
+                            {g.tradeInValue > 0 ? "" : ` · cobrado ${formatPYG(g.total - g.depositValue)}`}
                           </div>
                         )}
                       </div>
@@ -781,6 +873,17 @@ export default function Products() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="reservas">
+          <ReservationsPanel
+            reservations={reservations}
+            branchName={(id) => (hasMultipleBranches ? branchNameOf(id) : null)}
+            onSell={sellReservation}
+            onExtend={setExtendTarget}
+            onCancel={setCancelTarget}
+            onWhatsApp={reservationWhatsApp}
+          />
         </TabsContent>
 
         <TabsContent value="compras">
@@ -863,7 +966,10 @@ export default function Products() {
         canViewStock={canViewStock}
         canDelete={isAdmin}
         cartLine={previewItem ? cart[previewItem.id] : undefined}
+        reservation={previewItem ? activeByItem.get(previewItem.id) : undefined}
         onAddToCart={() => previewItem && addToCart(previewItem)}
+        onReserve={() => { if (previewItem) { setReserveItem(previewItem); setPreviewItem(null); } }}
+        onSellReservation={() => { const r = previewItem && activeByItem.get(previewItem.id); if (r) sellReservation(r); }}
         onUpdateQty={(q) => previewItem && updateCartQty(previewItem, q)}
         onEdit={() => { if (previewItem) { openEdit(previewItem); setPreviewItem(null); } }}
         onDelete={() => { if (previewItem) { setPendingDelete(previewItem); setPreviewItem(null); } }}
@@ -872,12 +978,31 @@ export default function Products() {
         open={cartOpen}
         onOpenChange={setCartOpen}
         products={items}
+        reservations={activeReservations}
         cart={cart}
         setCart={setCart}
         onSold={handlePurchaseRegistered}
         onPrintRequest={handlePrintSale}
         onPrintTradeIn={handlePrintPurchase}
         onReceiptRequest={handleReceiptSale}
+      />
+      <ReserveDeviceDialog
+        open={!!reserveItem}
+        onOpenChange={(o) => { if (!o) setReserveItem(null); }}
+        device={reserveItem}
+        onReserved={() => { void reloadReservations(); }}
+        businessName={businessName}
+        branchName={reserveItem && hasMultipleBranches ? branchNameOf(reserveItem.branch_id) : null}
+      />
+      <CancelReservationDialog
+        reservation={cancelTarget}
+        onOpenChange={(o) => { if (!o) setCancelTarget(null); }}
+        onCancelled={() => { void reloadReservations(); }}
+      />
+      <ExtendReservationDialog
+        reservation={extendTarget}
+        onOpenChange={(o) => { if (!o) setExtendTarget(null); }}
+        onExtended={() => { void reloadReservations(); }}
       />
       <EnviarReciboDialog
         open={receiptOpen}

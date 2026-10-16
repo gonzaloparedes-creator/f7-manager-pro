@@ -49,6 +49,7 @@ export default function BuyDeviceDialog({
   onPrint,
   mode = "compra",
   maxValue,
+  deposit = 0,
   initialForm,
   onCollect,
 }: {
@@ -59,6 +60,8 @@ export default function BuyDeviceDialog({
   mode?: DevicePurchaseKind;
   /** Canje: tope del valor reconocido (el total de la venta). */
   maxValue?: number;
+  /** Canje: seña ya abonada de equipos reservados en la misma venta; se descuenta del tope. */
+  deposit?: number;
   initialForm?: DevicePurchaseForm | null;
   onCollect?: (draft: TradeInDraft) => void;
 }) {
@@ -117,7 +120,7 @@ export default function BuyDeviceDialog({
   const submit = async () => {
     if (!user || !companyId) return;
     const problem = validateDevicePurchase(form, mode)
-      ?? (canje && maxValue !== undefined ? validateTradeInValue(purchasePrice, maxValue) : null);
+      ?? (canje && maxValue !== undefined ? validateTradeInValue(purchasePrice, maxValue, deposit) : null);
     if (problem) { toast.error(problem); return; }
     if (!canje && await cashGate.check()) {
       toast.error("La caja de hoy no está abierta. Abrila desde Caja para registrar la compra.");
@@ -375,7 +378,9 @@ export default function BuyDeviceDialog({
                 {canje ? (
                   <p className="text-xs text-muted-foreground">
                     No sale plata de la caja: este valor se descuenta de lo que paga el cliente por la venta, y es el costo del equipo cuando lo revendas.
-                    {maxValue !== undefined && ` Máximo: ${formatPYG(maxValue)} (el total de la venta).`}
+                    {maxValue !== undefined && (deposit > 0
+                      ? ` Máximo: ${formatPYG(Math.max(0, maxValue - deposit))} (el total de la venta menos la seña ya abonada).`
+                      : ` Máximo: ${formatPYG(maxValue)} (el total de la venta).`)}
                   </p>
                 ) : (
                   <div className="grid gap-2">

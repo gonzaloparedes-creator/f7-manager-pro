@@ -58,6 +58,7 @@ interface SaleRow {
   unit_price: number;
   unit_cost: number;
   trade_in_value?: number | null;
+  reservation_deposit?: number | null;
   payment_method: string | null;
   created_at: string;
   branch_id: string | null;
@@ -366,6 +367,7 @@ function salesByCategory(sales: SaleRow[], from: Date | null, to: Date | null) {
  * reconocimiento contable de la orden.
  */
 const TRADE_IN_BUCKET = "Canje (equipo recibido)";
+const DEPOSIT_BUCKET = "Seña (reserva)";
 
 function revenueByPaymentMethod(payments: PaymentRow[], sales: SaleRow[], from: Date | null, to: Date | null) {
   const map = new Map<string, number>();
@@ -382,6 +384,8 @@ function revenueByPaymentMethod(payments: PaymentRow[], sales: SaleRow[], from: 
     const tradeIn = Number(s.trade_in_value || 0);
     bump(s.payment_method, netSaleAmount(s));
     if (tradeIn > 0) bump(TRADE_IN_BUCKET, tradeIn);
+    const deposit = Number(s.reservation_deposit || 0);
+    if (deposit > 0) bump(DEPOSIT_BUCKET, deposit);
   }
   return map;
 }
@@ -495,7 +499,7 @@ export default function Reports() {
         if (!hasTienda) return;
         const { data: s, error: sErr } = await (supabase as any)
           .from("product_sales")
-          .select("product_name, quantity, unit_price, unit_cost, trade_in_value, payment_method, created_at, branch_id, category_name, subcategory_name, created_by")
+          .select("product_name, quantity, unit_price, unit_cost, trade_in_value, reservation_deposit, payment_method, created_at, branch_id, category_name, subcategory_name, created_by")
           .eq("company_id", companyId);
         if (sErr) hadError = true;
         setSales((s ?? []) as SaleRow[]);

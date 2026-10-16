@@ -8,14 +8,23 @@ export function saleTotal(sale: TicketSale): number {
   return sale.items.reduce((sum, item) => sum + item.quantity * Number(item.unit_price || 0), 0);
 }
 
+/** Lo que se cobró en el momento: el total menos el equipo recibido y menos la seña de la reserva. */
+export function saleToPay(sale: TicketSale): number {
+  const tradeIn = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in.value : 0;
+  const deposit = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
+  return Math.max(0, saleTotal(sale) - tradeIn - deposit);
+}
+
 function totalLines(sale: TicketSale): string[] {
   const total = saleTotal(sale);
-  const tradeIn = sale.trade_in;
-  if (!tradeIn || !(tradeIn.value > 0)) return [`*Total: ${formatPYG(total)}*`];
+  const tradeIn = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in : null;
+  const deposit = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
+  if (!tradeIn && !deposit) return [`*Total: ${formatPYG(total)}*`];
   return [
     `Subtotal: ${formatPYG(total)}`,
-    `Equipo recibido (${tradeIn.device_name}): -${formatPYG(tradeIn.value)}`,
-    `*A pagar: ${formatPYG(Math.max(0, total - tradeIn.value))}*`,
+    ...(tradeIn ? [`Equipo recibido (${tradeIn.device_name}): -${formatPYG(tradeIn.value)}`] : []),
+    ...(deposit ? [`Seña ya abonada: -${formatPYG(deposit)}`] : []),
+    `*A pagar: ${formatPYG(saleToPay(sale))}*`,
   ];
 }
 

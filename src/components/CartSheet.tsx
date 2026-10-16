@@ -21,11 +21,13 @@ import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice"
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
 import { amountToCollect, buildTradeInSaleParams, validateTradeInValue, type TradeInDraft } from "@/lib/tradeIn";
 import { belowMinPriceNames } from "@/lib/devicePricing";
+import { depositOf, depositProblem, totalDeposit, type DeviceReservation, type ReservedSaleLine } from "@/lib/reservations";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type DiscountUnit = "percent" | "amount";
 
-export type CartLine = { quantity: number; unitPrice: number };
+/** `reservationId` marca una línea que sale de una reserva: la seña ya cobrada se descuenta al vender. */
+export type CartLine = { quantity: number; unitPrice: number; reservationId?: string };
 export type Cart = Record<string, CartLine>;
 
 export type CompletedCartSale = {
@@ -39,6 +41,8 @@ export type CompletedCartSale = {
   customer_phone?: string | null;
   /** Equipo que el cliente entregó como parte de pago; `record` es su comprobante de compra. */
   trade_in?: { device_name: string; value: number; record?: DevicePurchaseRecord } | null;
+  /** Seña de reservas ya cobrada que se descontó de esta venta. */
+  deposit?: number | null;
 };
 
 type CartProduct = { id: string; name: string; stock: number; cost_price: number; is_device?: boolean; min_price?: number | null };
@@ -47,6 +51,7 @@ export default function CartSheet({
   open,
   onOpenChange,
   products,
+  reservations = [],
   cart,
   setCart,
   onSold,
@@ -57,6 +62,8 @@ export default function CartSheet({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   products: CartProduct[];
+  /** Reservas activas: de ahí sale la seña de las líneas que vienen de una reserva. */
+  reservations?: DeviceReservation[];
   cart: Cart;
   setCart: React.Dispatch<React.SetStateAction<Cart>>;
   onSold?: () => void;
@@ -97,10 +104,31 @@ export default function CartSheet({
   const discountAmount = Math.min(subtotal, Math.round(discountRaw));
   const discountFraction = subtotal > 0 ? discountAmount / subtotal : 0;
   const total = subtotal - discountAmount;
+
+  // Precio unitario con el descuento ya repartido: es lo que realmente se cobra y se registra.
+  const finalPrice = (l: { unitPrice: number }) =>
+    discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice;
+
+  // La seña de una reserva ya se cobró (y se contó en Caja) el día que se recibió:
+  // acá solo se descuenta de lo que falta cobrar. El monto sale de la reserva
+  // activa, nunca del carrito; el servidor igual lo vuelve a tomar de la reserva.
+  const reservationOf = (l: { reservationId?: string }) =>
+    l.reservationId ? reservations.find((r) => r.id === l.reservationId) : undefined;
+  const reservedLines = lines.filter((l) => l.reservationId);
+  const missingReservation = reservedLines.find((l) => !reservationOf(l));
+  const reservedSaleLines: ReservedSaleLine[] = reservedLines.flatMap((l) => {
+    const r = reservationOf(l);
+    return r ? [{ name: l.product.name, quantity: l.quantity, unitPrice: finalPrice(l), deposit: depositOf(r) }] : [];
+  });
+  const deposits = totalDeposit(reservedSaleLines);
+  const reservationProblem = missingReservation
+    ? `La reserva de «${missingReservation.product.name}» ya no está activa. Quitalo del carrito.`
+    : depositProblem(reservedSaleLines);
+
   const tradeInValue = tradeIn?.params.purchase_price ?? 0;
-  const tradeInProblem = tradeIn ? validateTradeInValue(tradeInValue, total) : null;
-  // Con canje, el cliente paga el total menos el valor del equipo que entrega.
-  const toCollect = amountToCollect(total, tradeInValue);
+  const tradeInProblem = tradeIn ? validateTradeInValue(tradeInValue, total, deposits) : null;
+  // El cliente paga el total menos el equipo que entrega y menos la seña que ya dejó.
+  const toCollect = amountToCollect(total, tradeInValue, deposits);
   const receivedNum = Math.round(Number(receivedCash)) || 0;
   const vuelto = receivedNum - toCollect;
   const showVuelto = isCashLabel(paymentMethod) && receivedCash.trim() !== "" && toCollect > 0;
@@ -140,13 +168,10 @@ export default function CartSheet({
     setBelowMinNames(null);
   };
 
-  // Precio unitario con el descuento ya repartido: es lo que realmente se cobra y se registra.
-  const finalPrice = (l: (typeof lines)[number]) =>
-    discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice;
-
   const checkout = async (minPriceConfirmed = false) => {
     if (!user || !companyId) return;
     if (lines.length === 0) return;
+    if (reservationProblem) { toast.error(reservationProblem); return; }
     const overStock = lines.find((l) => l.quantity > l.product.stock);
     if (overStock) {
       toast.error(`Solo hay ${overStock.product.stock} de "${overStock.product.name}" en stock`);
@@ -185,12 +210,13 @@ export default function CartSheet({
         id: string; product_name: string; quantity: number; unit_price: number; payment_method: string | null;
         created_at: string; branch_id: string | null;
         imei: string | null; warranty_days: number | null; customer_name: string | null; customer_phone: string | null;
+        reservation_deposit?: number | string | null;
       };
       let inserted: InsertedRow[];
       let tradeInInfo: CompletedCartSale["trade_in"] = null;
 
       if (tradeIn) {
-        const problem = validateTradeInValue(tradeInValue, total);
+        const problem = validateTradeInValue(tradeInValue, total, deposits);
         if (problem) { toast.error(problem); return; }
         // Venta y equipo recibido en una sola transacción: si algo falla no queda
         // una venta sin su canje ni un equipo en el catálogo sin su venta.
@@ -198,7 +224,7 @@ export default function CartSheet({
           p: buildTradeInSaleParams({
             saleGroupId,
             paymentMethod,
-            lines: lines.map((l) => ({ inventory_item_id: l.id, quantity: l.quantity, unit_price: finalPrice(l) })),
+            lines: lines.map((l) => ({ inventory_item_id: l.id, quantity: l.quantity, unit_price: finalPrice(l), reservation_id: l.reservationId ?? null })),
             draft: tradeIn,
             warranty,
           }),
@@ -242,12 +268,13 @@ export default function CartSheet({
           payment_method: paymentMethod,
           created_by: user.id,
           sale_group_id: saleGroupId,
+          ...(l.reservationId ? { reservation_id: l.reservationId } : {}),
           ...warranty,
         }));
         const { data, error } = await (supabase as any)
           .from("product_sales")
           .insert(rows)
-          .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id, imei, warranty_days, customer_name, customer_phone");
+          .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id, imei, warranty_days, customer_name, customer_phone, reservation_deposit");
         if (error) throw error;
         inserted = (data as InsertedRow[]) ?? [];
       }
@@ -269,6 +296,8 @@ export default function CartSheet({
         customer_name: buyerRow?.customer_name ?? null,
         customer_phone: buyerRow?.customer_phone ?? null,
         trade_in: tradeInInfo,
+        // La seña que realmente descontó el servidor, no la que mostraba el carrito.
+        deposit: inserted.reduce((s, r) => s + Number(r.reservation_deposit || 0), 0) || null,
       });
       setTradeIn(null);
       setCart({});
@@ -301,9 +330,11 @@ export default function CartSheet({
                   {completedSale.trade_in.device_name} · {formatPYG(completedSale.trade_in.value)}
                   {completedSale.trade_in.record ? ` · ${completedSale.trade_in.record.receipt_number}` : ""}
                 </div>
-                <div className="text-muted-foreground">
-                  Cobrado: {formatPYG(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - completedSale.trade_in.value))}
-                </div>
+                {!completedSale.deposit && (
+                  <div className="text-muted-foreground">
+                    Cobrado: {formatPYG(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - completedSale.trade_in.value))}
+                  </div>
+                )}
                 {completedSale.trade_in.record && onPrintTradeIn && (
                   <Button
                     variant="outline"
@@ -314,6 +345,15 @@ export default function CartSheet({
                     <Printer className="h-4 w-4" /> Imprimir comprobante del canje
                   </Button>
                 )}
+              </div>
+            )}
+            {!!completedSale.deposit && (
+              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm" data-testid="deposit-done">
+                <div className="font-medium text-foreground">Venta desde una reserva</div>
+                <div className="text-muted-foreground">Seña ya abonada: -{formatPYG(completedSale.deposit)}</div>
+                <div className="text-muted-foreground">
+                  Cobrado ahora: {formatPYG(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - (completedSale.trade_in?.value ?? 0) - completedSale.deposit))}
+                </div>
               </div>
             )}
             {completedSale.items.some((i) => i.warranty_days !== null && i.warranty_days !== undefined) && (
@@ -372,6 +412,16 @@ export default function CartSheet({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
+                  {l.reservationId && (
+                    <div className="text-xs text-primary" data-testid="cart-reservation-line">
+                      {(() => {
+                        const r = reservationOf(l);
+                        return r
+                          ? `Reserva ${r.receipt_number} · ${r.customer_name} · ${depositOf(r) > 0 ? `seña ${formatPYG(depositOf(r))}` : "sin seña"}`
+                          : "Esta reserva ya no está activa";
+                      })()}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-muted-foreground">Gs.</span>
@@ -524,9 +574,18 @@ export default function CartSheet({
                     <span className="text-sm text-muted-foreground">Total</span>
                     <span className="text-xl font-bold text-primary">{formatPYG(total)}</span>
                   </div>
-                  {tradeIn && !tradeInProblem && (
+                  {deposits > 0 && (
+                    <div className="flex items-center justify-between text-sm text-secondary" data-testid="deposit-line">
+                      <span>Seña ya abonada (reserva)</span>
+                      <span>-{formatPYG(deposits)}</span>
+                    </div>
+                  )}
+                  {reservationProblem && <p className="text-xs text-destructive" data-testid="reservation-problem">{reservationProblem}</p>}
+                  {(tradeIn || deposits > 0) && !tradeInProblem && (
                     <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-4 py-3">
-                      <span className="text-sm text-muted-foreground">A cobrar (total − equipo recibido)</span>
+                      <span className="text-sm text-muted-foreground">
+                        A cobrar (total{tradeIn ? " − equipo recibido" : ""}{deposits > 0 ? " − seña" : ""})
+                      </span>
                       <span className="text-xl font-bold text-primary" data-testid="to-collect">{formatPYG(toCollect)}</span>
                     </div>
                   )}
@@ -557,7 +616,7 @@ export default function CartSheet({
                 </div>
                 <SheetFooter className="flex-col gap-2 sm:flex-col sm:justify-start sm:space-x-0">
                   {cashGate.blocked && <CashRegisterRequiredNotice what="vender" />}
-                  <Button onClick={() => checkout()} disabled={loading || cashGate.blocked || !!tradeInProblem} size="lg" className="w-full">
+                  <Button onClick={() => checkout()} disabled={loading || cashGate.blocked || !!tradeInProblem || !!reservationProblem} size="lg" className="w-full">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Confirmar venta
                   </Button>
@@ -572,6 +631,7 @@ export default function CartSheet({
         onOpenChange={setTradeInOpen}
         mode="canje"
         maxValue={total}
+        deposit={deposits}
         initialForm={tradeIn?.form ?? null}
         onCollect={setTradeIn}
       />

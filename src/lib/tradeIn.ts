@@ -19,33 +19,51 @@ interface SaleAmountRow {
   quantity: number;
   unit_price: number | string | null;
   trade_in_value?: number | string | null;
+  reservation_deposit?: number | string | null;
 }
 
-export function amountToCollect(total: number, tradeInValue: number): number {
-  return Math.max(0, total - tradeInValue);
+/** Lo que hay que cobrar: el total menos el equipo recibido y menos la seña ya cobrada de una reserva. */
+export function amountToCollect(total: number, tradeInValue: number, depositValue = 0): number {
+  return Math.max(0, total - tradeInValue - depositValue);
 }
 
-export function validateTradeInValue(value: number, saleTotal: number): string | null {
+/** `deposit` es la seña de reservas que ya se cobró: el canje y la seña juntos no pueden superar el total. */
+export function validateTradeInValue(value: number, saleTotal: number, deposit = 0): string | null {
   if (!(value > 0)) return "Ingresá cuánto le reconocés por el equipo";
-  if (value > saleTotal) {
-    return "El equipo vale más que la venta. Bajá el valor reconocido o agregá más productos al carrito.";
+  if (value + deposit > saleTotal) {
+    return deposit > 0
+      ? "El equipo recibido más la seña superan el total de la venta. Bajá el valor reconocido o agregá más productos al carrito."
+      : "El equipo vale más que la venta. Bajá el valor reconocido o agregá más productos al carrito.";
   }
   return null;
 }
 
-/** Lo que realmente se cobró de una línea: su precio menos el canje (que se guarda en la primera línea de la venta). */
+/**
+ * Lo que realmente se cobró de una línea: su precio menos el canje (que se guarda
+ * en la primera línea de la venta) y menos la seña de su reserva (que ya se contó
+ * en Caja el día que se recibió).
+ */
 export function netSaleAmount(row: SaleAmountRow): number {
-  return row.quantity * Number(row.unit_price || 0) - Number(row.trade_in_value || 0);
+  return (
+    row.quantity * Number(row.unit_price || 0) -
+    Number(row.trade_in_value || 0) -
+    Number(row.reservation_deposit || 0)
+  );
 }
 
 export function tradeInOfSale(rows: { trade_in_value?: number | string | null }[]): number {
   return rows.reduce((sum, r) => sum + Number(r.trade_in_value || 0), 0);
 }
 
+export function depositOfSale(rows: { reservation_deposit?: number | string | null }[]): number {
+  return rows.reduce((sum, r) => sum + Number(r.reservation_deposit || 0), 0);
+}
+
 export interface TradeInSaleLine {
   inventory_item_id: string;
   quantity: number;
   unit_price: number;
+  reservation_id?: string | null;
 }
 
 /**
@@ -74,6 +92,7 @@ export function buildTradeInSaleParams(args: {
       inventory_item_id: l.inventory_item_id,
       quantity: l.quantity,
       unit_price: l.unit_price,
+      ...(l.reservation_id ? { reservation_id: l.reservation_id } : {}),
     })),
     trade_in: { ...args.draft.params, branch_id: null },
   };

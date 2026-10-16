@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { netSaleAmount } from "@/lib/tradeIn";
 
 interface PaymentRow { amount: number; payment_method: string | null }
-interface AmountEvent extends PaymentRow { source: "orden" | "venta" }
+interface AmountEvent extends PaymentRow { source: "orden" | "venta" | "sena" }
 interface ClosingRow {
   id: string;
   closing_date: string;
@@ -182,6 +182,7 @@ export default function CashClosing() {
   const [breakdownRows, setBreakdownRows] = useState<AmountEvent[]>([]);
   const [expenseRows, setExpenseRows] = useState<PaymentRow[]>([]);
   const [purchaseRows, setPurchaseRows] = useState<PaymentRow[]>([]);
+  const [refundRows, setRefundRows] = useState<PaymentRow[]>([]);
   const [existingClosing, setExistingClosing] = useState<ClosingRow | null>(null);
   const [closingHistory, setClosingHistory] = useState<ClosingRow[]>([]);
   const [countedCash, setCountedCash] = useState("");
@@ -251,8 +252,8 @@ export default function CashClosing() {
               .gte("created_at", from)
               .lte("created_at", to),
             (scopeBranchId
-              ? (supabase as any).from("product_sales").select("quantity, unit_price, trade_in_value, payment_method").eq("branch_id", scopeBranchId)
-              : (supabase as any).from("product_sales").select("quantity, unit_price, trade_in_value, payment_method"))
+              ? (supabase as any).from("product_sales").select("quantity, unit_price, trade_in_value, reservation_deposit, payment_method").eq("branch_id", scopeBranchId)
+              : (supabase as any).from("product_sales").select("quantity, unit_price, trade_in_value, reservation_deposit, payment_method"))
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
@@ -267,6 +268,15 @@ export default function CashClosing() {
             (scopeBranchId
               ? (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("kind", "compra").eq("branch_id", scopeBranchId)
               : (supabase as any).from("device_purchases").select("purchase_price, payment_method").eq("kind", "compra"))
+              .eq("company_id", companyId)
+              .gte("created_at", from)
+              .lte("created_at", to),
+            // Señas de reservas de equipos: la seña entra a la caja el día que se recibe y, si se cancela, la devolución
+            // sale el día que se devuelve. La retención no mueve plata. Al vender, la seña ya está cobrada (netSaleAmount).
+            (scopeBranchId
+              ? (supabase as any).from("device_reservation_movements").select("kind, amount, payment_method").eq("branch_id", scopeBranchId)
+              : (supabase as any).from("device_reservation_movements").select("kind, amount, payment_method"))
+              .in("kind", ["sena", "devolucion"])
               .eq("company_id", companyId)
               .gte("created_at", from)
               .lte("created_at", to),
@@ -303,14 +313,18 @@ export default function CashClosing() {
       setOpeningNotes("");
 
       if (canCloseCaja) {
-        const [{ data: pay }, { data: sal }, { data: exp }, { data: purch }, { data: closing }, { data: hist }] = adminRes;
+        const [{ data: pay }, { data: sal }, { data: exp }, { data: purch }, { data: resMov }, { data: closing }, { data: hist }] = adminRes;
+        const movements = (resMov ?? []) as { kind: "sena" | "devolucion"; amount: number; payment_method: string | null }[];
         const rows: AmountEvent[] = [
+          ...movements
+            .filter((m) => m.kind === "sena")
+            .map((m) => ({ amount: Number(m.amount || 0), payment_method: m.payment_method, source: "sena" as const })),
           ...((pay ?? []) as { amount: number; payment_method: string | null }[]).map((p) => ({
             amount: Number(p.amount || 0),
             payment_method: p.payment_method,
             source: "orden" as const,
           })),
-          ...((sal ?? []) as { quantity: number; unit_price: number; trade_in_value: number | null; payment_method: string | null }[]).map((s) => ({
+          ...((sal ?? []) as { quantity: number; unit_price: number; trade_in_value: number | null; reservation_deposit: number | null; payment_method: string | null }[]).map((s) => ({
             amount: netSaleAmount(s),
             payment_method: s.payment_method,
             source: "venta" as const,
@@ -325,6 +339,9 @@ export default function CashClosing() {
           amount: Number(p.purchase_price || 0),
           payment_method: p.payment_method,
         })));
+        setRefundRows(movements
+          .filter((m) => m.kind === "devolucion")
+          .map((m) => ({ amount: Number(m.amount || 0), payment_method: m.payment_method })));
         setExistingClosing((closing as ClosingRow) ?? null);
         setClosingHistory((hist ?? []) as ClosingRow[]);
         setRedoing(false);
@@ -346,8 +363,13 @@ export default function CashClosing() {
     () => groupByMethod(breakdownRows.filter((r) => r.source === "venta")),
     [breakdownRows]
   );
+  const breakdownBySenas = useMemo(
+    () => groupByMethod(breakdownRows.filter((r) => r.source === "sena")),
+    [breakdownRows]
+  );
   const breakdownByGastos = useMemo(() => groupByMethod(expenseRows), [expenseRows]);
   const breakdownByCompras = useMemo(() => groupByMethod(purchaseRows), [purchaseRows]);
+  const breakdownByDevoluciones = useMemo(() => groupByMethod(refundRows), [refundRows]);
 
   const cashIncome = useMemo(
     () => breakdown.reduce((s, [method, amount]) => s + (isCashLabel(method) ? amount : 0), 0),
@@ -361,12 +383,20 @@ export default function CashClosing() {
     () => breakdownByCompras.reduce((s, [method, amount]) => s + (isCashLabel(method) ? amount : 0), 0),
     [breakdownByCompras]
   );
+  const cashRefunds = useMemo(
+    () => breakdownByDevoluciones.reduce((s, [method, amount]) => s + (isCashLabel(method) ? amount : 0), 0),
+    [breakdownByDevoluciones]
+  );
   const totalIncome = useMemo(() => breakdown.reduce((s, [, amount]) => s + amount, 0), [breakdown]);
   const totalExpenses = useMemo(() => breakdownByGastos.reduce((s, [, amount]) => s + amount, 0), [breakdownByGastos]);
   const totalPurchases = useMemo(() => breakdownByCompras.reduce((s, [, amount]) => s + amount, 0), [breakdownByCompras]);
-  // Gastos y compras de equipos son salidas de plata por igual para la caja.
-  const cashOutflow = cashExpenses + cashPurchases;
-  const totalOutflow = totalExpenses + totalPurchases;
+  const totalRefunds = useMemo(() => breakdownByDevoluciones.reduce((s, [, amount]) => s + amount, 0), [breakdownByDevoluciones]);
+  // Gastos, compras de equipos y devoluciones de señas son salidas de plata por igual para la caja.
+  const cashOutflow = cashExpenses + cashPurchases + cashRefunds;
+  const totalOutflow = totalExpenses + totalPurchases + totalRefunds;
+  const outflowLabel = totalPurchases > 0 || totalRefunds > 0
+    ? "Total (ingresos - gastos, compras y devoluciones)"
+    : "Total (ingresos - gastos)";
   const openingCashForDate = existingOpening?.opening_cash ?? 0;
   const expectedCash = openingCashForDate + cashIncome - cashOutflow;
 
@@ -376,8 +406,9 @@ export default function CashClosing() {
   const virtualIncome = totalIncome - cashIncome;
   const virtualExpenses = totalExpenses - cashExpenses;
   const virtualPurchases = totalPurchases - cashPurchases;
+  const virtualRefunds = totalRefunds - cashRefunds;
   const openingVirtualForDate = existingOpening?.opening_virtual ?? 0;
-  const expectedVirtual = openingVirtualForDate + virtualIncome - virtualExpenses - virtualPurchases;
+  const expectedVirtual = openingVirtualForDate + virtualIncome - virtualExpenses - virtualPurchases - virtualRefunds;
   const virtualCounted = countedVirtual.trim() ? Math.round(Number(countedVirtual) || 0) : null;
   const differenceVirtual = virtualCounted === null ? null : virtualCounted - expectedVirtual;
 
@@ -435,6 +466,8 @@ export default function CashClosing() {
       ventas: Object.fromEntries(breakdownByVentas),
       gastos: Object.fromEntries(breakdownByGastos),
       compras_equipos: Object.fromEntries(breakdownByCompras),
+      ...(breakdownBySenas.length > 0 ? { senas: Object.fromEntries(breakdownBySenas) } : {}),
+      ...(breakdownByDevoluciones.length > 0 ? { devoluciones_senas: Object.fromEntries(breakdownByDevoluciones) } : {}),
       apertura: openingCashForDate,
       ...(virtualEnabled ? { apertura_virtual: openingVirtualForDate } : {}),
     };
@@ -686,7 +719,7 @@ export default function CashClosing() {
                 <Card>
                   <CardContent className="space-y-3 p-5">
                     <div className="text-sm font-semibold text-foreground">Ingresos del día por medio de pago</div>
-                    {breakdown.length === 0 && breakdownByGastos.length === 0 && breakdownByCompras.length === 0 ? (
+                    {breakdown.length === 0 && breakdownByGastos.length === 0 && breakdownByCompras.length === 0 && breakdownByDevoluciones.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No hubo movimientos ese día.</p>
                     ) : (
                       <div className="space-y-4">
@@ -724,6 +757,19 @@ export default function CashClosing() {
                           )}
                         </div>
 
+                        {breakdownBySenas.length > 0 && (
+                          <div className="space-y-1.5 border-t border-border/60 pt-3" data-testid="deposits-section">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Señas de reservas</div>
+                            {breakdownBySenas.map(([label, amount]) => (
+                              <MethodLine key={label} label={label} amount={amount} virtualEnabled={virtualEnabled} />
+                            ))}
+                            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                              <span>Subtotal señas</span>
+                              <span>{formatPYG(breakdownBySenas.reduce((s, [, a]) => s + a, 0))}</span>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="space-y-1.5 border-t border-border/60 pt-3">
                           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gastos</div>
                           {breakdownByGastos.length === 0 ? (
@@ -754,9 +800,22 @@ export default function CashClosing() {
                           </div>
                         )}
 
+                        {breakdownByDevoluciones.length > 0 && (
+                          <div className="space-y-1.5 border-t border-border/60 pt-3" data-testid="refunds-section">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Devoluciones de señas</div>
+                            {breakdownByDevoluciones.map(([label, amount]) => (
+                              <MethodLine key={label} label={label} amount={amount} negative virtualEnabled={virtualEnabled} />
+                            ))}
+                            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                              <span>Subtotal devoluciones</span>
+                              <span className="text-destructive">-{formatPYG(totalRefunds)}</span>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="space-y-1.5 border-t border-border pt-2">
                           <div className="flex items-center justify-between text-sm font-semibold">
-                            <span>{breakdownByCompras.length > 0 ? "Total (ingresos - gastos y compras)" : "Total (ingresos - gastos)"}</span>
+                            <span>{outflowLabel}</span>
                             <span>{formatPYG(totalIncome - totalOutflow)}</span>
                           </div>
                           {virtualEnabled && (
@@ -767,7 +826,7 @@ export default function CashClosing() {
                               </div>
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" /> Neto por caja virtual</span>
-                                <span>{formatPYG(virtualIncome - virtualExpenses - virtualPurchases)}</span>
+                                <span>{formatPYG(virtualIncome - virtualExpenses - virtualPurchases - virtualRefunds)}</span>
                               </div>
                             </>
                           )}
@@ -794,8 +853,10 @@ export default function CashClosing() {
                               { label: "Apertura", amount: openingCashForDate },
                               { label: "+ Reparaciones en efectivo", amount: sumBox(breakdownByOrdenes, true) },
                               { label: "+ Ventas en efectivo", amount: sumBox(breakdownByVentas, true) },
+                              ...(breakdownBySenas.length > 0 ? [{ label: "+ Señas de reservas en efectivo", amount: sumBox(breakdownBySenas, true) }] : []),
                               { label: "- Gastos en efectivo", amount: cashExpenses },
                               ...(breakdownByCompras.length > 0 ? [{ label: "- Compras de equipos en efectivo", amount: cashPurchases }] : []),
+                              ...(breakdownByDevoluciones.length > 0 ? [{ label: "- Devoluciones de señas en efectivo", amount: cashRefunds }] : []),
                             ]}
                             expectedLabel="Efectivo esperado"
                             expected={expectedCash}
@@ -813,8 +874,10 @@ export default function CashClosing() {
                                 { label: "Apertura", amount: openingVirtualForDate },
                                 { label: "+ Reparaciones por banco", amount: sumBox(breakdownByOrdenes, false) },
                                 { label: "+ Ventas por banco", amount: sumBox(breakdownByVentas, false) },
+                                ...(breakdownBySenas.length > 0 ? [{ label: "+ Señas de reservas por banco", amount: sumBox(breakdownBySenas, false) }] : []),
                                 { label: "- Gastos por banco", amount: virtualExpenses },
                                 ...(breakdownByCompras.length > 0 ? [{ label: "- Compras de equipos por banco", amount: virtualPurchases }] : []),
+                                ...(breakdownByDevoluciones.length > 0 ? [{ label: "- Devoluciones de señas por banco", amount: virtualRefunds }] : []),
                               ]}
                               expectedLabel="Saldo virtual esperado"
                               expected={expectedVirtual}
@@ -838,6 +901,7 @@ export default function CashClosing() {
                             { label: "+ Ingresos en efectivo", amount: cashIncome },
                             { label: "- Gastos en efectivo", amount: cashExpenses },
                             ...(breakdownByCompras.length > 0 ? [{ label: "- Compras de equipos en efectivo", amount: cashPurchases }] : []),
+                            ...(breakdownByDevoluciones.length > 0 ? [{ label: "- Devoluciones de señas en efectivo", amount: cashRefunds }] : []),
                           ]}
                           expectedLabel="Efectivo esperado"
                           expected={expectedCash}

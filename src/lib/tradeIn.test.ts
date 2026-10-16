@@ -3,6 +3,7 @@ import { emptyDevicePurchaseForm, buildDevicePurchaseParams } from "./devicePurc
 import {
   amountToCollect,
   buildTradeInSaleParams,
+  depositOfSale,
   netSaleAmount,
   tradeInOfSale,
   validateTradeInValue,
@@ -16,6 +17,12 @@ describe("amountToCollect", () => {
     expect(amountToCollect(1000000, 1000000)).toBe(0);
     expect(amountToCollect(1000000, 1500000)).toBe(0);
   });
+  it("resta también la seña ya cobrada de una reserva", () => {
+    expect(amountToCollect(3000000, 1200000, 500000)).toBe(1300000);
+    expect(amountToCollect(3000000, 0, 500000)).toBe(2500000);
+    expect(amountToCollect(1000000, 400000, 600000)).toBe(0);
+    expect(amountToCollect(1000000, 800000, 800000)).toBe(0);
+  });
 });
 
 describe("validateTradeInValue", () => {
@@ -26,6 +33,13 @@ describe("validateTradeInValue", () => {
   it("rechaza cero y más que el total", () => {
     expect(validateTradeInValue(0, 3000000)).toMatch(/reconocés/);
     expect(validateTradeInValue(3000001, 3000000)).toMatch(/vale más que la venta/);
+  });
+  it("con seña, el canje más la seña no pueden superar el total", () => {
+    expect(validateTradeInValue(2000000, 3000000, 1000000)).toBeNull();
+    expect(validateTradeInValue(2000001, 3000000, 1000000)).toMatch(/más la seña/);
+  });
+  it("sin seña el mensaje es el de siempre", () => {
+    expect(validateTradeInValue(3000001, 3000000, 0)).toMatch(/vale más que la venta/);
   });
 });
 
@@ -44,11 +58,34 @@ describe("netSaleAmount", () => {
     ];
     expect(rows.reduce((s, r) => s + netSaleAmount(r), 0)).toBe(400000);
   });
+  it("resta la seña de la reserva: ya se contó en Caja el día que se recibió", () => {
+    expect(netSaleAmount({ quantity: 1, unit_price: 3000000, reservation_deposit: 500000 })).toBe(2500000);
+    expect(netSaleAmount({ quantity: 1, unit_price: "3000000", reservation_deposit: "500000" })).toBe(2500000);
+  });
+  it("canje y seña se restan juntos", () => {
+    expect(
+      netSaleAmount({ quantity: 1, unit_price: 3000000, trade_in_value: 1000000, reservation_deposit: 500000 }),
+    ).toBe(1500000);
+  });
+  it("una seña nula o ausente no cambia nada", () => {
+    expect(netSaleAmount({ quantity: 1, unit_price: 100000, reservation_deposit: null })).toBe(100000);
+    expect(netSaleAmount({ quantity: 1, unit_price: 100000, reservation_deposit: 0 })).toBe(100000);
+  });
 });
 
 describe("tradeInOfSale", () => {
   it("suma el canje de todas las líneas de la venta", () => {
     expect(tradeInOfSale([{ trade_in_value: 500000 }, { trade_in_value: 0 }, {}])).toBe(500000);
+  });
+});
+
+describe("depositOfSale", () => {
+  it("suma la seña de todas las líneas de la venta", () => {
+    expect(depositOfSale([{ reservation_deposit: 500000 }, { reservation_deposit: "250000" }, { reservation_deposit: null }, {}])).toBe(750000);
+  });
+  it("una venta sin reservas no tiene seña", () => {
+    expect(depositOfSale([{}, {}])).toBe(0);
+    expect(depositOfSale([])).toBe(0);
   });
 });
 
@@ -76,6 +113,32 @@ describe("buildTradeInSaleParams", () => {
     expect(params.warranty_days).toBeNull();
     expect(params.customer_name).toBeNull();
     expect(params.customer_phone).toBeNull();
+  });
+
+  it("manda el reservation_id solo en la línea que viene de una reserva", () => {
+    const form = {
+      ...emptyDevicePurchaseForm("branch-1"),
+      device_name: "iPhone 11",
+      imei: "356938035643809",
+      seller_name: "Ana",
+      seller_cedula: "1.234.567",
+      purchase_price: "500.000",
+    };
+    const params = buildTradeInSaleParams({
+      saleGroupId: "grp-1",
+      paymentMethod: "Efectivo",
+      lines: [
+        { inventory_item_id: "item-1", quantity: 1, unit_price: 3000000, reservation_id: "res-1" },
+        { inventory_item_id: "item-2", quantity: 2, unit_price: 50000 },
+        { inventory_item_id: "item-3", quantity: 1, unit_price: 10000, reservation_id: null },
+      ],
+      draft: { form, params: buildDevicePurchaseParams(form, []) },
+    });
+    expect(params.items).toEqual([
+      { inventory_item_id: "item-1", quantity: 1, unit_price: 3000000, reservation_id: "res-1" },
+      { inventory_item_id: "item-2", quantity: 2, unit_price: 50000 },
+      { inventory_item_id: "item-3", quantity: 1, unit_price: 10000 },
+    ]);
   });
 
   it("incluye la garantía y los datos del comprador cuando se piden", () => {

@@ -107,6 +107,24 @@ describe("buildPriceList", () => {
     expect(text).toContain("*Sin categoría*");
   });
 
+  it("deja afuera los equipos reservados y los cuenta aparte", () => {
+    const res = buildPriceList({
+      items: [
+        item({ name: "iPhone 13 128GB", selling_price: 3500000 }),
+        item({ name: "iPhone 11 64GB", selling_price: 1800000, reserved: true }),
+        item({ name: "Agotado y reservado", stock: 0, reserved: true }),
+      ],
+      categoryName,
+      now,
+    });
+    expect(res.included).toBe(1);
+    expect(res.reserved).toBe(1);
+    expect(res.withoutStock).toBe(1);
+    expect(res.withoutPrice).toBe(0);
+    expect(res.text).toContain("iPhone 13 128GB");
+    expect(res.text).not.toContain("iPhone 11 64GB");
+  });
+
   it("sin artículos ofrecibles devuelve included 0", () => {
     const res = buildPriceList({ items: [item({ name: "A", stock: 0 })], categoryName, now });
     expect(res.included).toBe(0);

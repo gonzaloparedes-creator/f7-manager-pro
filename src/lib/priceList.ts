@@ -7,6 +7,7 @@ export type PriceListItem = {
   selling_price: number | string | null;
   category_id: string | null;
   battery_health?: number | string | null;
+  reserved?: boolean;
 };
 
 export type PriceListInput<T extends PriceListItem> = {
@@ -22,12 +23,13 @@ export type PriceListResult = {
   included: number;
   withoutStock: number;
   withoutPrice: number;
+  reserved: number;
 };
 
 const NO_CATEGORY = "Sin categoría";
 
 function sellable(item: PriceListItem): boolean {
-  return item.stock > 0 && Number(item.selling_price || 0) > 0;
+  return item.stock > 0 && !item.reserved && Number(item.selling_price || 0) > 0;
 }
 
 /**
@@ -39,7 +41,8 @@ export function buildPriceList<T extends PriceListItem>(input: PriceListInput<T>
   const { items, categoryName, businessName, branchName, now = new Date() } = input;
 
   const withoutStock = items.filter((i) => i.stock <= 0).length;
-  const withoutPrice = items.filter((i) => i.stock > 0 && !(Number(i.selling_price || 0) > 0)).length;
+  const reserved = items.filter((i) => i.stock > 0 && i.reserved).length;
+  const withoutPrice = items.filter((i) => i.stock > 0 && !i.reserved && !(Number(i.selling_price || 0) > 0)).length;
   const offered = items.filter(sellable);
 
   const groups = new Map<string, { label: string; rows: T[] }>();
@@ -72,5 +75,5 @@ export function buildPriceList<T extends PriceListItem>(input: PriceListInput<T>
     }
   }
 
-  return { text: lines.join("\n"), included: offered.length, withoutStock, withoutPrice };
+  return { text: lines.join("\n"), included: offered.length, withoutStock, withoutPrice, reserved };
 }

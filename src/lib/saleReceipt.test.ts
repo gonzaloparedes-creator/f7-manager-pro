@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSaleReceiptMessage } from "./saleReceipt";
+import { buildSaleReceiptMessage, saleToPay } from "./saleReceipt";
 
 const sale = {
   id: "abcdef123456",
@@ -7,6 +7,15 @@ const sale = {
   payment_method: "Efectivo",
   items: [{ product_name: "iPhone 14", quantity: 1, unit_price: 3000000 }],
 };
+
+describe("saleToPay", () => {
+  it("es el total menos canje y seña, y nunca negativo", () => {
+    expect(saleToPay(sale)).toBe(3000000);
+    expect(saleToPay({ ...sale, deposit: 500000 })).toBe(2500000);
+    expect(saleToPay({ ...sale, deposit: 500000, trade_in: { device_name: "X", value: 1000000 } })).toBe(1500000);
+    expect(saleToPay({ ...sale, deposit: 3000000, trade_in: { device_name: "X", value: 1000000 } })).toBe(0);
+  });
+});
 
 describe("buildSaleReceiptMessage", () => {
   it("sin canje muestra el total", () => {
@@ -23,6 +32,30 @@ describe("buildSaleReceiptMessage", () => {
     expect(msg).toContain("Subtotal: Gs. 3.000.000");
     expect(msg).toContain("Equipo recibido (iPhone 11): -Gs. 1.200.000");
     expect(msg).toContain("*A pagar: Gs. 1.800.000*");
+  });
+
+  it("con seña de reserva muestra la seña ya abonada y lo que se paga ahora", () => {
+    const msg = buildSaleReceiptMessage({ ...sale, deposit: 500000 }, {});
+    expect(msg).toContain("Subtotal: Gs. 3.000.000");
+    expect(msg).toContain("Seña ya abonada: -Gs. 500.000");
+    expect(msg).toContain("*A pagar: Gs. 2.500.000*");
+    expect(msg).not.toContain("Equipo recibido");
+  });
+
+  it("con canje y seña los resta a los dos", () => {
+    const msg = buildSaleReceiptMessage(
+      { ...sale, deposit: 500000, trade_in: { device_name: "iPhone 11", value: 1200000 } },
+      {}
+    );
+    expect(msg).toContain("Equipo recibido (iPhone 11): -Gs. 1.200.000");
+    expect(msg).toContain("Seña ya abonada: -Gs. 500.000");
+    expect(msg).toContain("*A pagar: Gs. 1.300.000*");
+  });
+
+  it("una seña en cero no cambia el comprobante", () => {
+    const msg = buildSaleReceiptMessage({ ...sale, deposit: 0 }, {});
+    expect(msg).toContain("*Total: Gs. 3.000.000*");
+    expect(msg).not.toContain("Seña");
   });
 
   it("sin garantía registrada no escribe líneas de garantía ni IMEI", () => {

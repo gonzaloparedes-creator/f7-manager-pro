@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingBag, ShoppingCart, AlertTriangle, Eye, EyeOff, Pencil, Trash2, X } from "lucide-react";
+import { ShoppingBag, ShoppingCart, AlertTriangle, CalendarClock, Eye, EyeOff, Pencil, Trash2, X } from "lucide-react";
 import QuantityStepper from "@/components/QuantityStepper";
 import { formatPYG } from "@/lib/orders";
+import { balanceDue, depositOf, displayDate, expiryText, type DeviceReservation } from "@/lib/reservations";
 import { isLowBattery, originLabel } from "@/lib/deviceSpecs";
 import { toMinPrice } from "@/lib/devicePricing";
 import type { Product } from "@/pages/Products";
@@ -19,7 +20,10 @@ export default function ProductPreviewDialog({
   canViewStock,
   canDelete,
   cartLine,
+  reservation,
   onAddToCart,
+  onReserve,
+  onSellReservation,
   onUpdateQty,
   onEdit,
   onDelete,
@@ -32,7 +36,11 @@ export default function ProductPreviewDialog({
   canViewStock: boolean;
   canDelete: boolean;
   cartLine: CartLine | undefined;
+  /** Reserva activa de este equipo, si la tiene: solo se puede vender desde la reserva. */
+  reservation?: DeviceReservation;
   onAddToCart: () => void;
+  onReserve?: () => void;
+  onSellReservation?: () => void;
   onUpdateQty: (qty: number) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -142,6 +150,24 @@ export default function ProductPreviewDialog({
             )}
           </div>
 
+          {reservation && (
+            <div className="space-y-1 rounded-md border border-secondary/40 bg-secondary/10 px-3 py-2.5 text-sm" data-testid="preview-reservation">
+              <div className="flex items-center gap-1.5 font-medium text-secondary">
+                <CalendarClock className="h-4 w-4" /> Reservado · {reservation.receipt_number}
+              </div>
+              <div>
+                Para <span className="font-medium">{reservation.customer_name}</span>
+                {" · "}{expiryText(reservation.expires_on)} ({displayDate(reservation.expires_on)})
+              </div>
+              <div className="text-muted-foreground">
+                Precio {formatPYG(Number(reservation.agreed_price))}
+                {depositOf(reservation) > 0
+                  ? ` · seña ${formatPYG(depositOf(reservation))} · saldo ${formatPYG(balanceDue(reservation))}`
+                  : " · sin seña"}
+              </div>
+            </div>
+          )}
+
           {cartLine ? (
             <div className="flex items-center justify-between gap-2">
               <QuantityStepper value={cartLine.quantity} max={product.stock} onChange={onUpdateQty} />
@@ -149,10 +175,21 @@ export default function ProductPreviewDialog({
                 {formatPYG(cartLine.quantity * cartLine.unitPrice)}
               </span>
             </div>
-          ) : (
-            <Button className="w-full gap-2" size="lg" disabled={outOfStock} onClick={onAddToCart}>
-              <ShoppingCart className="h-4 w-4" /> Agregar al carrito
+          ) : reservation ? (
+            <Button className="w-full gap-2" size="lg" onClick={onSellReservation}>
+              <ShoppingCart className="h-4 w-4" /> Vender reserva
             </Button>
+          ) : (
+            <div className="space-y-2">
+              <Button className="w-full gap-2" size="lg" disabled={outOfStock} onClick={onAddToCart}>
+                <ShoppingCart className="h-4 w-4" /> Agregar al carrito
+              </Button>
+              {product.is_device && !outOfStock && onReserve && (
+                <Button variant="outline" className="w-full gap-2" onClick={onReserve}>
+                  <CalendarClock className="h-4 w-4" /> Reservar
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
