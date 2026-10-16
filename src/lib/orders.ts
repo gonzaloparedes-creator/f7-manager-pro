@@ -167,6 +167,39 @@ export function computeWarrantyState(
   return { kind: "expired" };
 }
 
+export function orderMoney(o: {
+  quote_amount: number | null;
+  deposit_amount: number | null;
+  cargos_adicionales: { monto: number }[] | null;
+}) {
+  const cargosTotal = (o.cargos_adicionales ?? []).reduce((s, c) => s + Number(c?.monto ?? 0), 0);
+  const total = Number(o.quote_amount ?? 0) + cargosTotal;
+  const deposit = Number(o.deposit_amount ?? 0);
+  const saldo = Math.max(0, total - deposit);
+  return { total, deposit, saldo, isFullyPaid: total > 0 && saldo === 0 };
+}
+
+// Una orden abierta que lleva tantos días en el mismo estado se marca en
+// naranja ("atención") en las tarjetas y el tablero.
+export const STALE_AFTER_DAYS = 5;
+
+export function elapsedSince(iso: string | null | undefined, now = Date.now()) {
+  if (!iso) return null;
+  const ms = Math.max(0, now - new Date(iso).getTime());
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  return { minutes, hours, days: Math.floor(hours / 24) };
+}
+
+export function formatElapsedShort(iso: string | null | undefined, now = Date.now()) {
+  const e = elapsedSince(iso, now);
+  if (!e) return "";
+  if (e.minutes < 1) return "recién";
+  if (e.hours < 1) return `${e.minutes} min`;
+  if (e.days < 1) return `${e.hours} h`;
+  return `${e.days} d`;
+}
+
 export function formatPYG(value: number | null | undefined) {
   const n = Number(value ?? 0);
   return `Gs. ${n.toLocaleString("es-PY")}`;

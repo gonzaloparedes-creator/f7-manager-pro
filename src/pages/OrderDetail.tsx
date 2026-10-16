@@ -44,12 +44,10 @@ import ConvertQuoteDialog from "@/components/ConvertQuoteDialog";
 import AvisarClienteDialog, { type MessageOption } from "@/components/AvisarClienteDialog";
 import AvisarTecnicoDialog from "@/components/AvisarTecnicoDialog";
 import { loadTechnicianRecipients, type TechnicianRecipient } from "@/lib/technicianNotice";
-import { fetchWhatsAppSettings } from "@/hooks/useWhatsAppSettings";
 import { useMessageTemplates } from "@/hooks/useMessageTemplates";
 import {
   buildOrderMessageVars,
   MESSAGE_EVENTS,
-  notifyMessageQueueChanged,
   recipientPhone,
   renderMessage,
   resolveEventBody,
@@ -57,6 +55,7 @@ import {
   statusEventKey,
   type MessageEventKey,
 } from "@/lib/customerMessages";
+import { changeOrderStatus, resolveStatusNotice } from "@/lib/orderStatus";
 import imageCompression from "browser-image-compression";
 
 interface Order {
@@ -456,24 +455,6 @@ export default function OrderDetail() {
     }
   };
 
-  const sendLegacyStatusNotification = async (imageUrls: string[]) => {
-    if (!order) return;
-    try {
-      await supabase.functions.invoke("send-status-notification", {
-        body: {
-          customer_name: order.customer_name,
-          customer_phone: order.alternative_phone || order.customer_phone,
-          device_type: order.device_type,
-          order_number: order.order_number,
-          order_code: order.tracking_token,
-          new_status: newStatus,
-          app_origin: window.location.origin,
-          image_urls: imageUrls,
-        },
-      });
-    } catch (e) { console.warn(e); }
-  };
-
   const statusMessageFor = (statusKey: string) => {
     if (!order) return "";
     const vars = buildOrderMessageVars(order, {
@@ -483,32 +464,13 @@ export default function OrderDetail() {
     return renderMessage(resolveStatusBody(statusKey, statusPresets), vars);
   };
 
-  // Las empresas que todavía tienen Evolution conectado siguen recibiendo el
-  // aviso automático del servidor (hasta el apagado); el resto recibe la
-  // sugerencia para abrir WhatsApp con un toque.
   const notifyStatusChange = async (imageUrls: string[]) => {
     if (!order) return;
-    if (!companyId) {
-      await sendLegacyStatusNotification(imageUrls);
-      return;
-    }
-    let settings;
-    try {
-      settings = await fetchWhatsAppSettings(companyId);
-    } catch (e) {
-      console.warn(e);
-      await sendLegacyStatusNotification(imageUrls);
-      return;
-    }
-    if (settings.evolutionActive) {
-      await sendLegacyStatusNotification(imageUrls);
-      return;
-    }
-    if (settings.prefs[newStatus] !== true) return;
-    if (order.client_notify_whatsapp === false) return;
-    const phone = recipientPhone(order);
-    if (!phone) return;
-    setAvisar({ eventKey: statusEventKey(newStatus), message: statusMessageFor(newStatus), phone, suggested: true });
+    const notice = await resolveStatusNotice({
+      companyId, order, newStatus, presets: statusPresets, businessName, imageUrls,
+    });
+    if (!notice) return;
+    setAvisar({ eventKey: notice.eventKey, message: notice.message, phone: notice.phone, suggested: true });
     setAvisarOpen(true);
   };
 
@@ -612,34 +574,9 @@ export default function OrderDetail() {
         }
       }
 
-      const { error } = await supabase
-        .from("orders")
-        .update({
-          status: newStatus,
-          technician_notes: note && noteVisible ? note : order.technician_notes,
-          interruption_reason: interrupting ? interruptionReason : null,
-          interrupted_at: interrupting ? (order.status === newStatus && order.interrupted_at ? order.interrupted_at : new Date().toISOString()) : null,
-        })
-        .eq("id", order.id);
-      if (error) throw error;
-      await supabase.from("order_status_history").insert({
-        order_id: order.id, status: newStatus, status_label: resolveStatusLabel(newStatus, statusPresets),
-        note: note || null, is_internal: !noteVisible,
-        image_urls: imageUrls,
-      } as any);
-      if (interrupting && (newStatus !== order.status || interruptionReason !== (order.interruption_reason ?? ""))) {
-        try {
-          await supabase.from("order_status_history").insert({
-            order_id: order.id, status: newStatus, status_label: resolveStatusLabel(newStatus, statusPresets),
-            note: `Reparación interrumpida · motivo: ${interruptionReasonLabel(interruptionReason)}`,
-            is_internal: true, image_urls: [],
-          } as any);
-        } catch (e) {
-          console.warn("Failed to log interruption reason", e);
-        }
-      }
-
-      notifyMessageQueueChanged();
+      await changeOrderStatus({
+        order, newStatus, presets: statusPresets, note, noteVisible, imageUrls, interruptionReason,
+      });
       if (newStatus !== order.status) await notifyStatusChange(imageUrls);
 
       toast({ title: "Actualizado", description: "El estado fue actualizado." });

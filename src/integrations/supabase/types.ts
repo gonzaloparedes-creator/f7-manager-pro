@@ -1174,6 +1174,7 @@ export type Database = {
           secondary_phone: string | null
           senia_amount: number
           status: string
+          status_changed_at: string
           technician_id: string
           technician_notes: string | null
           terms_accepted: boolean
@@ -1231,6 +1232,7 @@ export type Database = {
           secondary_phone?: string | null
           senia_amount?: number
           status?: string
+          status_changed_at?: string
           technician_id: string
           technician_notes?: string | null
           terms_accepted?: boolean
@@ -1288,6 +1290,7 @@ export type Database = {
           secondary_phone?: string | null
           senia_amount?: number
           status?: string
+          status_changed_at?: string
           technician_id?: string
           technician_notes?: string | null
           terms_accepted?: boolean

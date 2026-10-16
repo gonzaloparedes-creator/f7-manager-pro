@@ -1,70 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCompany } from "@/hooks/useCompany";
 import { useBranchRestriction } from "@/hooks/useBranchRestriction";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useMoveOrder } from "@/hooks/useMoveOrder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  formatPYG, resolveStatusLabel, isClosedOrderStatus, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse,
-  PRIORITY_LABELS, normalizePriority, priorityBadgeClasses, priorityRank,
-} from "@/lib/orders";
+import { resolveStatusLabel, isClosedOrderStatus, normalizePriority, priorityRank } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
-import { Plus, Smartphone, Clock, CheckCircle2, Package, Wallet, User as UserIcon, Layers, Search, X, CalendarDays, Flag, LayoutDashboard } from "lucide-react";
+import { Plus, Smartphone, Clock, CheckCircle2, Package, Layers, Search, X, CalendarDays, Flag, LayoutDashboard, List, Columns3 } from "lucide-react";
 import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
 import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
 import DeliveryCalendarDialog from "@/components/DeliveryCalendarDialog";
 import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
-import { WarrantyBadge } from "@/components/WarrantyBadge";
-import OrderActionsMenu from "@/components/OrderActionsMenu";
 import EvolutionMigrationBanner from "@/components/EvolutionMigrationBanner";
+import OrderCard, { type OrderListItem } from "@/components/OrderCard";
+import OrdersBoard from "@/components/OrdersBoard";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-interface CargoAdicional { motivo: string; monto: number }
-interface Order {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_phone: string | null;
-  device_type: string;
-  imei: string | null;
-  marca: string | null;
-  modelo: string | null;
-  status: string;
-  created_at: string;
-  problems: string[] | null;
-  quote_amount: number | null;
-  deposit_amount: number | null;
-  deposit_payment_method: string | null;
-  cargos_adicionales: CargoAdicional[] | null;
-  estimated_delivery_date: string | null;
-  current_branch_id: string | null;
-  assigned_technician_id: string | null;
-  warranty_days: number | null;
-  delivered_at: string | null;
-  quote_response: QuoteResponse | null;
-  priority: string | null;
-}
+type Order = OrderListItem;
 interface Branch { id: string; name: string }
-interface ProfileLite { id: string; full_name: string | null }
 
-function orderMoney(o: Order) {
-  const cargosTotal = (o.cargos_adicionales ?? []).reduce((s, c) => s + Number(c?.monto ?? 0), 0);
-  const total = Number(o.quote_amount ?? 0) + cargosTotal;
-  const deposit = Number(o.deposit_amount ?? 0);
-  const saldo = Math.max(0, total - deposit);
-  const isFullyPaid = total > 0 && saldo === 0;
-  const hasPartial = total > 0 && saldo > 0 && deposit > 0;
-  const hasQuoteOnly = total > 0 && deposit === 0;
-  return { total, deposit, saldo, isFullyPaid, hasPartial, hasQuoteOnly };
+const VIEW_STORAGE_KEY = "f7:orders-view";
+
+function readStoredView(): "lista" | "tablero" {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === "tablero" ? "tablero" : "lista";
+  } catch {
+    return "lista";
+  }
 }
 
 const FIXED_FILTERS: { value: string; label: string }[] = [
@@ -101,8 +72,17 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [onlyHighPriority, setOnlyHighPriority] = useState(false);
   const [techMap, setTechMap] = useState<Record<string, string>>({});
+  const [view, setView] = useState<"lista" | "tablero">(readStoredView);
+  const isMobile = useIsMobile();
+  const { requestMove, dialogs: moveDialogs } = useMoveOrder({ setOrders, statusPresets });
   const location = useLocation();
   const navigate = useNavigate();
+
+  const changeView = (next: "lista" | "tablero") => {
+    setView(next);
+    try { localStorage.setItem(VIEW_STORAGE_KEY, next); } catch { /* sin storage: queda solo para esta sesión */ }
+  };
+  const showBoard = view === "tablero" && !isMobile;
 
   useEffect(() => { document.title = "Órdenes | F7 Manager Pro"; }, []);
 
@@ -129,7 +109,7 @@ export default function Dashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, customer_name, customer_phone, device_type, imei, marca, modelo, status, created_at, problems, quote_amount, deposit_amount, deposit_payment_method, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response, priority")
+      .select("id, order_number, customer_name, customer_phone, device_type, imei, marca, modelo, status, status_changed_at, created_at, problems, quote_amount, deposit_amount, deposit_payment_method, cargos_adicionales, estimated_delivery_date, current_branch_id, assigned_technician_id, warranty_days, delivered_at, quote_response, priority")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false });
     if (error) {
@@ -171,9 +151,7 @@ export default function Dashboard() {
     });
   }, [showBranchFilter, companyId]);
 
-  const openPayDialog = (e: React.MouseEvent, order: Order) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const openPayDialog = (order: Order) => {
     setPayingOrder(order);
     setPayDialogOpen(true);
   };
@@ -204,27 +182,37 @@ export default function Dashboard() {
     : branchScoped.filter((o) => o.status === filter);
 
   const searchQuery = search.trim().toLowerCase();
-  const filtered = searchQuery
-    ? filteredByStatus.filter((o) => {
-        const digits = searchQuery.replace(/\D/g, "");
-        return (
-          o.order_number.toLowerCase().includes(searchQuery) ||
-          o.customer_name.toLowerCase().includes(searchQuery) ||
-          o.device_type.toLowerCase().includes(searchQuery) ||
-          (o.imei ?? "").toLowerCase().includes(searchQuery) ||
-          (o.marca ?? "").toLowerCase().includes(searchQuery) ||
-          (o.modelo ?? "").toLowerCase().includes(searchQuery) ||
-          (!!digits && (o.customer_phone ?? "").includes(digits))
-        );
-      })
-    : filteredByStatus;
+  const matchesSearch = (o: Order) => {
+    const digits = searchQuery.replace(/\D/g, "");
+    return (
+      o.order_number.toLowerCase().includes(searchQuery) ||
+      o.customer_name.toLowerCase().includes(searchQuery) ||
+      o.device_type.toLowerCase().includes(searchQuery) ||
+      (o.imei ?? "").toLowerCase().includes(searchQuery) ||
+      (o.marca ?? "").toLowerCase().includes(searchQuery) ||
+      (o.modelo ?? "").toLowerCase().includes(searchQuery) ||
+      (!!digits && (o.customer_phone ?? "").includes(digits))
+    );
+  };
+  const passesPriority = (o: Order) =>
+    !onlyHighPriority || (normalizePriority(o.priority) === "alta" && !isClosedOrderStatus(o.status));
+  const filtered = searchQuery ? filteredByStatus.filter(matchesSearch) : filteredByStatus;
 
   // Las urgentes arriba y las de prioridad baja al final; el resto conserva el
   // orden de siempre (última actividad). Una orden ya cerrada no se reordena.
   const rankOf = (o: Order) => (isClosedOrderStatus(o.status) ? 1 : priorityRank(o.priority));
-  const visibleOrders = filtered
-    .filter((o) => !onlyHighPriority || (normalizePriority(o.priority) === "alta" && !isClosedOrderStatus(o.status)))
-    .sort((a, b) => rankOf(a) - rankOf(b));
+  const visibleOrders = filtered.filter(passesPriority).sort((a, b) => rankOf(a) - rankOf(b));
+
+  // El tablero ignora el filtro de estado (las columnas ya son los estados) y
+  // respeta sucursal, búsqueda y prioridad. Los presupuestos quedan en la Lista.
+  const boardOrders = showBoard
+    ? branchScoped.filter((o) => o.status !== "presupuesto" && (!searchQuery || matchesSearch(o)) && passesPriority(o))
+    : [];
+  const quotesCount = branchScoped.filter((o) => o.status === "presupuesto").length;
+  const noRealOrders = branchScoped.length === quotesCount;
+  const isEmpty = showBoard
+    ? boardOrders.length === 0 && (!!searchQuery || onlyHighPriority || noRealOrders)
+    : visibleOrders.length === 0;
 
   return (
     <div className="space-y-6">
@@ -277,40 +265,63 @@ export default function Dashboard() {
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <StatCard
           icon={Package} label="Total" value={stats.total}
-          active={filter === "total"} onClick={() => setFilter((f) => (f === "total" ? "todos" : "total"))}
+          active={!showBoard && filter === "total"}
+          onClick={showBoard ? undefined : () => setFilter((f) => (f === "total" ? "todos" : "total"))}
         />
         <StatCard
           icon={Clock} label="En proceso" value={stats.pending} accent="text-[hsl(var(--status-reparacion))]"
-          active={filter === "en_proceso"} onClick={() => setFilter((f) => (f === "en_proceso" ? "todos" : "en_proceso"))}
+          active={!showBoard && filter === "en_proceso"}
+          onClick={showBoard ? undefined : () => setFilter((f) => (f === "en_proceso" ? "todos" : "en_proceso"))}
         />
         <StatCard
           icon={CheckCircle2} label="Listas para retirar" value={stats.ready} accent="text-[hsl(var(--status-listo))]"
-          active={filter === "listo"} onClick={() => setFilter((f) => (f === "listo" ? "todos" : "listo"))}
+          active={!showBoard && filter === "listo"}
+          onClick={showBoard ? undefined : () => setFilter((f) => (f === "listo" ? "todos" : "listo"))}
         />
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por cliente, N° de orden, equipo, IMEI o teléfono…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-9"
-        />
-        {search && (
-          <button
-            type="button"
-            onClick={() => setSearch("")}
-            aria-label="Limpiar búsqueda"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por cliente, N° de orden, equipo, IMEI o teléfono…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Limpiar búsqueda"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="hidden shrink-0 items-center rounded-md border border-border bg-card p-0.5 md:flex" role="group" aria-label="Vista de órdenes">
+          {([["lista", "Lista", List], ["tablero", "Tablero", Columns3]] as const).map(([value, label, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => changeView(value)}
+              aria-pressed={view === value}
+              data-testid={`view-${value}`}
+              className={cn(
+                "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                view === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:-mx-1 md:px-1">
-        {FILTERS.map((f) => (
+        {!showBoard && FILTERS.map((f) => (
           <button
             key={f.value}
             onClick={() => setFilter(f.value)}
@@ -344,7 +355,7 @@ export default function Dashboard() {
         <div className="flex justify-center py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      ) : visibleOrders.length === 0 ? (
+      ) : isEmpty ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <Smartphone className="h-10 w-10 text-muted-foreground" />
@@ -353,182 +364,56 @@ export default function Dashboard() {
                 ? "No hay órdenes de prioridad alta en esta vista."
                 : searchQuery
                 ? `Ninguna orden coincide con "${search.trim()}".`
-                : filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${resolveStatusLabel(filter, statusPresets)}.`}
+                : showBoard || filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${resolveStatusLabel(filter, statusPresets)}.`}
             </p>
-            {filter === "todos" && !searchQuery && (
+            {(showBoard || filter === "todos") && !searchQuery && !onlyHighPriority && (
               <Button onClick={() => setOpen(true)} variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" /> Crear la primera
               </Button>
             )}
           </CardContent>
         </Card>
+      ) : showBoard ? (
+        <OrdersBoard
+          orders={boardOrders}
+          statusPresets={statusPresets}
+          techMap={techMap}
+          quotesCount={quotesCount}
+          onPay={openPayDialog}
+          onMove={requestMove}
+        />
       ) : (
         <>
           {/* Mobile: filas compactas, una línea de info por orden */}
           <div className="flex flex-col gap-2 sm:hidden">
-            {visibleOrders.map((o) => {
-              const { saldo, isFullyPaid, hasQuoteOnly, hasPartial, total } = orderMoney(o);
-              return (
-                <Link key={o.id} to={`/ordenes/${o.id}`}>
-                  <div className={cn(
-                    "flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors active:bg-accent",
-                    isFullyPaid ? "border-l-4 border-l-success" : "border-border"
-                  )}>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                      {o.customer_name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{o.customer_name}</div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Smartphone className="h-3 w-3 shrink-0" />
-                        <span className="shrink-0 whitespace-nowrap font-mono text-[11px]">{o.order_number}</span>
-                        <span className="truncate">
-                          · {o.device_type}
-                          {(o.marca || o.modelo) && ` · ${[o.marca, o.modelo].filter(Boolean).join(" ")}`}
-                        </span>
-                      </div>
-                      {o.imei && (
-                        <div className="truncate font-mono text-[11px] text-muted-foreground">{o.imei}</div>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
-                      {normalizePriority(o.priority) !== "normal" && !isClosedOrderStatus(o.status) && (
-                        <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", priorityBadgeClasses(o.priority))}>
-                          Prioridad {PRIORITY_LABELS[normalizePriority(o.priority)].toLowerCase()}
-                        </span>
-                      )}
-                      {o.status === "presupuesto" && o.quote_response && (
-                        <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
-                          {QUOTE_RESPONSE_LABELS[o.quote_response]}
-                        </span>
-                      )}
-                      {hasPartial || (total > 0 && saldo > 0) ? (
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-[11px] font-semibold text-secondary">Saldo: {formatPYG(saldo)}</span>
-                          <Button
-                            size="sm"
-                            onClick={(e) => openPayDialog(e, o)}
-                            className="h-7 gap-1 bg-secondary px-2 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/90"
-                          >
-                            <Wallet className="h-3 w-3" />
-                            Cobrar Saldo
-                          </Button>
-                        </div>
-                      ) : hasQuoteOnly ? (
-                        <span className="text-[11px] font-medium text-muted-foreground">{formatPYG(total)}</span>
-                      ) : null}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+            {visibleOrders.map((o) => (
+              <OrderCard
+                key={o.id}
+                order={o}
+                variant="row"
+                statusPresets={statusPresets}
+                technicianName={o.assigned_technician_id ? techMap[o.assigned_technician_id] : undefined}
+                onPay={openPayDialog}
+                onMove={requestMove}
+              />
+            ))}
           </div>
 
           {/* Desktop/tablet: cards completas con toda la info */}
           <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3">
-          {visibleOrders.map((o) => {
-            const { total, deposit, saldo, isFullyPaid, hasPartial, hasQuoteOnly } = orderMoney(o);
-            return (
-            <Link key={o.id} to={`/ordenes/${o.id}`}>
-              <Card className={cn(
-                "group h-full transition-all hover:shadow-elevated",
-                isFullyPaid
-                  ? "border-l-4 border-l-success shadow-[0_0_12px_-2px_hsl(var(--success)/0.5)] hover:border-l-success/80"
-                  : "hover:border-primary/50"
-              )}>
-                <CardContent className="space-y-3 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-mono font-medium text-muted-foreground">{o.order_number}</span>
-                    <div className="flex items-center gap-1.5">
-                      {isFullyPaid && (
-                        <Badge variant="outline" className="border border-success/20 bg-success/10 text-success">
-                          Total Pagado: {formatPYG(total)}
-                        </Badge>
-                      )}
-                      <StatusBadge status={o.status} label={resolveStatusLabel(o.status, statusPresets)} />
-                      {normalizePriority(o.priority) !== "normal" && !isClosedOrderStatus(o.status) && (
-                        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", priorityBadgeClasses(o.priority))}>
-                          Prioridad {PRIORITY_LABELS[normalizePriority(o.priority)].toLowerCase()}
-                        </span>
-                      )}
-                      {o.status === "presupuesto" && o.quote_response && (
-                        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", quoteResponseBadgeClasses(o.quote_response))}>
-                          {QUOTE_RESPONSE_LABELS[o.quote_response]}
-                        </span>
-                      )}
-                      <OrderActionsMenu
-                        orderId={o.id}
-                        orderNumber={o.order_number}
-                        onUpdated={load}
-                        onDeleted={() => setOrders((prev) => prev.filter((x) => x.id !== o.id))}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-semibold">{o.customer_name}</div>
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Smartphone className="h-3.5 w-3.5" />
-                      {o.device_type}
-                      {(o.marca || o.modelo) && ` · ${[o.marca, o.modelo].filter(Boolean).join(" ")}`}
-                    </div>
-                    {o.imei && (
-                      <div className="font-mono text-xs text-muted-foreground">{o.imei}</div>
-                    )}
-                  </div>
-                  <WarrantyBadge deliveredAt={o.delivered_at} warrantyDays={o.warranty_days} />
-                  {o.assigned_technician_id && techMap[o.assigned_technician_id] && (
-                    <Badge variant="secondary" className="gap-1 font-normal">
-                      <UserIcon className="h-3 w-3" />
-                      {techMap[o.assigned_technician_id]}
-                    </Badge>
-                  )}
-                  {o.problems && o.problems.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {o.problems.slice(0, 3).map((p) => (
-                        <span key={p} className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
-                          {p}
-                        </span>
-                      ))}
-                      {o.problems.length > 3 && (
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          +{o.problems.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex items-end justify-between gap-2 text-xs text-muted-foreground">
-                    <span>
-                      {new Date(o.created_at).toLocaleString("es-ES", {
-                        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-                      })}
-                    </span>
-                    {hasPartial || (total > 0 && saldo > 0) ? (
-                      <div className="flex items-end gap-2">
-                        <div className="flex flex-col items-end gap-0.5">
-                          {deposit > 0 && (
-                            <span className="text-[11px] text-muted-foreground">Pagado: <span className="font-medium text-foreground">{formatPYG(deposit)}</span></span>
-                          )}
-                          <span className="text-sm font-bold text-secondary">Saldo: {formatPYG(saldo)}</span>
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={(e) => openPayDialog(e, o)}
-                          className="h-7 gap-1 bg-secondary px-2 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/90"
-                        >
-                          <Wallet className="h-3 w-3" />
-                          Cobrar Saldo
-                        </Button>
-                      </div>
-                    ) : hasQuoteOnly ? (
-                      <span className="font-semibold text-foreground">{formatPYG(total)}</span>
-                    ) : null}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            );
-          })}
+            {visibleOrders.map((o) => (
+              <OrderCard
+                key={o.id}
+                order={o}
+                variant="card"
+                statusPresets={statusPresets}
+                technicianName={o.assigned_technician_id ? techMap[o.assigned_technician_id] : undefined}
+                onPay={openPayDialog}
+                onMove={requestMove}
+                onUpdated={load}
+                onDeleted={(id) => setOrders((prev) => prev.filter((x) => x.id !== id))}
+              />
+            ))}
           </div>
         </>
       )}
@@ -543,6 +428,7 @@ export default function Dashboard() {
         statusPresets={statusPresets}
       />
       <RegisterPaymentDialog order={payingOrder} open={payDialogOpen} onOpenChange={setPayDialogOpen} onRegistered={load} />
+      {moveDialogs}
     </div>
   );
 }
