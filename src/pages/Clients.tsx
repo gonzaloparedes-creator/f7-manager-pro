@@ -21,6 +21,10 @@ import { notifyMessageQueueChanged } from "@/lib/customerMessages";
 import { clearPostSaleCache } from "@/lib/pendingMessages";
 import { resolveStatusLabel } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
+import { formatDistanceToNowStrict } from "date-fns";
+import { es } from "date-fns/locale";
+
+const PAGE_SIZE = 50;
 
 type Client = {
   id: string;
@@ -99,6 +103,16 @@ export default function Clients() {
     );
   }, [clients, search]);
 
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [search]);
+  const visible = filtered.slice(0, visibleCount);
+
+  // orders viene ordenado de más nueva a más vieja, así que la primera de cada cliente es la última.
+  const lastOrderAgo = (clientId: string) => {
+    const last = ordersByClient.get(clientId)?.[0];
+    return last ? formatDistanceToNowStrict(new Date(last.created_at), { locale: es, addSuffix: true }) : null;
+  };
+
   const clientDraftKey = (cid: string) => `f7_client_draft_${cid}`;
 
   const openEdit = (c: Client) => {
@@ -159,11 +173,13 @@ export default function Clients() {
           </h1>
           <p className="text-sm text-muted-foreground">Gestioná tus clientes y mirá sus órdenes.</p>
         </div>
-        <Badge variant="secondary" className="gap-1"><UsersIcon className="h-3 w-3" /> {clients.length}</Badge>
+        <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+          {clients.length} {clients.length === 1 ? "cliente" : "clientes"}
+        </Badge>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="border-0 bg-transparent shadow-none sm:border sm:bg-card sm:shadow-sm">
+        <CardHeader className="px-0 pt-0 sm:p-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -174,7 +190,7 @@ export default function Clients() {
             />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 sm:p-6 sm:pt-0">
           {loading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">Cargando…</div>
           ) : filtered.length === 0 ? (
@@ -183,8 +199,9 @@ export default function Clients() {
             <>
               {/* Mobile: tarjetas apiladas — la tabla de 5 columnas no entra en un viewport chico */}
               <div className="space-y-2 sm:hidden">
-                {filtered.map((c) => {
+                {visible.map((c) => {
                   const count = ordersByClient.get(c.id)?.length ?? 0;
+                  const ago = lastOrderAgo(c.id);
                   return (
                     <div
                       key={c.id}
@@ -197,8 +214,10 @@ export default function Clients() {
                           <span>{c.phone ?? "Sin teléfono"}</span>
                           {c.cedula && <span className="font-mono">{c.cedula}</span>}
                         </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {count === 0 ? "Sin órdenes" : `${count} ${count === 1 ? "orden" : "órdenes"} · última ${ago}`}
+                        </div>
                       </div>
-                      <Badge variant={count > 0 ? "default" : "secondary"} className="shrink-0">{count}</Badge>
                       <div className="flex shrink-0 items-center">
                         {c.phone && (
                           <Button
@@ -228,11 +247,12 @@ export default function Clients() {
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Cédula / RUC</TableHead>
                     <TableHead className="text-center">Órdenes</TableHead>
+                    <TableHead>Última orden</TableHead>
                     <TableHead className="w-[110px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((c) => {
+                  {visible.map((c) => {
                     const count = ordersByClient.get(c.id)?.length ?? 0;
                     return (
                       <TableRow key={c.id} className="cursor-pointer" onClick={() => setSelectedClient(c)}>
@@ -242,6 +262,7 @@ export default function Clients() {
                         <TableCell className="text-center">
                           <Badge variant={count > 0 ? "default" : "secondary"}>{count}</Badge>
                         </TableCell>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">{lastOrderAgo(c.id) ?? "—"}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           {c.phone && (
                             <Button
@@ -264,6 +285,14 @@ export default function Clients() {
                   })}
                 </TableBody>
               </Table>
+
+              {filtered.length > visible.length && (
+                <div className="mt-4 flex justify-center">
+                  <Button variant="outline" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
+                    Mostrar más ({filtered.length - visible.length} restantes)
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </CardContent>

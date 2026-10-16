@@ -659,7 +659,7 @@ export default function Products() {
             Catálogo de venta al público — separado de los repuestos de reparación.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row">
           <Button variant="outline" onClick={() => openBuy("reventa")}>
             <HandCoins className="h-4 w-4" />
             Comprar a cliente
@@ -671,14 +671,14 @@ export default function Products() {
         </div>
       </div>
 
-      <div className={cn("grid grid-cols-2 gap-3", showDeviceAging ? "lg:grid-cols-5" : "lg:grid-cols-4", activeTab === "resumen" && "hidden")}>
-        <Card className="p-4">
+      <div className={cn("grid grid-cols-2 gap-2 sm:gap-3", showDeviceAging ? "lg:grid-cols-5" : "lg:grid-cols-4", activeTab === "resumen" && "hidden")}>
+        <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Total productos</div>
-          <div className="mt-1 text-2xl font-bold">{items.length}</div>
+          <div className="mt-1 text-xl font-bold sm:text-2xl">{items.length}</div>
         </Card>
         <Card
           className={cn(
-            "p-4 text-left transition-colors",
+            "p-3 text-left transition-colors sm:p-4",
             canViewStock && outOfStockCount + lowStockCount > 0 && "cursor-pointer hover:border-secondary/50",
             stockFilter === "low" && "border-secondary bg-secondary/10"
           )}
@@ -694,12 +694,12 @@ export default function Products() {
         >
           <div className="text-xs text-muted-foreground">Sin / bajo stock</div>
           {canViewStock ? (
-            <div className={cn("mt-1 flex items-center gap-2 text-2xl font-bold", outOfStockCount + lowStockCount > 0 && "text-secondary")}>
+            <div className={cn("mt-1 flex items-center gap-2 text-xl font-bold sm:text-2xl", outOfStockCount + lowStockCount > 0 && "text-secondary")}>
               {outOfStockCount + lowStockCount}
               {outOfStockCount + lowStockCount > 0 && <AlertTriangle className="h-5 w-5" />}
             </div>
           ) : (
-            <div className="mt-1 text-2xl font-bold text-muted-foreground">—</div>
+            <div className="mt-1 text-xl font-bold text-muted-foreground sm:text-2xl">—</div>
           )}
           {canViewStock && outOfStockCount + lowStockCount > 0 && (
             <div className="mt-1 text-[11px] font-medium text-secondary">
@@ -711,7 +711,7 @@ export default function Products() {
           <Card
             data-testid="stale-devices-card"
             className={cn(
-              "p-4 text-left transition-colors",
+              "p-3 text-left transition-colors sm:p-4",
               staleSummary.count > 0 && "cursor-pointer hover:border-secondary/50",
               stockFilter === "stale" && "border-secondary bg-secondary/10"
             )}
@@ -726,7 +726,7 @@ export default function Products() {
             }}
           >
             <div className="text-xs text-muted-foreground">Equipos detenidos {STALE_DEVICE_DAYS}+ días</div>
-            <div className={cn("mt-1 text-2xl font-bold", staleSummary.count > 0 && "text-secondary")}>
+            <div className={cn("mt-1 text-xl font-bold sm:text-2xl", staleSummary.count > 0 && "text-secondary")}>
               {staleSummary.count}
             </div>
             {staleSummary.count > 0 ? (
@@ -738,14 +738,14 @@ export default function Products() {
             )}
           </Card>
         )}
-        <Card className="p-4">
+        <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Ventas de hoy</div>
-          <div className="mt-1 text-2xl font-bold text-success">{formatPYG(totalToday)}</div>
+          <div className="mt-1 text-xl font-bold text-success sm:text-2xl">{formatPYG(totalToday)}</div>
           <div className="text-[11px] text-muted-foreground">{salesToday.length} venta{salesToday.length !== 1 ? "s" : ""}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Valor catálogo (costo)</div>
-          <div className="mt-1 text-2xl font-bold">
+          <div className="mt-1 text-xl font-bold sm:text-2xl">
             {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
           </div>
         </Card>
