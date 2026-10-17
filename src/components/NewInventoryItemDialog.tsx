@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
 import { Loader2, FolderPlus, Camera, Upload, X } from "lucide-react";
 import { CameraCapture } from "@/components/CameraCapture";
-import { sanitizeFilenameForStorage } from "@/lib/utils";
+import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { isDuplicateBarcodeError } from "@/lib/barcode";
 import { checkBarcodeForSave } from "@/lib/barcodeRemote";
 import BarcodeField from "@/components/BarcodeField";
@@ -50,6 +51,8 @@ export default function NewInventoryItemDialog({
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  // Sin permiso el campo Costo no se muestra, pero el valor cargado se conserva al editar.
+  const { canViewCosts } = useUserPermissions();
   const { categories, subcategoriesFor, reload: reloadCategories } = useCategories();
   const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
   const [name, setName] = useState("");
@@ -315,15 +318,17 @@ export default function NewInventoryItemDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className={cn("grid gap-3", canViewCosts ? "grid-cols-3" : "grid-cols-2")}>
             <div className="grid gap-2">
               <Label>Alerta mín.</Label>
               <Input type="number" min={0} value={minAlert} onChange={(e) => setMinAlert(e.target.value)} />
             </div>
-            <div className="grid gap-2">
-              <Label>Costo (Gs.)</Label>
-              <Input type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
-            </div>
+            {canViewCosts && (
+              <div className="grid gap-2">
+                <Label>Costo (Gs.)</Label>
+                <Input type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
+              </div>
+            )}
             <div className="grid gap-2">
               <Label>Precio venta (Gs.)</Label>
               <Input type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />

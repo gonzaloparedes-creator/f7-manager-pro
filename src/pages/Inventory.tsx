@@ -13,6 +13,7 @@ import PrintLabelDialog from "@/components/PrintLabelDialog";
 import { matchesBarcodeQuery } from "@/lib/barcode";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
@@ -45,6 +46,7 @@ export default function Inventory() {
   // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
   const { canViewStock } = useStaffPermissions();
+  const { canViewCosts } = useUserPermissions();
   const { companyId } = useCompany();
   const { isStarter, loading: planLoading } = usePlan();
   const { categories, subcategories, reload: reloadCategories } = useCategories();
@@ -139,7 +141,7 @@ export default function Inventory() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+      <div className={cn("grid grid-cols-2 gap-2 sm:gap-3", canViewCosts && "sm:grid-cols-3")}>
         <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Total artículos</div>
           <div className="mt-1 text-2xl font-bold">{items.length}</div>
@@ -155,12 +157,14 @@ export default function Inventory() {
             <div className="mt-1 text-2xl font-bold text-muted-foreground">—</div>
           )}
         </Card>
-        <Card className="col-span-2 p-3 sm:col-span-1 sm:p-4">
-          <div className="text-xs text-muted-foreground">Valor inventario (costo)</div>
-          <div className="mt-1 text-2xl font-bold">
-            {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
-          </div>
-        </Card>
+        {canViewCosts && (
+          <Card className="col-span-2 p-3 sm:col-span-1 sm:p-4">
+            <div className="text-xs text-muted-foreground">Valor inventario (costo)</div>
+            <div className="mt-1 text-2xl font-bold">
+              {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
+            </div>
+          </Card>
+        )}
       </div>
 
       <Card className="p-4">
@@ -279,7 +283,8 @@ export default function Inventory() {
                         </span>
                       )}
                       <span className="text-muted-foreground">
-                        {formatPYG(i.cost_price)} → <span className="font-medium text-foreground">{formatPYG(i.selling_price)}</span>
+                        {canViewCosts && <>{formatPYG(i.cost_price)} → </>}
+                        <span className="font-medium text-foreground">{formatPYG(i.selling_price)}</span>
                       </span>
                     </div>
                   </div>
@@ -298,7 +303,7 @@ export default function Inventory() {
                     {hasMultipleBranches && <TableHead>Sucursal</TableHead>}
                     <TableHead className="text-right">Stock</TableHead>
                     <TableHead className="text-right">Mín.</TableHead>
-                    <TableHead className="text-right">Costo</TableHead>
+                    {canViewCosts && <TableHead className="text-right">Costo</TableHead>}
                     <TableHead className="text-right">Precio</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
@@ -350,7 +355,7 @@ export default function Inventory() {
                           )}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">{canViewStock ? i.min_stock_alert : "—"}</TableCell>
-                        <TableCell className="text-right">{formatPYG(i.cost_price)}</TableCell>
+                        {canViewCosts && <TableCell className="text-right">{formatPYG(i.cost_price)}</TableCell>}
                         <TableCell className="text-right">{formatPYG(i.selling_price)}</TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end">

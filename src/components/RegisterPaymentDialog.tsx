@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useCashRegisterGate } from "@/hooks/useCashRegisterGate";
@@ -45,6 +46,7 @@ export default function RegisterPaymentDialog({
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const { canGiveDiscounts } = useUserPermissions();
   const { presets: paymentMethodPresets } = usePaymentMethodPresets();
   const { presets: statusPresets } = useOrderStatusPresets();
   const { toast } = useToast();
@@ -59,7 +61,7 @@ export default function RegisterPaymentDialog({
   const totalAjustado = Number(order?.quote_amount ?? 0) + cargosTotal;
   const saldo = Math.max(0, totalAjustado - Number(order?.deposit_amount ?? 0));
 
-  const discountInput = parseFloat(discountValue) || 0;
+  const discountInput = canGiveDiscounts ? parseFloat(discountValue) || 0 : 0;
   // Igual criterio que el descuento del carrito de Productos: se calcula
   // sobre el saldo pendiente, nunca sobre el total completo de la orden.
   const discountRaw = discountUnit === "percent"
@@ -218,48 +220,50 @@ export default function RegisterPaymentDialog({
 
         <div className="space-y-4">
           {cashGate.blocked && totalPay > 0 && <CashRegisterRequiredNotice what="cobrar" />}
-          <div className="space-y-2">
-            <Label htmlFor="rp-discount">Descuento (opcional)</Label>
-            <div className="flex gap-2">
-              <Input
-                id="rp-discount"
-                type="number"
-                min={0}
-                step="1"
-                value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value)}
-                placeholder="0"
-                className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-              <div className="flex shrink-0 overflow-hidden rounded-md border border-input">
-                <button
-                  type="button"
-                  onClick={() => setDiscountUnit("percent")}
-                  className={cn(
-                    "px-3 text-sm font-medium transition-colors",
-                    discountUnit === "percent" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  %
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDiscountUnit("amount")}
-                  className={cn(
-                    "px-3 text-sm font-medium transition-colors",
-                    discountUnit === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Gs.
-                </button>
+          {canGiveDiscounts && (
+            <div className="space-y-2">
+              <Label htmlFor="rp-discount">Descuento (opcional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="rp-discount"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  placeholder="0"
+                  className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <div className="flex shrink-0 overflow-hidden rounded-md border border-input">
+                  <button
+                    type="button"
+                    onClick={() => setDiscountUnit("percent")}
+                    className={cn(
+                      "px-3 text-sm font-medium transition-colors",
+                      discountUnit === "percent" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    %
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDiscountUnit("amount")}
+                    className={cn(
+                      "px-3 text-sm font-medium transition-colors",
+                      discountUnit === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Gs.
+                  </button>
+                </div>
               </div>
+              {discountAmount > 0 && (
+                <p className="text-xs text-secondary">
+                  -{formatPYG(discountAmount)} · saldo con descuento: {formatPYG(saldoConDescuento)}
+                </p>
+              )}
             </div>
-            {discountAmount > 0 && (
-              <p className="text-xs text-secondary">
-                -{formatPYG(discountAmount)} · saldo con descuento: {formatPYG(saldoConDescuento)}
-              </p>
-            )}
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label>Monto a cobrar y método de pago</Label>

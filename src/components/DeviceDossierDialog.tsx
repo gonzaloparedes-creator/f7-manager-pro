@@ -38,6 +38,7 @@ export default function DeviceDossierDialog({
   device,
   onOpenChange,
   companyId,
+  canViewCosts,
   businessName,
   branchName,
   categoryLabel,
@@ -45,6 +46,7 @@ export default function DeviceDossierDialog({
   device: Product | null;
   onOpenChange: (open: boolean) => void;
   companyId: string | null;
+  canViewCosts: boolean;
   businessName: string | null;
   branchName: string | null;
   categoryLabel: string | null;
@@ -56,7 +58,7 @@ export default function DeviceDossierDialog({
   useEffect(() => {
     setHistory(null);
     setLoadError(false);
-    if (!deviceId || !companyId) return;
+    if (!deviceId || !companyId || !canViewCosts) return;
     let cancelled = false;
 
     // Siempre filtrado por empresa además de por equipo (las políticas RLS ya lo exigen).
@@ -86,12 +88,12 @@ export default function DeviceDossierDialog({
     };
     load().catch(() => { if (!cancelled) setLoadError(true); });
     return () => { cancelled = true; };
-  }, [deviceId, companyId]);
+  }, [deviceId, companyId, canViewCosts]);
 
   if (!device) return null;
 
   const print = (variant: DossierVariant) => {
-    if (variant === "interno" && !history) return;
+    if (variant === "interno" && (!canViewCosts || !history)) return;
     try {
       printDossier(toDossierDevice(device), variant === "interno" && history ? history : EMPTY_HISTORY, {
         variant,
@@ -129,28 +131,30 @@ export default function DeviceDossierDialog({
             </span>
           </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="h-auto w-full items-start justify-start gap-3 whitespace-normal px-4 py-3 text-left"
-            disabled={!history}
-            onClick={() => print("interno")}
-            data-testid="dossier-interno"
-          >
-            {history || loadError ? (
-              <Lock className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
-            ) : (
-              <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
-            )}
-            <span className="space-y-0.5">
-              <span className="block font-semibold">Dossier interno</span>
-              <span className="block text-xs font-normal text-muted-foreground">
-                Costos, ganancia, estado e historial completo del equipo. Solo para uso interno.
+          {canViewCosts && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto w-full items-start justify-start gap-3 whitespace-normal px-4 py-3 text-left"
+              disabled={!history}
+              onClick={() => print("interno")}
+              data-testid="dossier-interno"
+            >
+              {history || loadError ? (
+                <Lock className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
+              ) : (
+                <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
+              )}
+              <span className="space-y-0.5">
+                <span className="block font-semibold">Dossier interno</span>
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Costos, ganancia, estado e historial completo del equipo. Solo para uso interno.
+                </span>
               </span>
-            </span>
-          </Button>
+            </Button>
+          )}
 
-          {loadError && (
+          {canViewCosts && loadError && (
             <p className="text-sm text-destructive" data-testid="dossier-error">
               No se pudo cargar el historial del equipo, así que el dossier interno no está disponible. Cerrá y volvé a abrir para reintentar.
             </p>

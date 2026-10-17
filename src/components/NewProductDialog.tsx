@@ -15,7 +15,8 @@ import { toast } from "sonner";
 import imageCompression from "browser-image-compression";
 import { Loader2, FolderPlus, Camera, Upload, X, Smartphone } from "lucide-react";
 import { CameraCapture } from "@/components/CameraCapture";
-import { sanitizeFilenameForStorage } from "@/lib/utils";
+import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { formatPYG } from "@/lib/orders";
 import { DEVICE_ORIGINS, DEVICE_ORIGIN_LABELS, isDeviceOrigin, parseBattery, type DeviceOrigin } from "@/lib/deviceSpecs";
 import { parseMinPrice } from "@/lib/devicePricing";
@@ -68,6 +69,8 @@ export default function NewProductDialog({
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  // Sin permiso los campos de costo / mínimo no se muestran, pero sus valores cargados se conservan al editar.
+  const { canViewCosts, canGiveDiscounts } = useUserPermissions();
   const { categories, subcategoriesFor, reload: reloadCategories } = useCategories();
   const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
   const [name, setName] = useState("");
@@ -205,7 +208,10 @@ export default function NewProductDialog({
     if (!name.trim()) { toast.error("Ingresa un nombre"); return; }
     const parsedBattery = parseBattery(battery);
     if (isDevice && parsedBattery.error) { toast.error(parsedBattery.error); return; }
-    if (isDevice && parsedMinPrice.error) { toast.error(parsedMinPrice.error); return; }
+    if (isDevice && parsedMinPrice.error) {
+      toast.error(canGiveDiscounts ? parsedMinPrice.error : "No tenés permiso para poner el precio de venta por debajo del mínimo de negociación de este equipo.");
+      return;
+    }
     setLoading(true);
     try {
       const checkedBarcode = await checkBarcodeForSave(companyId, barcode, editItem?.id);
@@ -447,16 +453,18 @@ export default function NewProductDialog({
 
           {isDevice ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="product-purchase-cost">Costo de compra (Gs.)</Label>
-                  <Input id="product-purchase-cost" type="number" min={0} step="1" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} placeholder="Gs. 0" />
+              {canViewCosts && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-purchase-cost">Costo de compra (Gs.)</Label>
+                    <Input id="product-purchase-cost" type="number" min={0} step="1" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} placeholder="Gs. 0" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-repair-cost">Repuestos (Gs.)</Label>
+                    <Input id="product-repair-cost" type="number" min={0} step="1" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} placeholder="Gs. 0" />
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="product-repair-cost">Repuestos (Gs.)</Label>
-                  <Input id="product-repair-cost" type="number" min={0} step="1" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} placeholder="Gs. 0" />
-                </div>
-              </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="product-repair-details">Qué repuestos le pusiste (opcional)</Label>
                 <Input id="product-repair-details" value={repairDetails} onChange={(e) => setRepairDetails(e.target.value)} placeholder="Ej: Pantalla original + batería" />
@@ -465,45 +473,49 @@ export default function NewProductDialog({
                 <Label htmlFor="product-price">Precio venta (Gs.)</Label>
                 <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="product-min-price">Mínimo de negociación (Gs., opcional)</Label>
-                <Input
-                  id="product-min-price"
-                  type="number"
-                  min={0}
-                  step="1"
-                  value={minPrice}
-                  onChange={(e) => setMinPrice(e.target.value)}
-                  placeholder="Hasta cuánto podés bajar"
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Es solo para vos: no aparece en la lista de WhatsApp, el ticket ni los comprobantes, y en el detalle del equipo se ve tapado.
-                </p>
-                {parsedMinPrice.error && minPrice.trim() !== "" && (
-                  <p className="text-xs text-destructive" data-testid="min-price-error">{parsedMinPrice.error}</p>
-                )}
-              </div>
-              <div className="grid gap-1 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Costo total (compra + repuestos)</span>
-                  <span className="font-medium">{formatPYG(deviceTotalCost)}</span>
+              {canGiveDiscounts && (
+                <div className="grid gap-2">
+                  <Label htmlFor="product-min-price">Mínimo de negociación (Gs., opcional)</Label>
+                  <Input
+                    id="product-min-price"
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    placeholder="Hasta cuánto podés bajar"
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Es solo para vos: no aparece en la lista de WhatsApp, el ticket ni los comprobantes, y en el detalle del equipo se ve tapado.
+                  </p>
+                  {parsedMinPrice.error && minPrice.trim() !== "" && (
+                    <p className="text-xs text-destructive" data-testid="min-price-error">{parsedMinPrice.error}</p>
+                  )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Ganancia estimada</span>
-                  <span id="device-profit" className={deviceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
-                    {formatPYG(deviceProfit)}
-                  </span>
-                </div>
-                {minPriceProfit !== null && (
+              )}
+              {canViewCosts && (
+                <div className="grid gap-1 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Ganancia si vendés al mínimo</span>
-                    <span id="device-min-profit" className={minPriceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
-                      {formatPYG(minPriceProfit)}
+                    <span className="text-muted-foreground">Costo total (compra + repuestos)</span>
+                    <span className="font-medium">{formatPYG(deviceTotalCost)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Ganancia estimada</span>
+                    <span id="device-profit" className={deviceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
+                      {formatPYG(deviceProfit)}
                     </span>
                   </div>
-                )}
-              </div>
+                  {minPriceProfit !== null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Ganancia si vendés al mínimo</span>
+                      <span id="device-min-profit" className={minPriceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
+                        {formatPYG(minPriceProfit)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="product-notes">Notas (opcional)</Label>
                 <Textarea id="product-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Ej: viene con cargador, detalle en el marco, comprado a Juan…" />
@@ -511,15 +523,17 @@ export default function NewProductDialog({
             </>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className={cn("grid gap-3", canViewCosts && "grid-cols-2")}>
                 <div className="grid gap-2">
                   <Label htmlFor="product-min-alert">Alerta mín.</Label>
                   <Input id="product-min-alert" type="number" min={0} value={minAlert} onChange={(e) => setMinAlert(e.target.value)} />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="product-cost">Costo (Gs.)</Label>
-                  <Input id="product-cost" type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
-                </div>
+                {canViewCosts && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-cost">Costo (Gs.)</Label>
+                    <Input id="product-cost" type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
+                  </div>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="product-price">Precio venta (Gs.)</Label>

@@ -47,6 +47,7 @@ import EnviarReciboDialog from "@/components/EnviarReciboDialog";
 import WarrantyLookup from "@/components/WarrantyLookup";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
@@ -125,6 +126,7 @@ export default function Products() {
   // va después de que todos los hooks ya se ejecutaron (Rules of Hooks).
   const { isAdmin } = useUserRole();
   const { canViewStock, canViewProducts, loading: staffPermsLoading } = useStaffPermissions();
+  const { canViewCosts, canGiveDiscounts } = useUserPermissions();
   const { user } = useAuth();
   const { companyId } = useCompany();
   const { isBusiness, isRetail, loading: planLoading } = usePlan();
@@ -415,6 +417,7 @@ export default function Products() {
   const outOfStockCount = items.filter((i) => i.stock <= 0).length;
   const lowStockCount = items.filter((i) => i.stock > 0 && i.stock <= i.min_stock_alert).length;
   const showDeviceAging = canViewStock && hasDevicesInStock(items);
+  const kpiCardCount = 3 + Number(showDeviceAging) + Number(canViewCosts);
   const staleSummary = staleDeviceSummary(items, now);
 
   const copyPriceList = async () => {
@@ -703,7 +706,7 @@ export default function Products() {
         </div>
       </div>
 
-      <div className={cn("grid grid-cols-2 gap-2 sm:gap-3", showDeviceAging ? "lg:grid-cols-5" : "lg:grid-cols-4", activeTab === "resumen" && "hidden")}>
+      <div className={cn("grid grid-cols-2 gap-2 sm:gap-3", kpiCardCount === 5 ? "lg:grid-cols-5" : kpiCardCount === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3", activeTab === "resumen" && "hidden")}>
         <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Total productos</div>
           <div className="mt-1 text-xl font-bold sm:text-2xl">{items.length}</div>
@@ -763,7 +766,7 @@ export default function Products() {
             </div>
             {staleSummary.count > 0 ? (
               <div className="mt-1 text-[11px] font-medium text-secondary">
-                {formatPYG(staleSummary.immobilizedCost)} inmovilizado · {stockFilter === "stale" ? "Mostrando estos ↓" : "Ver cuáles →"}
+                {canViewCosts && `${formatPYG(staleSummary.immobilizedCost)} inmovilizado · `}{stockFilter === "stale" ? "Mostrando estos ↓" : "Ver cuáles →"}
               </div>
             ) : (
               <div className="mt-1 text-[11px] text-muted-foreground">Ninguno sin moverse</div>
@@ -775,12 +778,14 @@ export default function Products() {
           <div className="mt-1 text-xl font-bold text-success sm:text-2xl">{formatPYG(totalToday)}</div>
           <div className="text-[11px] text-muted-foreground">{salesToday.length} venta{salesToday.length !== 1 ? "s" : ""}</div>
         </Card>
-        <Card className="p-3 sm:p-4">
-          <div className="text-xs text-muted-foreground">Valor catálogo (costo)</div>
-          <div className="mt-1 text-xl font-bold sm:text-2xl">
-            {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
-          </div>
-        </Card>
+        {canViewCosts && (
+          <Card className="p-3 sm:p-4">
+            <div className="text-xs text-muted-foreground">Valor catálogo (costo)</div>
+            <div className="mt-1 text-xl font-bold sm:text-2xl">
+              {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
+            </div>
+          </Card>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -809,6 +814,7 @@ export default function Products() {
               reservations={reservations}
               scrapWithoutParts={scrapSummary.withoutParts}
               canViewStock={canViewStock}
+              canViewCosts={canViewCosts}
               isAdmin={isAdmin}
               onRegisterDevice={openRegisterDevice}
               onBuyForResale={() => openBuy("reventa")}
@@ -995,7 +1001,7 @@ export default function Products() {
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className="font-semibold text-foreground">{formatPYG(p.purchase_price)}</span>
+                        {canViewCosts && <span className="font-semibold text-foreground">{formatPYG(p.purchase_price)}</span>}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -1020,6 +1026,7 @@ export default function Products() {
               devices={scrapDevices}
               totals={scrapSummary}
               loaded={scrapLoaded}
+              canViewCosts={canViewCosts}
               branchName={(id) => (hasMultipleBranches ? branchNameOf(id) : null)}
               onBuy={() => openBuy("piezas")}
               onExtract={(d) => setExtractId(d.purchase.id)}
@@ -1067,6 +1074,7 @@ export default function Products() {
         subcategoryLabel={previewItem ? subcategoryName(previewItem.subcategory_id) : null}
         branchLabel={hasMultipleBranches && previewItem?.branch_id ? branches.find((b) => b.id === previewItem.branch_id)?.name ?? null : null}
         canViewStock={canViewStock}
+        canSeeMinPrice={canGiveDiscounts}
         canDelete={isAdmin}
         cartLine={previewItem ? cart[previewItem.id] : undefined}
         reservation={previewItem ? activeByItem.get(previewItem.id) : undefined}
@@ -1088,6 +1096,7 @@ export default function Products() {
         device={dossierItem}
         onOpenChange={(o) => { if (!o) setDossierItem(null); }}
         companyId={companyId}
+        canViewCosts={canViewCosts}
         businessName={businessName}
         branchName={hasMultipleBranches && dossierItem?.branch_id ? branches.find((b) => b.id === dossierItem.branch_id)?.name ?? null : null}
         categoryLabel={dossierItem ? categoryName(dossierItem.category_id) : null}

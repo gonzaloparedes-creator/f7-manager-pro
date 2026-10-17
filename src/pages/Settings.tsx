@@ -50,7 +50,27 @@ type UserRow = {
   role: "admin" | "staff" | "recepcion" | null;
   commission_rate: number;
   restrict_to_branch: boolean;
+  can_view_costs: boolean;
+  can_give_discounts: boolean;
 };
+
+type PermissionField = "can_view_costs" | "can_give_discounts";
+const PERMISSION_SWITCHES: { field: PermissionField; label: string; shortLabel: string; hintOn: string; hintOff: string }[] = [
+  {
+    field: "can_view_costs",
+    label: "Ve costos y márgenes",
+    shortLabel: "Ve costos",
+    hintOn: "Ve costos, valor del inventario y ganancias.",
+    hintOff: "No ve costos, valor del inventario ni ganancias.",
+  },
+  {
+    field: "can_give_discounts",
+    label: "Puede dar descuentos y vender bajo el mínimo",
+    shortLabel: "Da descuentos",
+    hintOn: "Puede cambiar precios, dar descuentos y vender bajo el mínimo.",
+    hintOff: "Vende a precio de lista, sin descuentos.",
+  },
+];
 
 // supabase-js no parsea el cuerpo de la respuesta cuando una Edge Function
 // devuelve un status no-2xx: solo da un FunctionsHttpError genérico ("Edge
@@ -837,7 +857,7 @@ function UsersTab() {
     if (!companyId) return;
     setLoading(true);
     const [{ data: profs }, { data: brs }, { data: company }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, phone, branch_id, commission_rate, restrict_to_branch").eq("company_id", companyId),
+      (supabase as any).from("profiles").select("id, full_name, phone, branch_id, commission_rate, restrict_to_branch, can_view_costs, can_give_discounts").eq("company_id", companyId),
       supabase.from("branches").select("id, name, address").eq("company_id", companyId).order("name"),
       supabase.from("companies").select("commission_enabled, staff_can_view_stock, staff_can_view_products, staff_can_view_gastos, staff_can_close_caja, virtual_cash_enabled, require_open_cash").eq("id", companyId).maybeSingle(),
     ]);
@@ -1037,6 +1057,17 @@ function UsersTab() {
       return toast({ title: "Error", description: error.message, variant: "destructive" });
     }
     toast({ title: value ? "Ahora solo ve su sucursal" : "Ahora ve todas las sucursales" });
+  };
+
+  const toggleUserPermission = async (userId: string, field: PermissionField, value: boolean) => {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, [field]: value } : u)));
+    const { error } = await (supabase as any).from("profiles").update({ [field]: value }).eq("id", userId);
+    if (error) {
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, [field]: !value } : u)));
+      return toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    const sw = PERMISSION_SWITCHES.find((x) => x.field === field)!;
+    toast({ title: value ? "Permiso activado" : "Permiso quitado", description: sw.label });
   };
 
   const deleteUser = async (targetUser: UserRow) => {
@@ -1252,6 +1283,25 @@ function UsersTab() {
                       onCheckedChange={(v) => toggleBranchRestriction(u.id, v)}
                     />
                   </div>
+                  {PERMISSION_SWITCHES.map((sw) => {
+                    const isAdminRow = u.role === "admin";
+                    return (
+                      <div key={sw.field} className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
+                        <div>
+                          <Label htmlFor={`${sw.field}-m-${u.id}`} className="text-xs font-medium">{sw.label}</Label>
+                          <div className="text-[11px] text-muted-foreground">
+                            {isAdminRow ? "Un administrador siempre puede." : u[sw.field] ? sw.hintOn : sw.hintOff}
+                          </div>
+                        </div>
+                        <Switch
+                          id={`${sw.field}-m-${u.id}`}
+                          checked={isAdminRow || u[sw.field]}
+                          disabled={isAdminRow}
+                          onCheckedChange={(v) => toggleUserPermission(u.id, sw.field, v)}
+                        />
+                      </div>
+                    );
+                  })}
                   {commissionEnabled && canUseCommissions && (
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Comisión</Label>
@@ -1287,6 +1337,7 @@ function UsersTab() {
                     <TableHead>Rol</TableHead>
                     <TableHead>Sucursal</TableHead>
                     <TableHead>Solo su sucursal</TableHead>
+                    {PERMISSION_SWITCHES.map((sw) => <TableHead key={sw.field} title={sw.label}>{sw.shortLabel}</TableHead>)}
                     {commissionEnabled && canUseCommissions && <TableHead>Comisión</TableHead>}
                     <TableHead className="w-12 text-right">Acciones</TableHead>
                   </TableRow>
@@ -1330,6 +1381,21 @@ function UsersTab() {
                           />
                         </div>
                       </TableCell>
+                      {PERMISSION_SWITCHES.map((sw) => {
+                        const isAdminRow = u.role === "admin";
+                        return (
+                          <TableCell key={sw.field}>
+                            <div title={isAdminRow ? "Un administrador siempre puede." : `${sw.label}: ${u[sw.field] ? sw.hintOn : sw.hintOff}`}>
+                              <Switch
+                                checked={isAdminRow || u[sw.field]}
+                                disabled={isAdminRow}
+                                onCheckedChange={(v) => toggleUserPermission(u.id, sw.field, v)}
+                                aria-label={`${sw.label}: ${u.full_name || "usuario"}`}
+                              />
+                            </div>
+                          </TableCell>
+                        );
+                      })}
                       {commissionEnabled && canUseCommissions && (
                         <TableCell>
                           <div className="flex items-center gap-1">

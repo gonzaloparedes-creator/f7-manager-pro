@@ -19,6 +19,7 @@ export default function ScrapDevicesPanel({
   devices,
   totals,
   loaded,
+  canViewCosts,
   branchName,
   onBuy,
   onExtract,
@@ -27,6 +28,7 @@ export default function ScrapDevicesPanel({
   devices: ScrapDevice[];
   totals: ScrapTotals;
   loaded: boolean;
+  canViewCosts: boolean;
   branchName: (id: string | null) => string | null;
   onBuy: () => void;
   onExtract: (device: ScrapDevice) => void;
@@ -53,25 +55,29 @@ export default function ScrapDevicesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className={cn("grid gap-3", canViewCosts ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:max-w-xs")}>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Equipos en chatarra</div>
           <div className="mt-1 text-2xl font-bold" data-testid="scrap-count">{totals.count}</div>
           <div className="text-[11px] text-muted-foreground">{totals.partsCount} pieza{totals.partsCount !== 1 ? "s" : ""} cargada{totals.partsCount !== 1 ? "s" : ""}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Invertido</div>
-          <div className="mt-1 text-2xl font-bold">{formatPYG(totals.invested)}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Asignado a piezas</div>
-          <div className="mt-1 text-2xl font-bold text-success">{formatPYG(totals.allocated)}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Sin asignar</div>
-          <div className={cn("mt-1 text-2xl font-bold", totals.unassigned > 0 && "text-secondary")}>{formatPYG(totals.unassigned)}</div>
-          <div className="text-[11px] text-muted-foreground">Plata de equipos sin desarmar del todo</div>
-        </Card>
+        {canViewCosts && (
+          <>
+            <Card className="p-4">
+              <div className="text-xs text-muted-foreground">Invertido</div>
+              <div className="mt-1 text-2xl font-bold">{formatPYG(totals.invested)}</div>
+            </Card>
+            <Card className="p-4">
+              <div className="text-xs text-muted-foreground">Asignado a piezas</div>
+              <div className="mt-1 text-2xl font-bold text-success">{formatPYG(totals.allocated)}</div>
+            </Card>
+            <Card className="p-4">
+              <div className="text-xs text-muted-foreground">Sin asignar</div>
+              <div className={cn("mt-1 text-2xl font-bold", totals.unassigned > 0 && "text-secondary")}>{formatPYG(totals.unassigned)}</div>
+              <div className="text-[11px] text-muted-foreground">Plata de equipos sin desarmar del todo</div>
+            </Card>
+          </>
+        )}
       </div>
 
       <div className="flex justify-end">
@@ -101,12 +107,14 @@ export default function ScrapDevicesPanel({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="text-right">
-                      <div className="font-semibold text-foreground">{formatPYG(p.purchase_price)}</div>
-                      <div className={cn("text-[11px]", d.unassigned > 0 ? "text-secondary" : "text-muted-foreground")}>
-                        {d.unassigned > 0 ? `${formatPYG(d.unassigned)} sin asignar` : "Todo asignado"}
+                    {canViewCosts && (
+                      <div className="text-right">
+                        <div className="font-semibold text-foreground">{formatPYG(p.purchase_price)}</div>
+                        <div className={cn("text-[11px]", d.unassigned > 0 ? "text-secondary" : "text-muted-foreground")}>
+                          {d.unassigned > 0 ? `${formatPYG(d.unassigned)} sin asignar` : "Todo asignado"}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <Button size="icon" variant="ghost" className="h-10 w-10" aria-label="Reimprimir comprobante" onClick={() => onPrint(p)}>
                       <Printer className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
@@ -124,7 +132,7 @@ export default function ScrapDevicesPanel({
                           <span className="min-w-0 truncate">{part.part_name}</span>
                           <span className="flex shrink-0 items-center gap-2">
                             <Badge variant="outline" className={cn("text-[10px]", av.className)}>{av.label}</Badge>
-                            <span className="text-muted-foreground">{formatPYG(part.allocated_cost)}</span>
+                            {canViewCosts && <span className="text-muted-foreground">{formatPYG(part.allocated_cost)}</span>}
                           </span>
                         </li>
                       );

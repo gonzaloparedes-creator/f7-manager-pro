@@ -18,6 +18,7 @@ export default function ProductPreviewDialog({
   subcategoryLabel,
   branchLabel,
   canViewStock,
+  canSeeMinPrice,
   canDelete,
   cartLine,
   reservation,
@@ -36,6 +37,7 @@ export default function ProductPreviewDialog({
   subcategoryLabel: string | null;
   branchLabel: string | null;
   canViewStock: boolean;
+  canSeeMinPrice: boolean;
   canDelete: boolean;
   cartLine: CartLine | undefined;
   /** Reserva activa de este equipo, si la tiene: solo se puede vender desde la reserva. */
@@ -58,7 +60,7 @@ export default function ProductPreviewDialog({
   const lowStock = canViewStock && !outOfStock && product.stock <= product.min_stock_alert;
   const batteryText = product.battery_health != null ? `${product.battery_health}%` : null;
   const originText = originLabel(product.origin);
-  const minPrice = product.is_device ? toMinPrice(product.min_price) : null;
+  const minPrice = product.is_device && canSeeMinPrice ? toMinPrice(product.min_price) : null;
 
   return (
     <Dialog open={!!product} onOpenChange={onOpenChange}>

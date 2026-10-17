@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
 import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2, MessageCircle, ArrowLeftRight, ShieldCheck } from "lucide-react";
 import { formatPYG, isCashLabel } from "@/lib/orders";
@@ -73,6 +74,7 @@ export default function CartSheet({
 }) {
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const { canGiveDiscounts } = useUserPermissions();
   const { presets: paymentMethodPresets } = usePaymentMethodPresets();
   const cashGate = useCashRegisterGate(open);
   const [paymentMethod, setPaymentMethod] = useState("Efectivo");
@@ -94,7 +96,7 @@ export default function CartSheet({
   const hasDevice = lines.some((l) => l.product.is_device);
 
   const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
-  const discountInput = parseFloat(discountValue) || 0;
+  const discountInput = canGiveDiscounts ? parseFloat(discountValue) || 0 : 0;
   // El descuento se reparte como el mismo % en cada línea (no un monto fijo
   // restado del total), para que el ticket siga mostrando un precio por
   // unidad creíble en vez de un número raro por el reparto.
@@ -179,11 +181,19 @@ export default function CartSheet({
     }
     // El mínimo de negociación es un aviso, no un bloqueo: se pregunta una vez
     // y sin decir el monto, para no revelarlo si el cliente está mirando la pantalla.
+    // Quien no tiene permiso de dar descuentos no puede confirmarlo: se bloquea.
     if (!minPriceConfirmed) {
       const below = belowMinPriceNames(
         lines.filter((l) => l.product.is_device).map((l) => ({ name: l.product.name, unitPrice: finalPrice(l), minPrice: l.product.min_price })),
       );
-      if (below.length > 0) { setBelowMinNames(below); return; }
+      if (below.length > 0) {
+        if (!canGiveDiscounts) {
+          toast.error(`No tenés permiso para vender por debajo del mínimo de negociación: ${below.join(", ")}. Pedile a un administrador que haga la venta.`);
+          return;
+        }
+        setBelowMinNames(below);
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -431,7 +441,11 @@ export default function CartSheet({
                         step="1"
                         value={l.unitPrice}
                         onChange={(e) => setPrice(l.id, parseFloat(e.target.value) || 0)}
-                        className="h-9 w-24 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        readOnly={!canGiveDiscounts}
+                        className={cn(
+                          "h-9 w-24 text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                          !canGiveDiscounts && "border-transparent bg-transparent px-0 font-medium focus-visible:ring-0"
+                        )}
                       />
                     </div>
                     <QuantityStepper value={l.quantity} max={l.product.stock} onChange={(q) => setQty(l.id, q)} size="sm" />
@@ -496,43 +510,45 @@ export default function CartSheet({
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="cart-discount">Descuento (opcional)</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="cart-discount"
-                        type="number"
-                        min={0}
-                        step="1"
-                        value={discountValue}
-                        onChange={(e) => setDiscountValue(e.target.value)}
-                        placeholder="0"
-                        className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                      <div className="flex shrink-0 overflow-hidden rounded-md border border-input">
-                        <button
-                          type="button"
-                          onClick={() => setDiscountUnit("percent")}
-                          className={cn(
-                            "px-3 text-sm font-medium transition-colors",
-                            discountUnit === "percent" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          %
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDiscountUnit("amount")}
-                          className={cn(
-                            "px-3 text-sm font-medium transition-colors",
-                            discountUnit === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          Gs.
-                        </button>
+                  {canGiveDiscounts && (
+                    <div className="space-y-2">
+                      <Label htmlFor="cart-discount">Descuento (opcional)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="cart-discount"
+                          type="number"
+                          min={0}
+                          step="1"
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(e.target.value)}
+                          placeholder="0"
+                          className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                        <div className="flex shrink-0 overflow-hidden rounded-md border border-input">
+                          <button
+                            type="button"
+                            onClick={() => setDiscountUnit("percent")}
+                            className={cn(
+                              "px-3 text-sm font-medium transition-colors",
+                              discountUnit === "percent" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            %
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountUnit("amount")}
+                            className={cn(
+                              "px-3 text-sm font-medium transition-colors",
+                              discountUnit === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            Gs.
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {discountAmount > 0 && (
                     <>

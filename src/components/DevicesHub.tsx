@@ -24,6 +24,7 @@ export default function DevicesHub({
   reservations,
   scrapWithoutParts,
   canViewStock,
+  canViewCosts,
   isAdmin,
   onRegisterDevice,
   onBuyForResale,
@@ -35,6 +36,7 @@ export default function DevicesHub({
   reservations: DeviceReservation[];
   scrapWithoutParts: number;
   canViewStock: boolean;
+  canViewCosts: boolean;
   isAdmin: boolean;
   onRegisterDevice: () => void;
   onBuyForResale: () => void;
@@ -84,7 +86,7 @@ export default function DevicesHub({
           <div className="text-xs text-muted-foreground">En stock</div>
           <div className="mt-1 text-2xl font-bold" data-testid="hub-in-stock">{kpis.inStock.count}</div>
           <div className="text-[11px] text-muted-foreground">
-            {canViewStock ? `${formatPYG(kpis.inStock.cost)} de costo parado` : "equipos disponibles"}
+            {canViewStock && canViewCosts ? `${formatPYG(kpis.inStock.cost)} de costo parado` : "equipos disponibles"}
           </div>
         </Card>
         <Card className="p-4">
