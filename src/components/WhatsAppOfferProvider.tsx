@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { fetchWhatsAppSettings } from "@/hooks/useWhatsAppSettings";
 import { WhatsAppOfferContext, type CreationOfferEvent } from "@/hooks/useWhatsAppOffer";
 import AvisarClienteDialog, { type MessageOption } from "@/components/AvisarClienteDialog";
@@ -23,12 +24,13 @@ interface Request {
   id: number;
   orderIds: string[];
   event: CreationOfferEvent;
+  manual: boolean;
 }
 
 interface PreparedOffer {
   orderId: string;
   customerName: string;
-  phone: string;
+  phone: string | null;
   eventKey: string;
   message: string;
   options?: MessageOption[];
@@ -51,8 +53,8 @@ interface PreparedOffers {
 // técnico de que haya una persona asignada con teléfono.
 async function prepareOffers(companyId: string, userId: string | null, request: Request): Promise<PreparedOffers> {
   const none: PreparedOffers = { client: null, technicians: [] };
-  const settings = await fetchWhatsAppSettings(companyId);
-  if (settings.evolutionActive) return none;
+  const settings = request.manual ? null : await fetchWhatsAppSettings(companyId);
+  if (settings?.evolutionActive) return none;
 
   const ordersRes = await supabase
     .from("orders")
@@ -68,16 +70,20 @@ async function prepareOffers(companyId: string, userId: string | null, request: 
 
   // Un presupuesto todavía no tiene trabajo para el técnico.
   const technicians =
-    request.event === "orden_creada"
+    !request.manual && request.event === "orden_creada"
       ? (await loadTechnicianRecipients(companyId, orders, userId)).recipients
       : [];
 
-  const client = settings.prefs.orden_creada === true ? await prepareClientOffer(companyId, request, orders) : null;
+  const client =
+    request.manual || settings?.prefs.orden_creada === true
+      ? await prepareClientOffer(companyId, request, orders)
+      : null;
   return { client, technicians };
 }
 
 // Devuelve null cuando no corresponde avisar al cliente: pidió no recibir
-// avisos o el teléfono es un relleno.
+// avisos o el teléfono es un relleno. Si lo pidió el usuario con un clic, se
+// abre igual (con aviso si el teléfono es un relleno).
 async function prepareClientOffer(
   companyId: string,
   request: Request,
@@ -90,7 +96,7 @@ async function prepareClientOffer(
   ]);
 
   const clientIds = [...new Set(orders.map((o) => o.client_id).filter((c): c is string => !!c))];
-  if (clientIds.length > 0) {
+  if (!request.manual && clientIds.length > 0) {
     const { data: clients, error } = await supabase
       .from("clients")
       .select("id, notify_whatsapp")
@@ -101,7 +107,7 @@ async function prepareClientOffer(
 
   const first = orders[0];
   const phone = recipientPhone(first);
-  if (!phone) return null;
+  if (!phone && !request.manual) return null;
 
   const overrides: TemplateOverrides = {};
   for (const row of templatesRes.data ?? []) overrides[row.event_key] = row.body;
@@ -155,6 +161,7 @@ async function prepareClientOffer(
 function CreationOfferHost({ request, onDone }: { request: Request; onDone: () => void }) {
   const { companyId, loading } = useCompany();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [offers, setOffers] = useState<PreparedOffers | null>(null);
   const [stage, setStage] = useState<"client" | "technician">("client");
   const [open, setOpen] = useState(false);
@@ -171,6 +178,9 @@ function CreationOfferHost({ request, onDone }: { request: Request; onDone: () =
     prepareOffers(companyId, user?.id ?? null, request)
       .then((prepared) => {
         if (!prepared.client && prepared.technicians.length === 0) {
+          if (request.manual) {
+            toast({ title: "No se pudo preparar el aviso", description: "No se encontró la orden.", variant: "destructive" });
+          }
           onDone();
           return;
         }
@@ -180,6 +190,9 @@ function CreationOfferHost({ request, onDone }: { request: Request; onDone: () =
       })
       .catch((e) => {
         console.warn("No se pudo preparar el aviso por WhatsApp:", e);
+        if (request.manual) {
+          toast({ title: "No se pudo preparar el aviso", description: "Probá de nuevo en un momento.", variant: "destructive" });
+        }
         onDone();
       });
     // request.id cambia con cada oferta nueva (el host se remonta por key).
@@ -213,7 +226,7 @@ function CreationOfferHost({ request, onDone }: { request: Request; onDone: () =
         eventKey={offer.eventKey}
         initialMessage={offer.message}
         options={offer.options}
-        suggested
+        suggested={!request.manual}
         companyId={companyId}
       />
     );
@@ -238,10 +251,10 @@ export default function WhatsAppOfferProvider({ children }: { children: ReactNod
 
   const api = useMemo(
     () => ({
-      offerCreation: (orderIds: string[], event: CreationOfferEvent) => {
+      offerCreation: (orderIds: string[], event: CreationOfferEvent, opts?: { manual?: boolean }) => {
         if (orderIds.length === 0) return;
         seq.current += 1;
-        setRequest({ id: seq.current, orderIds, event });
+        setRequest({ id: seq.current, orderIds, event, manual: opts?.manual === true });
       },
     }),
     []

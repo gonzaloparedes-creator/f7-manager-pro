@@ -57,7 +57,7 @@ export default function OrderCreated({ order, companyId, customerCedula, receive
           <Printer className="h-6 w-6 text-primary" />
           Imprimir comprobante
         </button>
-        <button type="button" onClick={() => offerCreation([order.id], "orden_creada")} className={tile}>
+        <button type="button" onClick={() => offerCreation([order.id], "orden_creada", { manual: true })} className={tile}>
           <MessageCircle className="h-6 w-6 text-primary" />
           Avisar por WhatsApp
         </button>
