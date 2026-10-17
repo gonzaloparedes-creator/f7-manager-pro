@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, BatteryMedium, Loader2, MessageCircle, ShoppingBag, Smartphone } from "lucide-react";
+import { ArrowLeft, BatteryMedium, Check, Loader2, MessageCircle, Share2, Smartphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import StorefrontShell, { StorefrontUnavailable, useStorefrontTitle } from "@/components/storefront/StorefrontShell";
 import StorefrontCard from "@/components/storefront/StorefrontCard";
+import StorefrontGallery from "@/components/storefront/StorefrontGallery";
+import { IncludesList, ProductSeals } from "@/components/storefront/StorefrontSeals";
 import {
   buildInterestMessage,
+  galleryImages,
   priceLabel,
   stockLabel,
   storefrontPath,
@@ -21,6 +24,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export default function PublicStorefrontItem() {
   const { slug, itemId } = useParams();
   const [state, setState] = useState<State>({ status: "loading" });
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -42,6 +46,30 @@ export default function PublicStorefrontItem() {
 
   const ready = state.status === "ready" ? state.data : null;
   useStorefrontTitle(ready?.store.name, ready?.item?.name);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => setCopied(false), 2500);
+    return () => window.clearTimeout(t);
+  }, [copied]);
+
+  const share = async (name: string) => {
+    const url = window.location.href;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: name, url });
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      window.prompt("Copiá el enlace", url);
+    }
+  };
 
   if (state.status === "loading") {
     return (
@@ -94,17 +122,9 @@ export default function PublicStorefrontItem() {
         </Link>
 
         <div className="mt-4 grid gap-6 md:grid-cols-2">
-          <div className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
-            {item.image_url ? (
-              <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <ShoppingBag className="h-16 w-16" />
-              </div>
-            )}
-          </div>
+          <StorefrontGallery key={item.id} images={galleryImages(item)} name={item.name} />
 
-          <div className="flex flex-col">
+          <div className="flex min-w-0 flex-col">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               {item.category && <span className="rounded-full bg-muted px-2.5 py-1">{item.category}</span>}
               {item.is_device && (
@@ -132,16 +152,30 @@ export default function PublicStorefrontItem() {
               <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-foreground/90">{item.public_description.trim()}</p>
             )}
 
-            {interestHref && (
-              <a
-                href={interestHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            <IncludesList items={store.includes} />
+            <ProductSeals seals={store.product_seals} />
+
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+              {interestHref && (
+                <a
+                  href={interestHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 sm:flex-1 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  <MessageCircle className="h-5 w-5" /> Me interesa
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => void share(item.name)}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-base font-medium text-foreground transition-colors hover:bg-accent"
+                data-testid="storefront-share"
               >
-                <MessageCircle className="h-5 w-5" /> Me interesa
-              </a>
-            )}
+                {copied ? <Check className="h-5 w-5 text-primary" /> : <Share2 className="h-5 w-5" />}
+                {copied ? "Enlace copiado" : "Compartir"}
+              </button>
+            </div>
             <p className="mt-3 text-xs text-muted-foreground">
               Te respondemos por WhatsApp para confirmar disponibilidad y coordinar la entrega.
             </p>

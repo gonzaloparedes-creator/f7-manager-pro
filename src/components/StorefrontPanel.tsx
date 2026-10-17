@@ -21,23 +21,35 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import StorefrontView from "@/components/storefront/StorefrontView";
+import StorefrontCustomizer from "@/components/storefront/StorefrontCustomizer";
 import { formatPYG } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import {
   ACCENT_PRESETS,
+  PRODUCT_SEALS_MAX,
+  SEALS_MAX,
   SLUG_MAX,
+  SOCIAL_KINDS,
+  cleanIncludes,
+  cleanSeals,
+  defaultCustom,
   hiddenReason,
   isStorefrontVisible,
+  normalizeSocialUrl,
   normalizeStorefrontPhone,
   slugify,
   stripAccents,
   storefrontUrl,
   validateSlug,
+  type CustomDraft,
+  type SocialKind,
   type StorefrontItem,
+  type StorefrontSeal,
+  type StorefrontSocials,
   type StorefrontStore,
 } from "@/lib/storefront";
 
-interface Draft {
+interface Draft extends CustomDraft {
   slug: string;
   enabled: boolean;
   show_prices: boolean;
@@ -82,7 +94,16 @@ function defaultDraft(name: string | null): Draft {
     address: "",
     accent: ACCENT_PRESETS[0].value,
     installments: "",
+    ...defaultCustom(),
   };
+}
+
+function sealsFromRow(value: unknown, max: number): StorefrontSeal[] {
+  return Array.isArray(value) ? cleanSeals(value as StorefrontSeal[], max) : [];
+}
+
+function listFromRow(value: unknown): string[] {
+  return Array.isArray(value) ? cleanIncludes(value.filter((v): v is string => typeof v === "string")) : [];
 }
 
 export default function StorefrontPanel({ items, reservedIds, categoryName, onPublishedChange }: Props) {
@@ -110,7 +131,9 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
       supabase.from("companies").select("name, logo_url").eq("id", companyId).maybeSingle<{ name: string | null; logo_url: string | null }>(),
       (supabase as any)
         .from("storefront_settings")
-        .select("slug, enabled, show_prices, show_stock, tagline, whatsapp_phone, address, accent_color, installments_text")
+        .select(
+          "slug, enabled, show_prices, show_stock, tagline, whatsapp_phone, address, accent_color, installments_text, banner_url, search_placeholder, footer_text, instagram_url, facebook_url, tiktok_url, youtube_url, website_url, seals, product_seals, includes"
+        )
         .eq("company_id", companyId)
         .maybeSingle(),
     ]).then(([company, settings]) => {
@@ -131,6 +154,19 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
           address: row.address ?? "",
           accent: row.accent_color ?? ACCENT_PRESETS[0].value,
           installments: row.installments_text ?? "",
+          banner_url: row.banner_url ?? "",
+          search_placeholder: row.search_placeholder ?? "",
+          footer_text: row.footer_text ?? "",
+          socials: {
+            instagram: row.instagram_url ?? "",
+            facebook: row.facebook_url ?? "",
+            tiktok: row.tiktok_url ?? "",
+            youtube: row.youtube_url ?? "",
+            website: row.website_url ?? "",
+          },
+          seals: sealsFromRow(row.seals, SEALS_MAX),
+          product_seals: sealsFromRow(row.product_seals, PRODUCT_SEALS_MAX),
+          includes: listFromRow(row.includes),
         };
         setSaved(loaded);
         setDraft(loaded);
@@ -162,15 +198,29 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
   const slugError = validateSlug(draft.slug);
   const phoneInvalid = draft.whatsapp.trim() !== "" && normalizeStorefrontPhone(draft.whatsapp) === null;
 
+  const socialResults = useMemo(
+    () => Object.fromEntries(SOCIAL_KINDS.map((k) => [k, normalizeSocialUrl(k, draft.socials[k])])) as Record<SocialKind, ReturnType<typeof normalizeSocialUrl>>,
+    [draft.socials]
+  );
+  const socialErrors = useMemo(
+    () => Object.fromEntries(SOCIAL_KINDS.map((k) => [k, socialResults[k].error])) as Partial<Record<SocialKind, string | null>>,
+    [socialResults]
+  );
+  const socialsInvalid = SOCIAL_KINDS.some((k) => socialResults[k].error !== null);
+
   const save = async () => {
     if (!companyId) return;
     if (slugError) { toast.error(slugError); return; }
     if (slugState === "taken") { toast.error("Ese enlace ya está en uso. Probá con otro."); return; }
+    if (socialsInvalid) { toast.error("Revisá los enlaces de redes sociales."); return; }
     let phone: string | null = null;
     if (draft.whatsapp.trim()) {
       phone = normalizeStorefrontPhone(draft.whatsapp);
       if (!phone) { toast.error("El WhatsApp no es válido. Escribilo con código de país, por ejemplo 595981123456."); return; }
     }
+    const seals = cleanSeals(draft.seals, SEALS_MAX);
+    const productSeals = cleanSeals(draft.product_seals, PRODUCT_SEALS_MAX);
+    const includes = cleanIncludes(draft.includes);
     setSaving(true);
     const { error } = await (supabase as any).from("storefront_settings").upsert(
       {
@@ -184,6 +234,17 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
         address: draft.address.trim() || null,
         accent_color: draft.accent,
         installments_text: draft.installments.trim() || null,
+        banner_url: draft.banner_url || null,
+        search_placeholder: draft.search_placeholder.trim() || null,
+        footer_text: draft.footer_text.trim() || null,
+        instagram_url: socialResults.instagram.value,
+        facebook_url: socialResults.facebook.value,
+        tiktok_url: socialResults.tiktok.value,
+        youtube_url: socialResults.youtube.value,
+        website_url: socialResults.website.value,
+        seals,
+        product_seals: productSeals,
+        includes,
       },
       { onConflict: "company_id" }
     );
@@ -198,6 +259,12 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
       address: draft.address.trim(),
       installments: draft.installments.trim(),
       whatsapp: phone ?? "",
+      search_placeholder: draft.search_placeholder.trim(),
+      footer_text: draft.footer_text.trim(),
+      socials: Object.fromEntries(SOCIAL_KINDS.map((k) => [k, socialResults[k].value ?? ""])) as Record<SocialKind, string>,
+      seals,
+      product_seals: productSeals,
+      includes,
     };
     setSaved(next);
     setDraft(next);
@@ -231,8 +298,17 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
       installments_text: draft.installments.trim() || null,
       show_prices: draft.show_prices,
       show_stock: draft.show_stock,
+      banner_url: draft.banner_url || null,
+      search_placeholder: draft.search_placeholder.trim() || null,
+      footer_text: draft.footer_text.trim() || null,
+      socials: Object.fromEntries(
+        SOCIAL_KINDS.map((k) => [k, socialResults[k].value])
+      ) as StorefrontSocials,
+      seals: cleanSeals(draft.seals, SEALS_MAX),
+      product_seals: cleanSeals(draft.product_seals, PRODUCT_SEALS_MAX),
+      includes: cleanIncludes(draft.includes),
     }),
-    [draft, companyName, logoUrl]
+    [draft, companyName, logoUrl, socialResults]
   );
 
   const previewItems: StorefrontItem[] = useMemo(
@@ -495,11 +571,20 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
             </div>
           </div>
 
+          {companyId && (
+            <StorefrontCustomizer
+              companyId={companyId}
+              value={draft}
+              onChange={patch}
+              socialErrors={socialErrors}
+            />
+          )}
+
           <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
             <span className="text-xs text-muted-foreground">
               {saved === null ? "Todavía no la creaste" : dirty ? <span className="text-secondary">Hay cambios sin guardar</span> : "Todo guardado"}
             </span>
-            <Button type="button" onClick={save} disabled={saving || !dirty || !!slugError || slugState === "taken" || phoneInvalid} data-testid="storefront-save">
+            <Button type="button" onClick={save} disabled={saving || !dirty || !!slugError || slugState === "taken" || phoneInvalid || socialsInvalid} data-testid="storefront-save">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {saved === null ? "Crear mi vitrina" : "Guardar cambios"}
             </Button>

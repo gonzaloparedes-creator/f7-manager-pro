@@ -22,6 +22,7 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { formatPYG } from "@/lib/orders";
 import { DEVICE_ORIGINS, DEVICE_ORIGIN_LABELS, isDeviceOrigin, parseBattery, type DeviceOrigin } from "@/lib/deviceSpecs";
 import { parseMinPrice } from "@/lib/devicePricing";
+import { GALLERY_MAX } from "@/lib/storefront";
 import { isDuplicateBarcodeError } from "@/lib/barcode";
 import { checkBarcodeForSave } from "@/lib/barcodeRemote";
 import BarcodeField from "@/components/BarcodeField";
@@ -54,6 +55,23 @@ export interface EditableProduct {
   barcode?: string | null;
   show_in_storefront?: boolean;
   public_description?: string | null;
+  gallery_images?: string[] | null;
+}
+
+function GalleryThumb({ src, onRemove }: { src: string; onRemove: () => void }) {
+  return (
+    <div className="relative h-16 w-16">
+      <img src={src} alt="Foto adicional" className="h-full w-full rounded-md border border-border object-cover" />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+        aria-label="Quitar foto"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  );
 }
 
 export default function NewProductDialog({
@@ -103,6 +121,8 @@ export default function NewProductDialog({
   const [notes, setNotes] = useState("");
   const [showInStorefront, setShowInStorefront] = useState(false);
   const [publicDescription, setPublicDescription] = useState("");
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  const [galleryNew, setGalleryNew] = useState<{ file: File; preview: string }[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -131,6 +151,15 @@ export default function NewProductDialog({
     setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setMinPrice(""); setFile(null); setPreview(null);
     setIsDevice(false); setImei(""); setBattery(""); setOrigin(null); setPurchaseCost("0"); setRepairCost("0"); setRepairDetails(""); setNotes("");
     setShowInStorefront(false); setPublicDescription("");
+    setGalleryUrls([]); setGalleryNew([]);
+  };
+
+  const addGalleryFiles = (list: FileList | null) => {
+    if (!list) return;
+    const room = GALLERY_MAX - galleryUrls.length - galleryNew.length;
+    const picked = Array.from(list).filter((f) => f.type.startsWith("image/")).slice(0, Math.max(room, 0));
+    if (list.length > picked.length) toast.warning(`Máximo ${GALLERY_MAX} fotos adicionales por artículo.`);
+    setGalleryNew((prev) => [...prev, ...picked.map((f) => ({ file: f, preview: URL.createObjectURL(f) }))]);
   };
 
   const toggleDevice = (on: boolean) => {
@@ -166,6 +195,8 @@ export default function NewProductDialog({
       setNotes(editItem.notes ?? "");
       setShowInStorefront(!!editItem.show_in_storefront);
       setPublicDescription(editItem.public_description ?? "");
+      setGalleryUrls(editItem.gallery_images ?? []);
+      setGalleryNew([]);
       setFile(null);
       setPreview(editItem.image_url);
     } else {
@@ -248,6 +279,23 @@ export default function NewProductDialog({
         image_url = data.publicUrl;
       }
 
+      let gallery_images = galleryUrls;
+      if (canPublish && galleryNew.length > 0) {
+        setCompressing(true);
+        const uploaded: string[] = [];
+        for (const g of galleryNew) {
+          const compressed = await imageCompression(g.file, { maxSizeMB: 0.3, maxWidthOrHeight: 1000, useWebWorker: true });
+          const path = `${companyId}/${crypto.randomUUID()}-${sanitizeFilenameForStorage(compressed.name)}`;
+          const { error: upErr } = await supabase.storage
+            .from("inventory-images")
+            .upload(path, compressed, { contentType: compressed.type });
+          if (upErr) throw upErr;
+          uploaded.push(supabase.storage.from("inventory-images").getPublicUrl(path).data.publicUrl);
+        }
+        setCompressing(false);
+        gallery_images = [...galleryUrls, ...uploaded].slice(0, GALLERY_MAX);
+      }
+
       const payload = {
         branch_id: effectiveBranchId,
         name: name.trim(),
@@ -269,7 +317,7 @@ export default function NewProductDialog({
         repair_details: isDevice ? repairDetails.trim() || null : null,
         notes: isDevice ? notes.trim() || null : null,
         ...(canPublish
-          ? { show_in_storefront: showInStorefront, public_description: publicDescription.trim() || null }
+          ? { show_in_storefront: showInStorefront, public_description: publicDescription.trim() || null, gallery_images }
           : {}),
       };
 
@@ -623,6 +671,44 @@ export default function NewProductDialog({
                   placeholder="Ej: Incluye cargador y funda. 6 meses de garantía."
                 />
                 <span className="text-right text-[11px] text-muted-foreground">{publicDescription.length}/600</span>
+              </div>
+              <div className="grid gap-2" data-testid="storefront-gallery-field">
+                <Label>Fotos adicionales para la vitrina (hasta {GALLERY_MAX})</Label>
+                <p className="-mt-1 text-xs text-muted-foreground">Se suman a la imagen principal en la ficha del artículo.</p>
+                {galleryUrls.length + galleryNew.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {galleryUrls.map((url) => (
+                      <GalleryThumb key={url} src={url} onRemove={() => setGalleryUrls((l) => l.filter((u) => u !== url))} />
+                    ))}
+                    {galleryNew.map((g) => (
+                      <GalleryThumb
+                        key={g.preview}
+                        src={g.preview}
+                        onRemove={() => {
+                          URL.revokeObjectURL(g.preview);
+                          setGalleryNew((l) => l.filter((x) => x.preview !== g.preview));
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+                {galleryUrls.length + galleryNew.length < GALLERY_MAX && (
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted">
+                    <Upload className="h-4 w-4" />
+                    Agregar fotos
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      data-testid="storefront-gallery-input"
+                      onChange={(e) => {
+                        addGalleryFiles(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
               </div>
             </div>
           )}

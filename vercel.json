@@ -33,6 +33,70 @@
       "destination": "/api/tracking-og?code=:code"
     },
     {
+      "source": "/v/:slug/:itemId",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|WhatsApp|Twitterbot|Slackbot|TelegramBot|LinkedInBot|Discordbot|SkypeUriPreview|Pinterest|Applebot|redditbot|vkShare).*"
+        }
+      ],
+      "destination": "/api/storefront-og?slug=:slug&item=:itemId"
+    },
+    {
+      "source": "/v/:slug/:itemId",
+      "missing": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode"
+        }
+      ],
+      "destination": "/api/storefront-og?slug=:slug&item=:itemId"
+    },
+    {
+      "source": "/v/:slug/:itemId",
+      "has": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode",
+          "value": "^(?!navigate$).+$"
+        }
+      ],
+      "destination": "/api/storefront-og?slug=:slug&item=:itemId"
+    },
+    {
+      "source": "/v/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|WhatsApp|Twitterbot|Slackbot|TelegramBot|LinkedInBot|Discordbot|SkypeUriPreview|Pinterest|Applebot|redditbot|vkShare).*"
+        }
+      ],
+      "destination": "/api/storefront-og?slug=:slug"
+    },
+    {
+      "source": "/v/:slug",
+      "missing": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode"
+        }
+      ],
+      "destination": "/api/storefront-og?slug=:slug"
+    },
+    {
+      "source": "/v/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode",
+          "value": "^(?!navigate$).+$"
+        }
+      ],
+      "destination": "/api/storefront-og?slug=:slug"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

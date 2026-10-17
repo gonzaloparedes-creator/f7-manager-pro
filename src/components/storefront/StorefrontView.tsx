@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Store, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ArrowDown, Search, SlidersHorizontal, Store, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatPYG } from "@/lib/orders";
@@ -11,6 +11,7 @@ import {
   isDefaultQuery,
   parsePriceInput,
   priceBounds,
+  searchPlaceholderOf,
   type CatalogQuery,
   type SortKey,
   type StorefrontItem,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/storefront";
 import StorefrontShell, { useStorefrontTitle } from "./StorefrontShell";
 import StorefrontCard from "./StorefrontCard";
+import { SealsStrip } from "./StorefrontSeals";
 
 interface Props {
   store: StorefrontStore;
@@ -29,6 +31,7 @@ interface Props {
 export default function StorefrontView({ store, items, preview = false }: Props) {
   const [query, setQuery] = useState<CatalogQuery>(EMPTY_QUERY);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const catalogRef = useRef<HTMLElement>(null);
   useStorefrontTitle(preview ? undefined : store.name);
 
   const categories = useMemo(() => categoriesOf(items), [items]);
@@ -53,8 +56,20 @@ export default function StorefrontView({ store, items, preview = false }: Props)
 
   return (
     <StorefrontShell store={store} preview={preview}>
-      <section className="border-b border-border bg-gradient-to-br from-primary/15 via-background to-background">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+      <section
+        className={cn(
+          "relative overflow-hidden border-b border-border",
+          !store.banner_url && "bg-gradient-to-br from-primary/15 via-background to-background"
+        )}
+        data-testid="storefront-hero"
+      >
+        {store.banner_url && (
+          <>
+            <img src={store.banner_url} alt="" className="absolute inset-0 h-full w-full object-cover" data-testid="storefront-banner" />
+            <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-background/40" />
+          </>
+        )}
+        <div className="relative mx-auto max-w-6xl px-4 py-8 sm:py-12">
           <h1 className="max-w-2xl text-2xl font-extrabold tracking-tight text-foreground sm:text-4xl">
             {store.tagline?.trim() || `Mirá lo que tenemos en ${store.name}`}
           </h1>
@@ -63,20 +78,31 @@ export default function StorefrontView({ store, items, preview = false }: Props)
               {store.installments_text.trim()}
             </p>
           )}
-          <div className="relative mt-6 max-w-xl">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query.text}
-              onChange={(e) => patch({ text: e.target.value })}
-              placeholder="Buscar un producto…"
-              aria-label="Buscar un producto"
-              className="h-12 rounded-xl bg-card pl-11 text-base"
-            />
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full max-w-xl">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query.text}
+                onChange={(e) => patch({ text: e.target.value })}
+                placeholder={searchPlaceholderOf(store)}
+                aria-label="Buscar un producto"
+                className="h-12 rounded-xl bg-card pl-11 text-base"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={preview ? undefined : () => catalogRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Ver catálogo <ArrowDown className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-6">
+      <SealsStrip seals={store.seals} />
+
+      <section ref={catalogRef} className="mx-auto max-w-6xl scroll-mt-4 px-4 py-6" data-testid="storefront-catalog">
         {categories.length > 1 && (
           <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
             <Chip active={query.category === null} onClick={() => patch({ category: null })}>

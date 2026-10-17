@@ -2,7 +2,16 @@ import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { MapPin, MessageCircle, Navigation, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { accentStyle, buildGeneralMessage, mapsUrl, storefrontPath, whatsappLink, type StorefrontStore } from "@/lib/storefront";
+import {
+  accentStyle,
+  buildGeneralMessage,
+  mapsUrl,
+  socialLinks,
+  storefrontPath,
+  whatsappLink,
+  type StorefrontStore,
+} from "@/lib/storefront";
+import { SocialIcon } from "./StorefrontIcons";
 
 interface ShellProps {
   store: StorefrontStore;
@@ -22,6 +31,7 @@ export function useStorefrontTitle(storeName: string | undefined, detail?: strin
 
 export default function StorefrontShell({ store, preview = false, children }: ShellProps) {
   const waHref = store.whatsapp_phone ? whatsappLink(store.whatsapp_phone, buildGeneralMessage(store.name)) : null;
+  const socials = socialLinks(store.socials);
 
   const brand = (
     <span className="flex min-w-0 items-center gap-2.5">
@@ -59,9 +69,30 @@ export default function StorefrontShell({ store, preview = false, children }: Sh
 
       <StorefrontLocation store={store} preview={preview} />
 
-      <footer className="border-t border-border bg-card/60 px-4 py-6 text-center text-xs text-muted-foreground">
-        <p>{store.name}</p>
-        <p className="mt-1">Vitrina hecha con F7 Manager</p>
+      <footer className="border-t border-border bg-card/60 px-4 py-8 text-center text-xs text-muted-foreground">
+        <p className="text-sm font-semibold text-foreground">{store.name}</p>
+        {store.footer_text?.trim() && (
+          <p className="mx-auto mt-2 max-w-xl whitespace-pre-line text-sm leading-relaxed">{store.footer_text.trim()}</p>
+        )}
+        {socials.length > 0 && (
+          <nav aria-label="Redes sociales" className="mt-4 flex flex-wrap items-center justify-center gap-2.5" data-testid="storefront-socials">
+            {socials.map((s) => (
+              <a
+                key={s.kind}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={s.label}
+                title={s.label}
+                onClick={preview ? (e) => e.preventDefault() : undefined}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                <SocialIcon kind={s.kind} className="h-[18px] w-[18px]" />
+              </a>
+            ))}
+          </nav>
+        )}
+        <p className="mt-4">Vitrina hecha con F7 Manager</p>
       </footer>
 
       {waHref && (

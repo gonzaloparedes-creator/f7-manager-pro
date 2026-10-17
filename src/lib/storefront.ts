@@ -2,6 +2,16 @@ import type { CSSProperties } from "react";
 import { formatPYG } from "@/lib/orders";
 import { toWhatsAppPhone } from "@/lib/whatsapp";
 
+export interface StorefrontSeal {
+  icon: string;
+  title: string;
+  subtitle?: string;
+}
+
+export type SocialKind = "instagram" | "facebook" | "tiktok" | "youtube" | "website";
+
+export type StorefrontSocials = Record<SocialKind, string | null>;
+
 export interface StorefrontStore {
   slug: string;
   name: string;
@@ -13,6 +23,13 @@ export interface StorefrontStore {
   installments_text: string | null;
   show_prices: boolean;
   show_stock: boolean;
+  banner_url: string | null;
+  search_placeholder: string | null;
+  footer_text: string | null;
+  socials: StorefrontSocials;
+  seals: StorefrontSeal[];
+  product_seals: StorefrontSeal[];
+  includes: string[];
 }
 
 export interface StorefrontItem {
@@ -26,6 +43,7 @@ export interface StorefrontItem {
   battery_health: number | null;
   stock: number | null;
   public_description?: string | null;
+  gallery_images?: string[];
   created_at: string;
 }
 
@@ -287,4 +305,187 @@ export function buildGeneralMessage(storeName: string): string {
 export function stockLabel(item: Pick<StorefrontItem, "stock" | "is_device">): string | null {
   if (item.is_device || item.stock === null) return null;
   return item.stock === 1 ? "Última unidad" : `${item.stock} disponibles`;
+}
+
+export const SEALS_MAX = 6;
+export const PRODUCT_SEALS_MAX = 4;
+export const INCLUDES_MAX = 8;
+export const SEAL_TITLE_MAX = 40;
+export const SEAL_SUBTITLE_MAX = 80;
+export const INCLUDE_MAX = 40;
+export const GALLERY_MAX = 5;
+export const SEARCH_PLACEHOLDER_MAX = 60;
+export const FOOTER_TEXT_MAX = 240;
+export const SOCIAL_URL_MAX = 200;
+export const DEFAULT_SEARCH_PLACEHOLDER = "Buscar un producto…";
+
+export const SEAL_ICONS: { id: string; label: string }[] = [
+  { id: "shield-check", label: "Escudo" },
+  { id: "badge-check", label: "Verificado" },
+  { id: "thumbs-up", label: "Me gusta" },
+  { id: "award", label: "Premio" },
+  { id: "truck", label: "Envío" },
+  { id: "wrench", label: "Taller" },
+  { id: "package", label: "Paquete" },
+  { id: "credit-card", label: "Tarjeta" },
+  { id: "clock", label: "Reloj" },
+  { id: "heart", label: "Corazón" },
+  { id: "star", label: "Estrella" },
+  { id: "smartphone", label: "Celular" },
+];
+
+export const DEFAULT_SEAL_ICON = "shield-check";
+const SEAL_ICON_IDS = new Set(SEAL_ICONS.map((i) => i.id));
+
+/** Deja los sellos como los acepta la base: sin vacíos, con textos recortados y un ícono conocido. */
+export function cleanSeals(list: StorefrontSeal[], max: number): StorefrontSeal[] {
+  const out: StorefrontSeal[] = [];
+  for (const seal of list) {
+    const title = seal.title.trim().slice(0, SEAL_TITLE_MAX).trim();
+    if (!title) continue;
+    const subtitle = (seal.subtitle ?? "").trim().slice(0, SEAL_SUBTITLE_MAX).trim();
+    out.push({
+      icon: SEAL_ICON_IDS.has(seal.icon) ? seal.icon : DEFAULT_SEAL_ICON,
+      title,
+      ...(subtitle ? { subtitle } : {}),
+    });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+export function cleanIncludes(list: string[]): string[] {
+  const out: string[] = [];
+  for (const text of list) {
+    const value = text.trim().slice(0, INCLUDE_MAX).trim();
+    if (!value) continue;
+    out.push(value);
+    if (out.length >= INCLUDES_MAX) break;
+  }
+  return out;
+}
+
+export const SOCIAL_KINDS: SocialKind[] = ["instagram", "facebook", "tiktok", "youtube", "website"];
+
+export const SOCIAL_LABELS: Record<SocialKind, string> = {
+  instagram: "Instagram",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  website: "Sitio web",
+};
+
+export const EMPTY_SOCIALS: StorefrontSocials = { instagram: null, facebook: null, tiktok: null, youtube: null, website: null };
+
+const SOCIAL_HOSTS: Record<SocialKind, string[] | null> = {
+  instagram: ["instagram.com"],
+  facebook: ["facebook.com", "fb.com", "fb.me"],
+  tiktok: ["tiktok.com"],
+  youtube: ["youtube.com", "youtu.be"],
+  website: null,
+};
+
+const HANDLE_URL: Partial<Record<SocialKind, (handle: string) => string>> = {
+  instagram: (h) => `https://www.instagram.com/${h}`,
+  tiktok: (h) => `https://www.tiktok.com/@${h}`,
+};
+
+export interface SocialResult {
+  value: string | null;
+  error: string | null;
+}
+
+/**
+ * Acepta un enlace (con o sin https) o, en Instagram y TikTok, el @usuario, y
+ * devuelve la dirección https que exige la base. Vacío es válido (sin red).
+ */
+export function normalizeSocialUrl(kind: SocialKind, raw: string): SocialResult {
+  const text = raw.trim();
+  if (!text) return { value: null, error: null };
+
+  const label = SOCIAL_LABELS[kind];
+  const fromHandle = HANDLE_URL[kind];
+  const invalid: SocialResult = {
+    value: null,
+    error:
+      kind === "website"
+        ? "Escribí la dirección de tu sitio, por ejemplo mitienda.com.py."
+        : `Pegá el enlace de tu ${label}${fromHandle ? " o escribí tu usuario" : ""}.`,
+  };
+  const hosts = SOCIAL_HOSTS[kind];
+
+  const handle = /^@?([A-Za-z0-9._]{1,40})$/.exec(text);
+  if (fromHandle && handle && !(hosts ?? []).some((d) => text.toLowerCase().includes(d))) {
+    return { value: fromHandle(handle[1]), error: null };
+  }
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`;
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return invalid;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return invalid;
+  if (url.port) return invalid;
+
+  const host = url.hostname.toLowerCase();
+  if (hosts) {
+    if (!hosts.some((d) => host === d || host.endsWith(`.${d}`))) return invalid;
+    if (url.pathname.length <= 1) return invalid;
+  } else if (!host.includes(".")) {
+    return invalid;
+  }
+
+  const path = url.pathname === "/" && !url.search && !url.hash ? "" : `${url.pathname}${url.search}${url.hash}`;
+  const value = `https://${host}${path}`;
+  if (value.length > SOCIAL_URL_MAX) return { value: null, error: "El enlace es demasiado largo." };
+  return { value, error: null };
+}
+
+export interface SocialLink {
+  kind: SocialKind;
+  label: string;
+  url: string;
+}
+
+export function socialLinks(socials: Partial<StorefrontSocials> | null | undefined): SocialLink[] {
+  if (!socials) return [];
+  return SOCIAL_KINDS.flatMap((kind) => {
+    const url = socials[kind];
+    return url ? [{ kind, label: SOCIAL_LABELS[kind], url }] : [];
+  });
+}
+
+/** La foto principal y las de la galería, sin repetidas ni vacías. */
+export function galleryImages(item: Pick<StorefrontItem, "image_url" | "gallery_images">): string[] {
+  const all = [item.image_url, ...(item.gallery_images ?? [])].filter((u): u is string => !!u);
+  return Array.from(new Set(all));
+}
+
+/** Lo que el administrador personaliza de su vitrina, tal como lo edita el panel. */
+export interface CustomDraft {
+  banner_url: string;
+  search_placeholder: string;
+  footer_text: string;
+  socials: Record<SocialKind, string>;
+  seals: StorefrontSeal[];
+  product_seals: StorefrontSeal[];
+  includes: string[];
+}
+
+export function defaultCustom(): CustomDraft {
+  return {
+    banner_url: "",
+    search_placeholder: "",
+    footer_text: "",
+    socials: { instagram: "", facebook: "", tiktok: "", youtube: "", website: "" },
+    seals: [],
+    product_seals: [],
+    includes: [],
+  };
+}
+
+export function searchPlaceholderOf(store: Pick<StorefrontStore, "search_placeholder">): string {
+  return store.search_placeholder?.trim() || DEFAULT_SEARCH_PLACEHOLDER;
 }

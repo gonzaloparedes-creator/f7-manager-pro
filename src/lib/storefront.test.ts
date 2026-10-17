@@ -1,20 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_SEAL_ICON,
+  DEFAULT_SEARCH_PLACEHOLDER,
   EMPTY_QUERY,
+  EMPTY_SOCIALS,
+  INCLUDES_MAX,
+  INCLUDE_MAX,
   NO_CATEGORY_KEY,
+  SEALS_MAX,
+  SEAL_SUBTITLE_MAX,
+  SEAL_TITLE_MAX,
+  SOCIAL_URL_MAX,
   accentStyle,
   applyCatalogQuery,
   buildGeneralMessage,
   buildInterestMessage,
   categoriesOf,
+  cleanIncludes,
+  cleanSeals,
+  galleryImages,
   hiddenReason,
   isDefaultQuery,
   isStorefrontVisible,
   mapsUrl,
+  normalizeSocialUrl,
   parsePriceInput,
   priceBounds,
   priceLabel,
+  searchPlaceholderOf,
   slugify,
+  socialLinks,
   stockLabel,
   storefrontPath,
   storefrontUrl,
@@ -267,5 +282,124 @@ describe("accentStyle", () => {
   it("usa texto oscuro sobre fondos claros", () => {
     const style = accentStyle("#FFEB3B") as Record<string, string>;
     expect(style["--primary-foreground"]).toBe("212 52% 11%");
+  });
+});
+
+describe("cleanSeals", () => {
+  it("descarta los vacíos y recorta los textos", () => {
+    const out = cleanSeals(
+      [
+        { icon: "truck", title: "  Envíos  ", subtitle: "  a todo el país " },
+        { icon: "star", title: "   " },
+      ],
+      SEALS_MAX,
+    );
+    expect(out).toEqual([{ icon: "truck", title: "Envíos", subtitle: "a todo el país" }]);
+  });
+
+  it("no guarda subtítulo vacío", () => {
+    expect(cleanSeals([{ icon: "star", title: "Garantía", subtitle: "  " }], SEALS_MAX)).toEqual([{ icon: "star", title: "Garantía" }]);
+  });
+
+  it("reemplaza un ícono desconocido por el de siempre", () => {
+    expect(cleanSeals([{ icon: "bomba", title: "Algo" }], SEALS_MAX)[0].icon).toBe(DEFAULT_SEAL_ICON);
+  });
+
+  it("respeta el máximo y los largos que acepta la base", () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ icon: "star", title: `Sello ${i}` }));
+    expect(cleanSeals(many, 4)).toHaveLength(4);
+    const long = cleanSeals([{ icon: "star", title: "t".repeat(90), subtitle: "s".repeat(200) }], SEALS_MAX)[0];
+    expect(long.title).toHaveLength(SEAL_TITLE_MAX);
+    expect(long.subtitle).toHaveLength(SEAL_SUBTITLE_MAX);
+  });
+});
+
+describe("cleanIncludes", () => {
+  it("saca vacíos, recorta y limita la cantidad", () => {
+    expect(cleanIncludes([" Cargador ", "", "  ", "Funda"])).toEqual(["Cargador", "Funda"]);
+    expect(cleanIncludes(Array.from({ length: 12 }, (_, i) => `Cosa ${i}`))).toHaveLength(INCLUDES_MAX);
+    expect(cleanIncludes(["x".repeat(100)])[0]).toHaveLength(INCLUDE_MAX);
+  });
+});
+
+describe("normalizeSocialUrl", () => {
+  it("vacío es válido y significa sin red", () => {
+    expect(normalizeSocialUrl("instagram", "   ")).toEqual({ value: null, error: null });
+  });
+
+  it("arma el enlace desde el @usuario en Instagram y TikTok", () => {
+    expect(normalizeSocialUrl("instagram", "@tecnofix.py").value).toBe("https://www.instagram.com/tecnofix.py");
+    expect(normalizeSocialUrl("instagram", "tecnofix").value).toBe("https://www.instagram.com/tecnofix");
+    expect(normalizeSocialUrl("tiktok", "@tecnofix").value).toBe("https://www.tiktok.com/@tecnofix");
+  });
+
+  it("acepta el enlace con o sin https y fuerza https", () => {
+    expect(normalizeSocialUrl("instagram", "instagram.com/tecnofix").value).toBe("https://instagram.com/tecnofix");
+    expect(normalizeSocialUrl("facebook", "http://www.facebook.com/tecnofix").value).toBe("https://www.facebook.com/tecnofix");
+    expect(normalizeSocialUrl("youtube", "https://youtu.be/abc123").value).toBe("https://youtu.be/abc123");
+  });
+
+  it("rechaza una red que no corresponde al campo", () => {
+    expect(normalizeSocialUrl("instagram", "https://facebook.com/tecnofix").error).not.toBeNull();
+    expect(normalizeSocialUrl("facebook", "https://instagram.com/tecnofix").error).not.toBeNull();
+  });
+
+  it("rechaza dominios que solo imitan a la red", () => {
+    expect(normalizeSocialUrl("instagram", "https://instagram.com.evil.com/x").error).not.toBeNull();
+    expect(normalizeSocialUrl("instagram", "https://evil.com/instagram.com/x").error).not.toBeNull();
+    expect(normalizeSocialUrl("instagram", "https://notinstagram.com/x").error).not.toBeNull();
+  });
+
+  it("rechaza esquemas peligrosos, puertos y enlaces sin perfil", () => {
+    expect(normalizeSocialUrl("website", "javascript:alert(1)").error).not.toBeNull();
+    expect(normalizeSocialUrl("website", "ftp://tienda.com").error).not.toBeNull();
+    expect(normalizeSocialUrl("website", "https://tienda.com:8080").error).not.toBeNull();
+    expect(normalizeSocialUrl("instagram", "https://instagram.com").error).not.toBeNull();
+  });
+
+  it("no deja pasar usuario:clave en el enlace", () => {
+    const r = normalizeSocialUrl("instagram", "https://user:pass@instagram.com/tecnofix");
+    expect(r.value).toBe("https://instagram.com/tecnofix");
+  });
+
+  it("el sitio web pide un dominio con punto y saca la barra final", () => {
+    expect(normalizeSocialUrl("website", "mitienda.com.py").value).toBe("https://mitienda.com.py");
+    expect(normalizeSocialUrl("website", "https://mitienda.com.py/catalogo?a=1").value).toBe("https://mitienda.com.py/catalogo?a=1");
+    expect(normalizeSocialUrl("website", "localhost").error).not.toBeNull();
+  });
+
+  it("rechaza un enlace más largo que el máximo", () => {
+    const r = normalizeSocialUrl("website", `https://mitienda.com.py/${"a".repeat(SOCIAL_URL_MAX)}`);
+    expect(r.value).toBeNull();
+    expect(r.error).not.toBeNull();
+  });
+});
+
+describe("socialLinks", () => {
+  it("lista solo las redes cargadas, en orden fijo", () => {
+    const links = socialLinks({ ...EMPTY_SOCIALS, website: "https://x.com.py", instagram: "https://instagram.com/x" });
+    expect(links.map((l) => l.kind)).toEqual(["instagram", "website"]);
+    expect(links[0].label).toBe("Instagram");
+  });
+
+  it("sin datos devuelve lista vacía", () => {
+    expect(socialLinks(null)).toEqual([]);
+    expect(socialLinks(EMPTY_SOCIALS)).toEqual([]);
+  });
+});
+
+describe("galleryImages", () => {
+  it("pone la principal primero y no repite ni deja vacías", () => {
+    expect(galleryImages({ image_url: "a", gallery_images: ["b", "a", "c"] })).toEqual(["a", "b", "c"]);
+    expect(galleryImages({ image_url: null, gallery_images: ["b"] })).toEqual(["b"]);
+    expect(galleryImages({ image_url: null })).toEqual([]);
+  });
+});
+
+describe("searchPlaceholderOf", () => {
+  it("usa el texto propio o el de siempre", () => {
+    expect(searchPlaceholderOf({ search_placeholder: "  Buscá tu equipo  " })).toBe("Buscá tu equipo");
+    expect(searchPlaceholderOf({ search_placeholder: "   " })).toBe(DEFAULT_SEARCH_PLACEHOLDER);
+    expect(searchPlaceholderOf({ search_placeholder: null })).toBe(DEFAULT_SEARCH_PLACEHOLDER);
   });
 });
