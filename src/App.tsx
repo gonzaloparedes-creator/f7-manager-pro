@@ -22,6 +22,8 @@ import Inventory from "./pages/Inventory.tsx";
 import Products from "./pages/Products.tsx";
 import HowToUse from "./pages/HowToUse.tsx";
 import PublicTrackingByCode from "./pages/PublicTrackingByCode.tsx";
+import PublicStorefront from "./pages/PublicStorefront.tsx";
+import PublicStorefrontItem from "./pages/PublicStorefrontItem.tsx";
 import MasterAdmin from "./pages/MasterAdmin.tsx";
 import SuperAdminHome from "./pages/SuperAdminHome.tsx";
 import SuperAdminSuppliers from "./pages/SuperAdminSuppliers.tsx";
@@ -57,6 +59,8 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/actualizar-password" element={<UpdatePassword />} />
           <Route path="/tracking/:orderCode" element={<PublicTrackingByCode />} />
+          <Route path="/v/:slug" element={<PublicStorefront />} />
+          <Route path="/v/:slug/:itemId" element={<PublicStorefrontItem />} />
           <Route path="/master-admin" element={<MasterAdmin />} />
           <Route path="/superadmin" element={<SuperAdminHome />} />
           <Route path="/superadmin/proveedores" element={<SuperAdminSuppliers />} />

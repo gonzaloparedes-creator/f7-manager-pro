@@ -1,0 +1,164 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, BatteryMedium, Loader2, MessageCircle, ShoppingBag, Smartphone } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import StorefrontShell, { StorefrontUnavailable, useStorefrontTitle } from "@/components/storefront/StorefrontShell";
+import StorefrontCard from "@/components/storefront/StorefrontCard";
+import {
+  buildInterestMessage,
+  priceLabel,
+  stockLabel,
+  storefrontPath,
+  storefrontUrl,
+  whatsappLink,
+  type StorefrontItemData,
+} from "@/lib/storefront";
+
+type State = { status: "loading" } | { status: "missing" } | { status: "error" } | { status: "ready"; data: StorefrontItemData };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default function PublicStorefrontItem() {
+  const { slug, itemId } = useParams();
+  const [state, setState] = useState<State>({ status: "loading" });
+
+  useEffect(() => {
+    let active = true;
+    if (!slug || !itemId || !UUID_RE.test(itemId)) {
+      setState({ status: "missing" });
+      return;
+    }
+    setState({ status: "loading" });
+    (supabase as any)
+      .rpc("get_storefront_item", { _slug: slug, _item_id: itemId })
+      .then(({ data, error }: { data: StorefrontItemData | null; error: unknown }) => {
+        if (!active) return;
+        if (error) setState({ status: "error" });
+        else if (!data) setState({ status: "missing" });
+        else setState({ status: "ready", data });
+      });
+    return () => { active = false; };
+  }, [slug, itemId]);
+
+  const ready = state.status === "ready" ? state.data : null;
+  useStorefrontTitle(ready?.store.name, ready?.item?.name);
+
+  if (state.status === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (state.status === "error") {
+    return <StorefrontUnavailable title="No pudimos cargar el artículo" message="Revisá tu conexión y probá de nuevo en un momento." />;
+  }
+  if (state.status === "missing" || !ready) {
+    return (
+      <StorefrontUnavailable
+        title="Esta vitrina no está disponible"
+        message="El enlace puede estar mal escrito o el negocio la tiene pausada por ahora."
+        backTo={slug ? storefrontPath(slug) : undefined}
+      />
+    );
+  }
+
+  const { store, item, similar } = ready;
+  if (!item) {
+    return (
+      <StorefrontUnavailable
+        title="Este artículo ya no está disponible"
+        message="Puede que se haya vendido o que el negocio lo haya sacado de la vitrina."
+        backTo={storefrontPath(store.slug)}
+      />
+    );
+  }
+
+  const stock = store.show_stock ? stockLabel(item) : null;
+  const interestHref = store.whatsapp_phone
+    ? whatsappLink(
+        store.whatsapp_phone,
+        buildInterestMessage(item, store.name, storefrontUrl(store.slug, window.location.origin, item.id))
+      )
+    : null;
+  const hasPrice = item.price !== null && item.price > 0;
+
+  return (
+    <StorefrontShell store={store}>
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <Link
+          to={storefrontPath(store.slug)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> Volver a la vitrina
+        </Link>
+
+        <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <div className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
+            {item.image_url ? (
+              <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <ShoppingBag className="h-16 w-16" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {item.category && <span className="rounded-full bg-muted px-2.5 py-1">{item.category}</span>}
+              {item.is_device && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                  <Smartphone className="h-3 w-3 text-primary" /> Equipo
+                </span>
+              )}
+              {item.is_device && item.battery_health !== null && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                  <BatteryMedium className="h-3 w-3" /> Batería {item.battery_health}%
+                </span>
+              )}
+              {stock && <span className="rounded-full bg-muted px-2.5 py-1">{stock}</span>}
+            </div>
+
+            <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">{item.name}</h1>
+            <p className={hasPrice ? "mt-2 text-3xl font-extrabold text-primary" : "mt-2 text-lg font-medium text-muted-foreground"}>
+              {priceLabel(item)}
+            </p>
+            {hasPrice && store.installments_text?.trim() && (
+              <p className="mt-1 text-sm text-muted-foreground">{store.installments_text.trim()}</p>
+            )}
+
+            {item.public_description?.trim() && (
+              <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-foreground/90">{item.public_description.trim()}</p>
+            )}
+
+            {interestHref && (
+              <a
+                href={interestHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                <MessageCircle className="h-5 w-5" /> Me interesa
+              </a>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Te respondemos por WhatsApp para confirmar disponibilidad y coordinar la entrega.
+            </p>
+          </div>
+        </div>
+
+        {similar.length > 0 && (
+          <section className="mt-12">
+            <h2 className="text-lg font-bold text-foreground">También te puede interesar</h2>
+            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+              {similar.map((s) => (
+                <StorefrontCard key={s.id} item={s} slug={store.slug} showStock={store.show_stock} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </StorefrontShell>
+  );
+}

@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Tabs, ScrollTabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins, BatteryMedium, CalendarClock } from "lucide-react";
+import { Plus, ShoppingBag, ShoppingCart, AlertTriangle, Trash2, Printer, EyeOff, Pencil, Smartphone, MessageCircle, HandCoins, BatteryMedium, CalendarClock, Store } from "lucide-react";
 import NewProductDialog from "@/components/NewProductDialog";
 import BuyDeviceDialog, { type BuyDestination } from "@/components/BuyDeviceDialog";
 import DevicesHub from "@/components/DevicesHub";
 import ScrapDevicesPanel from "@/components/ScrapDevicesPanel";
+import StorefrontPanel from "@/components/StorefrontPanel";
 import ExtractPartDialog from "@/components/ExtractPartDialog";
 import { useScrapDevices } from "@/hooks/useScrapDevices";
 import {
@@ -80,6 +81,8 @@ export type Product = {
   origin?: string | null;
   min_price?: number | null;
   barcode?: string | null;
+  show_in_storefront?: boolean;
+  public_description?: string | null;
   created_at?: string;
 };
 
@@ -261,7 +264,7 @@ export default function Products() {
     const [{ data: productsData, error: pErr }, { data: salesData, error: sErr }] = await Promise.all([
       (supabase as any)
         .from("inventory_items")
-        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, battery_health, origin, min_price, purchase_cost, repair_cost, repair_details, notes, barcode, created_at")
+        .select("id, name, category_id, subcategory_id, branch_id, stock, min_stock_alert, cost_price, selling_price, image_url, is_device, imei, battery_health, origin, min_price, purchase_cost, repair_cost, repair_details, notes, barcode, show_in_storefront, public_description, created_at")
         .eq("company_id", companyId)
         .eq("is_for_sale", true)
         .order("created_at", { ascending: false }),
@@ -529,6 +532,12 @@ export default function Products() {
   // sin este reload quedaba desactualizada (el producto recién creado caía
   // en el agrupado "Sin categoría" hasta refrescar la página a mano).
   const handleSaved = () => { load(); reloadCategories(); };
+  const showStorefront = isAdmin && isBusiness;
+  const handlePublishedChange = (ids: string[], value: boolean) => {
+    const set = new Set(ids);
+    setItems((prev) => prev.map((p) => (set.has(p.id) ? { ...p, show_in_storefront: value } : p)));
+  };
+  const reservedIds = useMemo(() => new Set(activeByItem.keys()), [activeByItem]);
 
   const renderProductCard = (i: Product) => {
     const outOfStock = i.stock <= 0;
@@ -578,11 +587,16 @@ export default function Products() {
             </div>
           </div>
 
-          {(cat || i.branch_id || i.is_device) && (
+          {(cat || i.branch_id || i.is_device || (showStorefront && i.show_in_storefront)) && (
             <div className="flex flex-wrap items-center gap-1">
               {i.is_device && (
                 <Badge variant="outline" className="gap-1 border-primary/40 text-[11px] text-primary">
                   <Smartphone className="h-3 w-3" /> Equipo
+                </Badge>
+              )}
+              {showStorefront && i.show_in_storefront && (
+                <Badge variant="outline" data-testid="storefront-badge" className="gap-1 border-primary/40 bg-primary/5 text-[11px] text-primary">
+                  <Store className="h-3 w-3" /> En vitrina
                 </Badge>
               )}
               {reservation && (
@@ -805,6 +819,7 @@ export default function Products() {
             </TabsTrigger>
           )}
           <TabsTrigger value="garantias">Garantías</TabsTrigger>
+          {showStorefront && <TabsTrigger value="vitrina" data-testid="tab-vitrina">Vitrina</TabsTrigger>}
         </ScrollTabsList>
 
         {showDevicesHub && (
@@ -1038,6 +1053,17 @@ export default function Products() {
         <TabsContent value="garantias">
           <WarrantyLookup />
         </TabsContent>
+
+        {showStorefront && (
+          <TabsContent value="vitrina">
+            <StorefrontPanel
+              items={items}
+              reservedIds={reservedIds}
+              categoryName={categoryName}
+              onPublishedChange={handlePublishedChange}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {cartCount > 0 && (

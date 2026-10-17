@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
+import { useUserRole } from "@/hooks/useUserRole";
+import { usePlan } from "@/hooks/usePlan";
 import { useCategories } from "@/hooks/useCategories";
 import { useBranches } from "@/hooks/useBranches";
 import { toast } from "sonner";
@@ -50,6 +52,8 @@ export interface EditableProduct {
   origin?: string | null;
   min_price?: number | null;
   barcode?: string | null;
+  show_in_storefront?: boolean;
+  public_description?: string | null;
 }
 
 export default function NewProductDialog({
@@ -71,6 +75,10 @@ export default function NewProductDialog({
   const { companyId } = useCompany();
   // Sin permiso los campos de costo / mínimo no se muestran, pero sus valores cargados se conservan al editar.
   const { canViewCosts, canGiveDiscounts } = useUserPermissions();
+  // Publicar en la vitrina es solo del admin y solo del plan Business (la base también lo exige).
+  const { isAdmin } = useUserRole();
+  const { isBusiness } = usePlan();
+  const canPublish = isAdmin && isBusiness;
   const { categories, subcategoriesFor, reload: reloadCategories } = useCategories();
   const { branches, defaultBranchId, hasMultipleBranches } = useBranches();
   const [name, setName] = useState("");
@@ -93,6 +101,8 @@ export default function NewProductDialog({
   const [repairCost, setRepairCost] = useState("0");
   const [repairDetails, setRepairDetails] = useState("");
   const [notes, setNotes] = useState("");
+  const [showInStorefront, setShowInStorefront] = useState(false);
+  const [publicDescription, setPublicDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -120,6 +130,7 @@ export default function NewProductDialog({
     setName(""); setBarcode(""); setCategoryId(null); setSubcategoryId(null); setBranchId(null);
     setStock("0"); setMinAlert("0"); setCost("0"); setPrice("0"); setMinPrice(""); setFile(null); setPreview(null);
     setIsDevice(false); setImei(""); setBattery(""); setOrigin(null); setPurchaseCost("0"); setRepairCost("0"); setRepairDetails(""); setNotes("");
+    setShowInStorefront(false); setPublicDescription("");
   };
 
   const toggleDevice = (on: boolean) => {
@@ -153,6 +164,8 @@ export default function NewProductDialog({
       setRepairCost(String(editItem.repair_cost ?? 0));
       setRepairDetails(editItem.repair_details ?? "");
       setNotes(editItem.notes ?? "");
+      setShowInStorefront(!!editItem.show_in_storefront);
+      setPublicDescription(editItem.public_description ?? "");
       setFile(null);
       setPreview(editItem.image_url);
     } else {
@@ -255,6 +268,9 @@ export default function NewProductDialog({
         repair_cost: isDevice ? parseFloat(repairCost) || 0 : 0,
         repair_details: isDevice ? repairDetails.trim() || null : null,
         notes: isDevice ? notes.trim() || null : null,
+        ...(canPublish
+          ? { show_in_storefront: showInStorefront, public_description: publicDescription.trim() || null }
+          : {}),
       };
 
       if (isDevice && payload.imei) {
@@ -584,6 +600,32 @@ export default function NewProductDialog({
               </span>
             )}
           </div>
+
+          {canPublish && (
+            <div className="grid gap-3 rounded-lg border border-border p-3" data-testid="storefront-fields">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <Label htmlFor="product-storefront" className="text-sm font-semibold">Publicar en la vitrina online</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Los clientes lo ven mientras tenga stock y precio, y no esté reservado.
+                  </p>
+                </div>
+                <Switch id="product-storefront" checked={showInStorefront} onCheckedChange={setShowInStorefront} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="product-public-description">Descripción para el cliente (opcional)</Label>
+                <Textarea
+                  id="product-public-description"
+                  value={publicDescription}
+                  maxLength={600}
+                  rows={3}
+                  onChange={(e) => setPublicDescription(e.target.value)}
+                  placeholder="Ej: Incluye cargador y funda. 6 meses de garantía."
+                />
+                <span className="text-right text-[11px] text-muted-foreground">{publicDescription.length}/600</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

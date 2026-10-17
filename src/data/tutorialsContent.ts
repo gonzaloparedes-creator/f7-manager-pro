@@ -471,6 +471,18 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "vitrina-online",
+        title: "Vitrina online: tu catálogo en un enlace",
+        badge: { label: "Solo plan Business · la configura un administrador" },
+        body: [
+          "La pestaña \"Vitrina\" (en Productos, visible solo para administradores del plan Business) arma una página pública con tus productos y equipos, que cualquier persona puede abrir desde el celular sin instalar nada ni crear una cuenta. El enlace tiene la forma /v/tu-taller: lo elegís vos, y el botón \"Copiar enlace\" lo deja listo para pegar en WhatsApp, Instagram o Google.",
+          "Para crearla, completá el enlace, una frase de portada, tu WhatsApp, la dirección y el color de tu marca, y activá \"Vitrina activa\". A la derecha ves una vista previa en vivo de cómo queda. Si pausás la vitrina, el enlace deja de mostrar productos pero no se pierde: al reactivarla vuelve igual.",
+          "Nada se publica solo: cada producto o equipo tiene su switch \"Publicar en la vitrina online\" (en la lista de la propia pestaña o al crear/editar el producto), apagado por defecto. También podés usar \"Publicar todo lo disponible\" para subir de una vez todo lo que se puede ver, y \"Sacar todo\" para apagar todo de golpe. Al crear o editar un producto, la \"Descripción para el cliente\" es un texto opcional que se muestra en la página del artículo.",
+          "Aunque esté publicado, un artículo no se muestra si no tiene stock, si está reservado para un cliente o si no tiene precio (cuando la vitrina muestra precios). En la lista aparece con la etiqueta naranja \"No se ve\" y el motivo, y vuelve a mostrarse solo cuando se resuelve. \"Mostrar precios\" y \"Mostrar unidades disponibles\" son opcionales; sin precios, el cliente ve \"Consultar precio\".",
+          "El cliente puede buscar, filtrar por categoría y por rango de precio, ordenar, y abrir cada artículo. El botón \"Me interesa\" abre WhatsApp con un mensaje que ya nombra el artículo y trae el enlace. La vitrina nunca muestra costos, mínimo de negociación, IMEI, origen ni datos de tus clientes. Si el plan baja de Business, el enlace deja de mostrar productos.",
+        ],
+      },
+      {
         id: "ventas",
         title: "Ventas recientes y ticket imprimible",
         body: [
