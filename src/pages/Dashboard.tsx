@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { resolveStatusLabel, isClosedOrderStatus, normalizePriority, priorityRank } from "@/lib/orders";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { Plus, Smartphone, Clock, CheckCircle2, Package, Layers, Search, X, CalendarDays, Flag, LayoutDashboard, List, Columns3 } from "lucide-react";
-import NewOrderDialog from "@/components/NewOrderDialog";
 import NewQuoteDialog from "@/components/NewQuoteDialog";
 import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
 import DeliveryCalendarDialog from "@/components/DeliveryCalendarDialog";
@@ -61,7 +60,6 @@ export default function Dashboard() {
     [statusPresets]
   );
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -86,15 +84,12 @@ export default function Dashboard() {
 
   useEffect(() => { document.title = "Órdenes | F7 Manager Pro"; }, []);
 
-  // El FAB de acciones rápidas navega acá con state.openNewOrder o
-  // state.openNewQuote cuando se toca esa acción desde otra página — se
+  // El FAB de acciones rápidas navega acá con state.openNewQuote o
+  // state.openBatchOrder cuando se toca esa acción desde otra página — se
   // limpia el state al abrir para que no se re-dispare con el botón atrás.
   useEffect(() => {
-    const state = location.state as { openNewOrder?: boolean; openNewQuote?: boolean; openBatchOrder?: boolean } | null;
-    if (state?.openNewOrder) {
-      setOpen(true);
-      navigate(location.pathname, { replace: true, state: null });
-    } else if (state?.openNewQuote) {
+    const state = location.state as { openNewQuote?: boolean; openBatchOrder?: boolean } | null;
+    if (state?.openNewQuote) {
       setQuoteOpen(true);
       navigate(location.pathname, { replace: true, state: null });
     } else if (state?.openBatchOrder) {
@@ -253,7 +248,7 @@ export default function Dashboard() {
             <Button variant="outline" onClick={() => setQuoteOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" /> Nuevo Presupuesto
             </Button>
-            <Button onClick={() => setOpen(true)} className="gap-2">
+            <Button onClick={() => navigate("/ordenes/nueva")} className="gap-2">
               <Plus className="h-4 w-4" /> Nueva Orden
             </Button>
           </div>
@@ -367,7 +362,7 @@ export default function Dashboard() {
                 : showBoard || filter === "todos" ? "Aún no tenés órdenes." : `No hay órdenes en ${resolveStatusLabel(filter, statusPresets)}.`}
             </p>
             {(showBoard || filter === "todos") && !searchQuery && !onlyHighPriority && (
-              <Button onClick={() => setOpen(true)} variant="outline" className="gap-2">
+              <Button onClick={() => navigate("/ordenes/nueva")} variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" /> Crear la primera
               </Button>
             )}
@@ -418,7 +413,6 @@ export default function Dashboard() {
         </>
       )}
 
-      <NewOrderDialog open={open} onOpenChange={setOpen} onCreated={load} />
       <NewQuoteDialog open={quoteOpen} onOpenChange={setQuoteOpen} onCreated={load} />
       <NewBatchOrderDialog open={batchOpen} onOpenChange={setBatchOpen} onCreated={load} />
       <DeliveryCalendarDialog

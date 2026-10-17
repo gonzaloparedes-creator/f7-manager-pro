@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt, Cpu, MessageCircle, Menu } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -65,6 +65,7 @@ function AppLayoutContent() {
   const { isStarter, isBusiness, isRetail, loading: planLoading } = usePlan();
   const hasExternalInventory = isBusiness || isRetail;
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   useGenerateRecurringExpenses(canViewGastos && !isStarter && !planLoading);
@@ -111,6 +112,20 @@ function AppLayoutContent() {
 
   if (isActive === false && !isSuperAdmin) {
     return <SuspendedAccount />;
+  }
+
+  // Nueva orden es una pantalla completa por pasos: sin sidebar, barra
+  // inferior ni botón flotante. El proveedor de WhatsApp queda en la raíz en
+  // ambos casos para que sus avisos sobrevivan al pasar de la pantalla
+  // completa al detalle de la orden.
+  if (pathname === "/ordenes/nueva") {
+    return (
+      <WhatsAppOfferProvider>
+        <div className="min-h-screen bg-background">
+          <Outlet />
+        </div>
+      </WhatsAppOfferProvider>
+    );
   }
 
   const renderNavItem = (item: typeof baseNav[number], mobile = false) => {
@@ -217,6 +232,7 @@ function AppLayoutContent() {
   };
 
   return (
+    <WhatsAppOfferProvider>
     <div className="min-h-screen bg-background">
       <UpgradeProDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
 
@@ -280,9 +296,7 @@ function AppLayoutContent() {
 
       <main className="md:pl-64 pb-20 md:pb-0">
         <div className="mx-auto max-w-6xl p-4 md:p-8 animate-fade-in">
-          <WhatsAppOfferProvider>
-            <Outlet />
-          </WhatsAppOfferProvider>
+          <Outlet />
         </div>
       </main>
 
@@ -292,6 +306,7 @@ function AppLayoutContent() {
       </nav>
       <QuickActionsFab />
     </div>
+    </WhatsAppOfferProvider>
   );
 }
 

@@ -52,7 +52,7 @@ export default function QuickActionsFab() {
       label: "Nueva Orden",
       desc: "Recibir un equipo para reparación",
       icon: ClipboardList,
-      run: () => navigate("/dashboard", { state: { openNewOrder: true } }),
+      run: () => navigate("/ordenes/nueva"),
     },
     {
       key: "quote",

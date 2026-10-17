@@ -10,6 +10,7 @@ import Register from "./pages/Register.tsx";
 import UpdatePassword from "./pages/UpdatePassword.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import OrderDetail from "./pages/OrderDetail.tsx";
+import NewOrder from "./pages/NewOrder.tsx";
 import Settings from "./pages/Settings.tsx";
 import Clients from "./pages/Clients.tsx";
 import PendingMessages from "./pages/PendingMessages.tsx";
@@ -63,6 +64,7 @@ const App = () => (
           <Route path="/superadmin/metricas" element={<SuperAdminMetrics />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/ordenes/nueva" element={<NewOrder />} />
             <Route path="/ordenes/:id" element={<OrderDetail />} />
             <Route path="/clientes" element={<Clients />} />
             <Route path="/avisos" element={<PendingMessages />} />

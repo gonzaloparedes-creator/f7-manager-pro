@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
 import { CameraCapture } from "@/components/CameraCapture";
 
+export type IntakeSectionKey = "equipo" | "asignacion" | "fotos" | "accesorios" | "checklist" | "financiero" | "seguridad";
+
 export interface DeviceIntakeValue {
   device_type: string;
   imei: string;
@@ -59,6 +61,14 @@ interface DeviceIntakeFieldsProps {
   onCameraActiveChange?: (active: boolean) => void;
   onCompressingChange?: (compressing: boolean) => void;
   compact?: boolean;
+  // Sin `sections` se renderiza el formulario completo de siempre (Modo
+  // Lote). Con `sections` se muestran solo esos bloques — el asistente de
+  // Nueva orden reparte el formulario en pasos — y "asignacion" (técnico +
+  // prioridad) y "fotos" salen de "equipo" para poder ubicarse por separado.
+  sections?: IntakeSectionKey[];
+  // Sin recuadro superior ni título en "equipo" y con los demás bloques como
+  // tarjetas: para cuando cada paso ya trae su propio título grande.
+  bare?: boolean;
 }
 
 function parseAmount(s: string) {
@@ -71,10 +81,10 @@ function formatThousands(s: string) {
   return n ? n.toLocaleString("es-PY") : "";
 }
 
-// Extraído de NewOrderDialog.tsx para poder usarse tanto ahí (un solo
-// equipo) como en Modo Lote (uno por equipo del lote) sin duplicar la
-// lógica de chips/checklist/fotos/seguridad — un solo lugar para arreglar
-// bugs o agregar campos de ahí en adelante.
+// Compartido entre el asistente de Nueva orden (un solo equipo) y Modo Lote
+// (uno por equipo del lote) para no duplicar la lógica de
+// chips/checklist/fotos/seguridad — un solo lugar para arreglar bugs o
+// agregar campos de ahí en adelante.
 export default function DeviceIntakeFields({
   idPrefix,
   value,
@@ -87,6 +97,8 @@ export default function DeviceIntakeFields({
   onCameraActiveChange,
   onCompressingChange,
   compact = false,
+  sections,
+  bare = false,
 }: DeviceIntakeFieldsProps) {
   const { toast } = useToast();
   const { presets: accessoryPresets } = useAccessoryPresets();
@@ -238,15 +250,102 @@ export default function DeviceIntakeFields({
 
   const id = (name: string) => `${idPrefix}_${name}`;
 
+  const legacy = !sections;
+  const has = (key: IntakeSectionKey) => (legacy ? key !== "asignacion" && key !== "fotos" : sections.includes(key));
+  const lead = bare ? "space-y-4" : "space-y-3 border-t border-border pt-4";
+  const card = bare ? "space-y-3 rounded-xl border border-border bg-card p-4 sm:p-5" : "space-y-3 border-t border-border pt-4";
+
+  const assignmentFields = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor={id("assigned_technician")}>Técnico asignado</Label>
+        <Select
+          value={value.assigned_technician_id || ""}
+          onValueChange={(v) => onChange({ assigned_technician_id: v })}
+        >
+          <SelectTrigger id={id("assigned_technician")}><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+          <SelectContent>
+            {technicians.map((t) => (
+              <SelectItem key={t.id} value={t.id}>{t.full_name || "Técnico sin nombre"}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor={id("priority")}>Prioridad</Label>
+        <Select
+          value={normalizePriority(value.priority)}
+          onValueChange={(v) => onChange({ priority: v as OrderPriority })}
+        >
+          <SelectTrigger id={id("priority")}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {ORDER_PRIORITIES.map((p) => (
+              <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  );
+
+  const photosField = (
+    <div className="space-y-2">
+      <Label>Fotos</Label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted">
+          <Upload className="h-4 w-4" />
+          Galería
+          <input
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,image/gif,image/bmp,image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }}
+          />
+        </label>
+        <button
+          ref={cameraTriggerRef}
+          type="button"
+          onClick={openCamera}
+          className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted"
+        >
+          <Camera className="h-4 w-4" />
+          Cámara
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {files.length} / {photoLimit} fotos{isStarterPlan ? " (plan Starter)" : ""}
+        {compressing && " · Optimizando…"}
+      </p>
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {files.map((f, i) => (
+            <div key={f.previewUrl} className="relative">
+              <img src={f.previewUrl} alt={f.file.name} className="h-16 w-16 rounded-md object-cover" />
+              <button
+                type="button"
+                onClick={() => { URL.revokeObjectURL(f.previewUrl); onFilesChange(files.filter((_, j) => j !== i)); }}
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Equipo */}
+      {has("equipo") && (
       <div
         ref={(el) => registerSectionRef?.("equipo", el)}
         data-section="equipo"
-        className="space-y-3 border-t border-border pt-4"
+        className={lead}
       >
-        <h4 className="text-sm font-semibold text-foreground">Detalles del equipo</h4>
+        {!bare && <h4 className="text-sm font-semibold text-foreground">Detalles del equipo</h4>}
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor={id("device_type")}>Equipo *</Label>
@@ -332,35 +431,7 @@ export default function DeviceIntakeFields({
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor={id("assigned_technician")}>Técnico asignado</Label>
-          <Select
-            value={value.assigned_technician_id || ""}
-            onValueChange={(v) => onChange({ assigned_technician_id: v })}
-          >
-            <SelectTrigger id={id("assigned_technician")}><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-            <SelectContent>
-              {technicians.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.full_name || "Técnico sin nombre"}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor={id("priority")}>Prioridad</Label>
-          <Select
-            value={normalizePriority(value.priority)}
-            onValueChange={(v) => onChange({ priority: v as OrderPriority })}
-          >
-            <SelectTrigger id={id("priority")}><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {ORDER_PRIORITIES.map((p) => (
-                <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {legacy && assignmentFields}
 
         <div className="space-y-2">
           <Label>Detalles a la vista *</Label>
@@ -389,57 +460,29 @@ export default function DeviceIntakeFields({
             onChange={(e) => onChange({ problem_description: e.target.value })} />
         </div>
 
-        <div className="space-y-2">
-          <Label>Fotos</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted">
-              <Upload className="h-4 w-4" />
-              Galería
-              <input
-                type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,image/gif,image/bmp,image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }}
-              />
-            </label>
-            <button
-              ref={cameraTriggerRef}
-              type="button"
-              onClick={openCamera}
-              className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-sm text-muted-foreground hover:bg-muted"
-            >
-              <Camera className="h-4 w-4" />
-              Cámara
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {files.length} / {photoLimit} fotos{isStarterPlan ? " (plan Starter)" : ""}
-            {compressing && " · Optimizando…"}
-          </p>
-          {files.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {files.map((f, i) => (
-                <div key={f.previewUrl} className="relative">
-                  <img src={f.previewUrl} alt={f.file.name} className="h-16 w-16 rounded-md object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => { URL.revokeObjectURL(f.previewUrl); onFilesChange(files.filter((_, j) => j !== i)); }}
-                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {legacy && photosField}
       </div>
+      )}
+
+      {/* Técnico y prioridad */}
+      {!legacy && has("asignacion") && (
+        <div className={card}>{assignmentFields}</div>
+      )}
+
+      {/* Fotos */}
+      {!legacy && has("fotos") && (
+        <div className={card}>
+          <h4 className="text-sm font-semibold text-foreground">Fotos del equipo</h4>
+          {photosField}
+        </div>
+      )}
 
       {/* Accesorios */}
+      {has("accesorios") && (
       <div
         ref={(el) => registerSectionRef?.("accesorios", el)}
         data-section="accesorios"
-        className="space-y-3 border-t border-border pt-4"
+        className={card}
       >
         <h4 className="text-sm font-semibold text-foreground">Accesorios y Componentes</h4>
         <p className="text-xs text-muted-foreground">Marcá lo que el cliente entrega junto al equipo.</p>
@@ -460,12 +503,14 @@ export default function DeviceIntakeFields({
           </div>
         )}
       </div>
+      )}
 
       {/* Checklist */}
+      {has("checklist") && (
       <div
         ref={(el) => registerSectionRef?.("checklist", el)}
         data-section="checklist"
-        className="space-y-3 border-t border-border pt-4"
+        className={card}
       >
         <h4 className="text-sm font-semibold text-foreground">Checklist de Recepción</h4>
         <p className="text-xs text-muted-foreground">Dejá constancia del estado del equipo al recibirlo (opcional, item por item).</p>
@@ -510,12 +555,14 @@ export default function DeviceIntakeFields({
           </div>
         )}
       </div>
+      )}
 
       {/* Financiero */}
+      {has("financiero") && (
       <div
         ref={(el) => registerSectionRef?.("financiero", el)}
         data-section="financiero"
-        className="space-y-3 border-t border-border pt-4"
+        className={card}
       >
         <h4 className="text-sm font-semibold text-foreground">Información financiera</h4>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -592,12 +639,14 @@ export default function DeviceIntakeFields({
           <WarrantySelector value={value.warranty_days} onChange={(d) => onChange({ warranty_days: d })} />
         </div>
       </div>
+      )}
 
       {/* Seguridad */}
+      {has("seguridad") && (
       <div
         ref={(el) => registerSectionRef?.("seguridad", el)}
         data-section="seguridad"
-        className="space-y-3 border-t border-border pt-4"
+        className={card}
       >
         <h4 className="text-sm font-semibold text-foreground">Seguridad del equipo</h4>
         <p className="text-xs text-muted-foreground">Datos opcionales para que el técnico pueda acceder al equipo durante la reparación.</p>
@@ -656,6 +705,7 @@ export default function DeviceIntakeFields({
           )}
         </div>
       </div>
+      )}
 
       {cameraOpen && (
         <CameraCapture onClose={closeCamera} onCapture={(fs) => addFiles(fs)} />
