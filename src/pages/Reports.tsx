@@ -14,6 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, Info, BarChart3 } from "lucide-react";
 import KpiHint from "@/components/KpiHint";
 import ReportsInsights from "@/components/ReportsInsights";
+import ReportsBusiness from "@/components/ReportsBusiness";
 import { usePlan } from "@/hooks/usePlan";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
@@ -546,6 +547,28 @@ export default function Reports() {
 
   const gananciaNetaTotal = (hasTaller ? ingresoNetoTaller : 0) + (hasTienda ? gananciaNetaTienda : 0);
 
+  // Punto de equilibrio: siempre el mes en curso y los últimos 90 días, sin
+  // importar el período elegido arriba. Misma definición de cobrado y costo que
+  // los números de esta página.
+  const businessFinance = useMemo(() => {
+    const now = new Date();
+    const monthFrom = startOfMonth(now);
+    const monthTo = endOfDay(now);
+    const trailFrom = startOfDay(addDays(now, -89));
+    const windowTotals = (f: Date, t: Date) => ({
+      revenue: (hasTaller ? revenueInRange(orders, f, t) : 0) + (hasTienda ? salesRevenueInRange(sales, f, t) : 0),
+      cost: (hasTaller ? partsCostInRange(orders, parts, f, t) : 0) + (hasTienda ? salesCostInRange(sales, f, t) : 0),
+    });
+    const month = windowTotals(monthFrom, monthTo);
+    const trailing = windowTotals(trailFrom, monthTo);
+    return {
+      monthRevenue: month.revenue,
+      monthCost: month.cost,
+      trailingRevenue: trailing.revenue,
+      trailingCost: trailing.cost,
+    };
+  }, [orders, parts, sales, hasTaller, hasTienda]);
+
   const categoriaTaller = useMemo(
     () => hasTaller ? partsCostByCategory(orders, parts, from, to) : new Map<string, CategoryCost>(),
     [hasTaller, orders, parts, from, to]
@@ -918,6 +941,8 @@ export default function Reports() {
       </Card>
 
       <ReportsInsights from={from} to={to} hasTaller={hasTaller} hasTienda={hasTienda} />
+
+      <ReportsBusiness from={from} to={to} hasTaller={hasTaller} hasTienda={hasTienda} finance={businessFinance} />
     </div>
   );
 }

@@ -182,7 +182,7 @@ export function orderTotal(o: Pick<OrderInsightRow, "quote_amount" | "cargos_adi
   return Number(o.quote_amount ?? 0) + extras;
 }
 
-function inRange(iso: string | null, from: Date | null, to: Date | null): boolean {
+export function inRange(iso: string | null, from: Date | null, to: Date | null): boolean {
   if (!iso) return false;
   if (!from || !to) return true;
   const t = new Date(iso).getTime();

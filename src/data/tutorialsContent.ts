@@ -563,6 +563,17 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
       },
       {
+        id: "numeros-del-negocio",
+        title: "Números del negocio: punto de equilibrio, productos y clientes",
+        body: [
+          "Después de \"Para decidir mejor\" hay otra sección, \"Números del negocio\", con cuatro tarjetas que también salen de lo que ya cargaste. Cada una tiene su ícono de ayuda (?).",
+          "Punto de equilibrio: te dice cuánto tenés que cobrar en el mes para que la ganancia cubra tus costos fijos. Los costos fijos son tus gastos recurrentes activos (alquiler, sueldos, internet…; los semanales se pasan a un mes típico), que cargás en Gastos → Recurrentes. Muestra cuánto llevás ganado este mes, qué porcentaje de los costos fijos ya cubriste, cuánto te falta y, al ritmo de hoy, cómo cerrarías el mes. El estado es Saludable (ya cubriste los costos o, al ritmo de hoy, los vas a cubrir), Atención (al ritmo de hoy cubrirías al menos el 70 %) o Crítico (menos del 70 %); antes del día 7 del mes dice \"Muy pronto para decir\" porque todavía hay pocos días para proyectar. Si no tenés gastos recurrentes cargados, la tarjeta te lleva directo a cargarlos. No depende del período elegido arriba, y los gastos sueltos que no son recurrentes no entran.",
+          "Curva ABC de productos (solo si tenés Tienda): ordena lo vendido en el período elegido de más a menos facturado. A son los pocos productos que juntan el 80 % de lo vendido — nunca deberían faltar —; B son los que siguen hasta el 95 %; C es la cola larga que aporta poco. Cada fila muestra unidades, porcentaje del total y la ganancia de ese producto.",
+          "Clientes por grupo (solo si tenés Taller): agrupa a tus clientes según cuántas veces vinieron y hace cuánto no vuelven. Campeones (3 o más visitas y volvieron en los últimos 90 días), Leales (2 visitas, la última en los últimos 90 días), Nuevos (una visita reciente o una orden abierta), En riesgo (entre 91 y 180 días sin volver) y Dormidos (más de 180 días). Tocá un grupo para ver sus cinco mejores clientes. Los presupuestos no cuentan como visita, y mira toda la historia, no el período elegido.",
+          "Valor de cada cliente (LTV): lo que dejó en promedio cada cliente que ya pagó al menos una orden, el porcentaje que volvió y quiénes concentran más. Es lo facturado, sin descontar costos de repuestos, así que sirve para saber cuánto vale conseguir y cuidar a un cliente, no como ganancia.",
+        ],
+      },
+      {
         id: "medio-de-pago",
         title: "Ingresos por medio de pago",
         body: [

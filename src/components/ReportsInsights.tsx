@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Boxes, ClipboardList, Clock, MessageCircle, PackageSearch, PackageX, Printer, Timer, Trophy, UserX, type LucideIcon } from "lucide-react";
+import { Boxes, ClipboardList, Clock, MessageCircle, PackageSearch, PackageX, Printer, Timer, Trophy, UserX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { useBranches } from "@/hooks/useBranches";
 import { useCategories } from "@/hooks/useCategories";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import KpiHint from "@/components/KpiHint";
+import { InsightCard, InsightEmpty as Empty, InsightLoading as Loading } from "@/components/InsightCard";
+import { fetchAllPages } from "@/lib/fetchAllPages";
 import { formatPYG, resolveStatusLabel } from "@/lib/orders";
 import { normalizedRealPhone } from "@/lib/clients";
 import { openWhatsApp, toWhatsAppPhone } from "@/lib/whatsapp";
@@ -39,20 +39,6 @@ const ALL_BRANCHES = "all";
 
 type InventoryRow = StockItem & { is_for_repair: boolean; is_for_sale: boolean };
 type UsageRow = { inventory_item_id: string | null; created_at: string };
-
-async function fetchAllPages<T>(
-  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<T[]> {
-  const PAGE = 1000;
-  const out: T[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await build(offset, offset + PAGE - 1);
-    if (error) throw error;
-    out.push(...(data ?? []));
-    if (!data || data.length < PAGE) break;
-  }
-  return out;
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -561,43 +547,4 @@ export default function ReportsInsights({
       </div>
     </section>
   );
-}
-
-function InsightCard({
-  title,
-  icon: Icon,
-  hint,
-  testId,
-  headerExtra,
-  children,
-}: {
-  title: string;
-  icon: LucideIcon;
-  hint: string;
-  testId: string;
-  headerExtra?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card data-testid={testId}>
-      <CardContent className="space-y-3 p-5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Icon className="h-4 w-4 text-primary" /> {title}
-            <KpiHint label={title} text={hint} />
-          </div>
-          {headerExtra}
-        </div>
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Loading() {
-  return <p className="text-sm text-muted-foreground">Cargando…</p>;
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-muted-foreground">{children}</p>;
 }
