@@ -293,7 +293,7 @@ export function mapsUrl(address: string): string {
 
 export function buildInterestMessage(item: Pick<StorefrontItem, "name" | "price">, storeName: string, link?: string): string {
   const price = item.price !== null && item.price > 0 ? ` (${formatPYG(item.price)})` : "";
-  const lines = [`Hola ${storeName}! Vi "${item.name}"${price} en su vitrina y me interesa.`];
+  const lines = [`Hola ${storeName}! Me interesa este producto: "${item.name}"${price}. ¿Lo tienen disponible?`];
   if (link) lines.push(link);
   return lines.join("\n");
 }

@@ -155,30 +155,39 @@ export default function PublicStorefrontItem() {
             <IncludesList items={store.includes} />
             <ProductSeals seals={store.product_seals} />
 
-            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+            <div className="mt-6 flex gap-2.5">
               {interestHref && (
                 <a
                   href={interestHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 sm:flex-1 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                  className="inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                  data-testid="storefront-contact"
                 >
-                  <MessageCircle className="h-5 w-5" /> Me interesa
+                  <MessageCircle className="h-5 w-5 shrink-0" /> Contactar por WhatsApp
                 </a>
               )}
               <button
                 type="button"
                 onClick={() => void share(item.name)}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-base font-medium text-foreground transition-colors hover:bg-accent"
+                aria-label={copied ? "Enlace copiado" : "Compartir"}
+                title={copied ? "Enlace copiado" : "Compartir"}
+                className={
+                  interestHref
+                    ? "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-accent"
+                    : "inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-base font-medium text-foreground transition-colors hover:bg-accent sm:flex-none"
+                }
                 data-testid="storefront-share"
               >
                 {copied ? <Check className="h-5 w-5 text-primary" /> : <Share2 className="h-5 w-5" />}
-                {copied ? "Enlace copiado" : "Compartir"}
+                {!interestHref && (copied ? "Enlace copiado" : "Compartir")}
               </button>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Te respondemos por WhatsApp para confirmar disponibilidad y coordinar la entrega.
-            </p>
+            {interestHref && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Se abre WhatsApp con el mensaje ya escrito. Te respondemos para confirmar disponibilidad y coordinar la entrega.
+              </p>
+            )}
           </div>
         </div>
 

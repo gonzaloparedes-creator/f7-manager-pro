@@ -257,7 +257,7 @@ describe("textos y enlaces", () => {
 
   it("buildInterestMessage omite el precio cuando no se muestra", () => {
     const msg = buildInterestMessage({ name: "Funda", price: null }, "TecnoFix");
-    expect(msg).toBe('Hola TecnoFix! Vi "Funda" en su vitrina y me interesa.');
+    expect(msg).toBe('Hola TecnoFix! Me interesa este producto: "Funda". ¿Lo tienen disponible?');
   });
 
   it("buildGeneralMessage nombra el negocio", () => {

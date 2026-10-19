@@ -273,6 +273,12 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
 
   const publicUrl = saved ? storefrontUrl(saved.slug, window.location.origin) : null;
 
+  const focusWhatsapp = () => {
+    const el = document.getElementById("sf-whatsapp");
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    el?.focus({ preventScroll: true });
+  };
+
   const copyLink = async () => {
     if (!publicUrl) return;
     try {
@@ -433,6 +439,19 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
             La vitrina está pausada: quien abra el enlace no verá tus productos. Activala y guardá para publicarla.
           </p>
         )}
+        {saved && !saved.whatsapp && (
+          <div
+            className="mt-3 flex flex-col gap-2 rounded-lg border border-secondary/40 bg-secondary/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+            data-testid="storefront-no-whatsapp"
+          >
+            <p className="text-sm text-foreground">
+              Tu vitrina no tiene un número de WhatsApp cargado: quien vea un producto no puede escribirte desde ahí.
+            </p>
+            <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={focusWhatsapp}>
+              Cargar mi WhatsApp
+            </Button>
+          </div>
+        )}
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
@@ -504,11 +523,18 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
               value={draft.whatsapp}
               onChange={(e) => patch({ whatsapp: e.target.value })}
               placeholder="0981 123 456"
+              className={!draft.whatsapp.trim() ? "border-secondary/60" : undefined}
             />
             {phoneInvalid ? (
               <p className="text-xs text-destructive">Ese número no parece válido. Probá con el código de país, por ejemplo 595981123456.</p>
+            ) : draft.whatsapp.trim() ? (
+              <p className="text-xs text-muted-foreground">
+                El botón "Contactar por WhatsApp" de cada producto abre una conversación con este número y un mensaje ya escrito con el nombre del producto.
+              </p>
             ) : (
-              <p className="text-xs text-muted-foreground">Sin número no aparece el botón de WhatsApp ni "Me interesa".</p>
+              <p className="text-xs text-secondary">
+                Sin número no aparece el botón "Contactar por WhatsApp" en los productos. Escribilo como lo usás en WhatsApp.
+              </p>
             )}
           </div>
 
