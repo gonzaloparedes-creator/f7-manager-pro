@@ -589,6 +589,18 @@ export const tutorialCategories: TutorialCategory[] = [
         ],
         images: [{ file: "reportes-sucursal-tecnico-01.png", alt: "Desglose por sucursal y por técnico" }],
       },
+      {
+        id: "liquidar-comisiones",
+        title: "Liquidar comisiones",
+        badge: { label: "Solo Admin" },
+        body: [
+          "Cuando le pagás la comisión a un técnico o vendedor, podés dejarlo registrado para saber qué período ya cobró. En \"Por vendedor / técnico\", elegí arriba un período que termine ayer o antes (por ejemplo \"Semana pasada\" o \"Mes pasado\") y tocá \"Liquidar\" en la fila de la persona. \"Todo el tiempo\" y \"Hoy\" no se pueden liquidar.",
+          "Se abre una ventana con lo atribuido a esa persona en esas fechas, su porcentaje y el monto a pagar. Podés agregar una nota (por ejemplo \"pagado en efectivo el viernes\") y confirmar con \"Registrar liquidación\". Ese cálculo se hace de nuevo al abrir la ventana, así que siempre coincide con lo que realmente se cobró.",
+          "Solo se liquidan días ya cerrados: si el período incluye hoy, se liquida hasta ayer y lo de hoy queda para la próxima. Si parte del período ya estaba liquidado, esos días se saltean y no se pagan dos veces. Cuando todo el período ya está liquidado, la fila muestra \"Liquidada\".",
+          "Esto deja constancia del pago de la comisión: no mueve la caja ni crea un gasto, así que si querés que figure como salida de dinero, cargalo aparte en Gastos.",
+          "Una liquidación no se edita ni se borra. Si te equivocaste, abrí \"Liquidaciones\" (debajo de la tabla), tocá \"Anular\" y confirmá: queda en el historial como anulada y esos días vuelven a estar disponibles para liquidar de nuevo.",
+        ],
+      },
     ],
   },
   {

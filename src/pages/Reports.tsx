@@ -11,7 +11,7 @@ import { formatPYG, interruptionReasonLabel } from "@/lib/orders";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, Info, BarChart3 } from "lucide-react";
+import { Wallet, TrendingUp, PackageMinus, TrendingDown, PackageX, ShieldAlert, Wrench, ShoppingBag, CalendarDays, Tags, Building2, UsersRound, Smartphone, Info, BarChart3, Check, History } from "lucide-react";
 import KpiHint from "@/components/KpiHint";
 import ReportsInsights from "@/components/ReportsInsights";
 import ReportsBusiness from "@/components/ReportsBusiness";
@@ -24,6 +24,10 @@ import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { netSaleAmount } from "@/lib/tradeIn";
+import { revenueByStaffId, totalOf } from "@/lib/staffRevenue";
+import { SettleDialog, SettlementHistoryDialog, type SettlePerson } from "@/components/CommissionSettlements";
+import { useCommissionSettlements } from "@/hooks/useCommissionSettlements";
+import { dateKey, settleWindow, type CommissionSettlement } from "@/lib/commissionSettlements";
 
 interface CargoAdicional { motivo: string; monto: number }
 interface OrderRow {
@@ -110,11 +114,6 @@ function startOfWeek(d: Date) {
 function endOfWeek(d: Date) { return endOfDay(addDays(startOfWeek(d), 6)); }
 function startOfYear(d: Date) { return new Date(d.getFullYear(), 0, 1); }
 function endOfYear(d: Date) { return new Date(d.getFullYear(), 11, 31, 23, 59, 59, 999); }
-
-function totalOf(o: OrderRow) {
-  const cargos = (o.cargos_adicionales ?? []).reduce((s, c) => s + Number(c?.monto ?? 0), 0);
-  return Number(o.quote_amount ?? 0) + cargos;
-}
 
 function getRange(tf: Timeframe, customRange?: DateRange): { from: Date | null; to: Date | null } {
   const now = new Date();
@@ -412,27 +411,6 @@ function revenueByBranchId(orders: OrderRow[], sales: SaleRow[], from: Date | nu
   return map;
 }
 
-function revenueByStaffId(orders: OrderRow[], sales: SaleRow[], from: Date | null, to: Date | null) {
-  const map = new Map<string, number>();
-  const add = (id: string | null, amount: number) => {
-    if (!amount) return;
-    const key = id ?? "";
-    map.set(key, (map.get(key) ?? 0) + amount);
-  };
-  for (const o of orders) {
-    const senia = Number(o.senia_amount ?? 0);
-    let rev = 0;
-    if (inRange(o.deposit_date, from, to)) rev += senia;
-    if (inRange(o.final_payment_date, from, to)) rev += Math.max(0, totalOf(o) - senia);
-    add(o.assigned_technician_id, rev);
-  }
-  for (const s of sales) {
-    if (!inRange(s.created_at, from, to)) continue;
-    add(s.created_by, s.quantity * Number(s.unit_price || 0));
-  }
-  return map;
-}
-
 export default function Reports() {
   // Todos los hooks van primero, sin condicionar — los early return de
   // permisos/plan van después de que todos los hooks ya se ejecutaron.
@@ -449,6 +427,7 @@ export default function Reports() {
   const [orderPayments, setOrderPayments] = useState<PaymentRow[]>([]);
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [commissionEnabled, setCommissionEnabled] = useState(false);
+  const { settlements, reload: reloadSettlements } = useCommissionSettlements(companyId, commissionEnabled && isAdmin);
   const [useDeviceClassification, setUseDeviceClassification] = useState(false);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<Timeframe>("este_mes");
@@ -622,6 +601,10 @@ export default function Reports() {
       return { id, name: person?.full_name || (id ? "Usuario" : "Sin asignar"), revenue, rate: person?.commission_rate ?? 0 };
     });
   }, [orders, sales, from, to, staff]);
+
+  const showStaffCard =
+    staffBreakdown.length > 1 ||
+    (commissionEnabled && (settlements.length > 0 || staffBreakdown.some((r) => r.id && r.rate > 0)));
 
   const effectiveScope: ChartScope = hasTaller && hasTienda ? chartScope : hasTaller ? "taller" : "tienda";
 
@@ -851,7 +834,7 @@ export default function Reports() {
         )}
       </div>
 
-      {(categoriaTaller.size > 0 || categoriaTienda.size > 0 || (hasMultipleBranches && branchBreakdown.length > 0) || staffBreakdown.length > 1
+      {(categoriaTaller.size > 0 || categoriaTienda.size > 0 || (hasMultipleBranches && branchBreakdown.length > 0) || showStaffCard
         || gananciaPorEquipo.size > 0 || gananciaPorMarca.size > 0 || gananciaPorModeloTop.size > 0 || paymentMethodBreakdown.length > 0
         || (hasTaller && interruptions.interrupted > 0)) && (
         <div className="grid gap-4 md:grid-cols-2">
@@ -879,8 +862,17 @@ export default function Reports() {
           {hasTaller && interruptions.interrupted > 0 && (
             <InterruptionsCard {...interruptions} />
           )}
-          {staffBreakdown.length > 1 && (
-            <StaffCommissionCard rows={staffBreakdown} commissionEnabled={commissionEnabled} />
+          {showStaffCard && (
+            <StaffCommissionCard
+              rows={staffBreakdown}
+              commissionEnabled={commissionEnabled}
+              from={from}
+              to={to}
+              companyId={companyId}
+              hasTienda={hasTienda}
+              settlements={settlements}
+              onSettlementsChanged={reloadSettlements}
+            />
           )}
         </div>
       )}
@@ -1170,12 +1162,36 @@ function RevenueListCard({ title, icon, rows }: { title: string; icon: any; rows
 function StaffCommissionCard({
   rows,
   commissionEnabled,
+  from,
+  to,
+  companyId,
+  hasTienda,
+  settlements,
+  onSettlementsChanged,
 }: {
   rows: { id: string; name: string; revenue: number; rate: number }[];
   commissionEnabled: boolean;
+  from: Date | null;
+  to: Date | null;
+  companyId: string | null;
+  hasTienda: boolean;
+  settlements: CommissionSettlement[];
+  onSettlementsChanged: () => void;
 }) {
+  const [settling, setSettling] = useState<{ person: SettlePerson; from: string; to: string; includesToday: boolean; skipsSettled: boolean } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const sorted = [...rows].sort((a, b) => b.revenue - a.revenue);
   const totalCommission = sorted.reduce((s, r) => s + (r.revenue * r.rate) / 100, 0);
+
+  const today = dateKey(new Date());
+  const fromKey = from ? dateKey(from) : null;
+  const toKey = to ? dateKey(to) : null;
+  const canSettle = commissionEnabled && !!companyId;
+  const windowFor = (personId: string) =>
+    settleWindow(fromKey, toKey, today, settlements.filter((s) => s.user_id === personId));
+  const rangeWindow = settleWindow(fromKey, toKey, today, []);
+
   return (
     <BreakdownCardShell title="Por vendedor / técnico" icon={UsersRound}>
       <div className="overflow-x-auto">
@@ -1188,20 +1204,49 @@ function StaffCommissionCard({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r) => (
-              <tr key={r.id} className="border-t border-border/50">
-                <td className="py-1.5 text-foreground">{r.name}</td>
-                <td className="py-1.5 text-right">{formatPYG(r.revenue)}</td>
-                {commissionEnabled && (
-                  <td className="py-1.5 text-right font-medium text-primary">
-                    {formatPYG((r.revenue * r.rate) / 100)}
-                    <span className="ml-1 text-xs text-muted-foreground">({r.rate}%)</span>
-                  </td>
-                )}
-              </tr>
-            ))}
+            {sorted.map((r) => {
+              const win = canSettle && r.id && r.rate > 0 ? windowFor(r.id) : null;
+              return (
+                <tr key={r.id} className="border-t border-border/50" data-testid="staff-row">
+                  <td className="py-1.5 align-top text-foreground">{r.name}</td>
+                  <td className="py-1.5 text-right align-top">{formatPYG(r.revenue)}</td>
+                  {commissionEnabled && (
+                    <td className="py-1.5 text-right align-top">
+                      <div className="font-medium text-primary">
+                        {formatPYG((r.revenue * r.rate) / 100)}
+                        <span className="ml-1 text-xs text-muted-foreground">({r.rate}%)</span>
+                      </div>
+                      {win?.status === "covered" && (
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary" data-testid="settled-badge">
+                          <Check className="h-3 w-3" /> Liquidada
+                        </span>
+                      )}
+                      {win?.status === "ok" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-1 h-7 text-xs"
+                          data-testid="settle-button"
+                          onClick={() =>
+                            setSettling({
+                              person: { id: r.id, name: r.name, rate: r.rate },
+                              from: win.from,
+                              to: win.to,
+                              includesToday: win.includesToday,
+                              skipsSettled: win.skipsSettled,
+                            })
+                          }
+                        >
+                          Liquidar
+                        </Button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
-          {commissionEnabled && (
+          {commissionEnabled && sorted.length > 0 && (
             <tfoot>
               <tr className="border-t border-border font-semibold">
                 <td className="py-1.5" colSpan={2}>Total comisiones</td>
@@ -1211,6 +1256,49 @@ function StaffCommissionCard({
           )}
         </table>
       </div>
+
+      {canSettle && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground" data-testid="settle-hint">
+            {rangeWindow.status === "no-range" && rangeWindow.reason === "all"
+              ? "Para liquidar comisiones elegí un período (por ejemplo «Mes pasado»)."
+              : rangeWindow.status === "no-range"
+                ? "Hoy todavía no se puede liquidar: elegí un período que termine ayer o antes."
+                : toKey && toKey >= today
+                  ? "Se liquida hasta ayer; lo de hoy queda para la próxima."
+                  : ""}
+          </p>
+          {settlements.length > 0 && (
+            <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => setHistoryOpen(true)} data-testid="settlement-history-button">
+              <History className="h-3.5 w-3.5" /> Liquidaciones ({settlements.filter((s) => !s.voided_at).length})
+            </Button>
+          )}
+        </div>
+      )}
+
+      {canSettle && companyId && (
+        <>
+          <SettleDialog
+            open={!!settling}
+            onOpenChange={(o) => { if (!o) setSettling(null); }}
+            person={settling?.person ?? null}
+            periodFrom={settling?.from ?? ""}
+            periodTo={settling?.to ?? ""}
+            includesToday={settling?.includesToday ?? false}
+            skipsSettled={settling?.skipsSettled ?? false}
+            companyId={companyId}
+            hasTienda={hasTienda}
+            onSaved={onSettlementsChanged}
+          />
+          <SettlementHistoryDialog
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            settlements={settlements}
+            companyId={companyId}
+            onChanged={onSettlementsChanged}
+          />
+        </>
+      )}
     </BreakdownCardShell>
   );
 }
