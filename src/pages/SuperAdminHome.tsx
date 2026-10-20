@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Globe2, Building2, Rocket, BarChart3 } from "lucide-react";
+import { ShieldCheck, Globe2, Building2, Rocket, BarChart3, Receipt } from "lucide-react";
 
 export default function SuperAdminHome() {
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -41,6 +41,12 @@ export default function SuperAdminHome() {
       icon: Rocket,
       title: "Panel de Fundadores",
       desc: "Embudo de activación del Programa Fundadores: quién activó, quién paga.",
+    },
+    {
+      to: "/superadmin/recibos",
+      icon: Receipt,
+      title: "Recibos de pagos",
+      desc: "Generá e imprimí el recibo de lo que te paga cada negocio por su plan, con logo de F7, plan y fechas.",
     },
   ];
 
