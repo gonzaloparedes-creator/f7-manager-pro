@@ -31,6 +31,7 @@ import SuperAdminFundadores from "./pages/SuperAdminFundadores.tsx";
 import SuperAdminMetrics from "./pages/SuperAdminMetrics.tsx";
 import SuperAdminReceipts from "./pages/SuperAdminReceipts.tsx";
 import Presentacion from "./pages/Presentacion.tsx";
+import Oferta from "./pages/Oferta.tsx";
 import AppLayout from "./components/AppLayout.tsx";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
         <MetaPixelTracker />
         <Routes>
           <Route path="/" element={<Presentacion />} />
+          <Route path="/oferta" element={<Oferta />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/actualizar-password" element={<UpdatePassword />} />
