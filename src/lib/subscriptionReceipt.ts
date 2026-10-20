@@ -41,6 +41,10 @@ export interface SubscriptionReceipt {
   period_start: string;
   period_end: string;
   payment_date: string;
+  // Precio antes del descuento; `amount` es lo que se recibió (subtotal − descuento).
+  subtotal: number;
+  discount_amount: number;
+  discount_note: string | null;
   amount: number;
   currency: ReceiptCurrency;
   payment_method: string;
@@ -145,6 +149,38 @@ export function parseMoneyInput(raw: string, currency: ReceiptCurrency): number 
   return Number(text.replace(",", "."));
 }
 
+// Guaraníes sin decimales; dólares con centavos.
+export function roundMoney(value: number, currency: ReceiptCurrency): number {
+  if (!Number.isFinite(value)) return NaN;
+  return currency === "PYG" ? Math.round(value) : Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+// "10", "12,5" o "7.5" (hasta dos decimales).
+export function parsePercentInput(raw: string): number {
+  const text = raw.trim();
+  if (!/^\d+([.,]\d{1,2})?$/.test(text)) return NaN;
+  return Number(text.replace(",", "."));
+}
+
+export type DiscountMode = "percent" | "fixed";
+
+// Monto del descuento a partir de lo que se escribió: vacío = sin descuento (0), ilegible = NaN.
+export function computeDiscountAmount(
+  subtotal: number,
+  mode: DiscountMode,
+  raw: string,
+  currency: ReceiptCurrency
+): number {
+  if (!raw.trim()) return 0;
+  if (mode === "fixed") return parseMoneyInput(raw, currency);
+  const percent = parsePercentInput(raw);
+  return roundMoney((subtotal * percent) / 100, currency);
+}
+
+export function computeTotal(subtotal: number, discount: number, currency: ReceiptCurrency): number {
+  return roundMoney(subtotal - discount, currency);
+}
+
 export function formatMoney(amount: number, currency: ReceiptCurrency): string {
   if (currency === "PYG") return `Gs. ${Math.round(amount).toLocaleString("es-PY")}`;
   const hasCents = Math.abs(amount - Math.trunc(amount)) > 0.0001;
@@ -233,14 +269,33 @@ export function defaultDescription(plan: PlanType, cycle: Cycle): string {
 }
 
 export type ReceiptErrors = Partial<Record<
-  "customer_name" | "amount" | "payment_date" | "period_start" | "period_end" | "payment_method" | "description" | "issuer_name",
+  | "customer_name"
+  | "subtotal"
+  | "discount_amount"
+  | "amount"
+  | "payment_date"
+  | "period_start"
+  | "period_end"
+  | "payment_method"
+  | "description"
+  | "issuer_name",
   string
 >>;
 
 export function validateDraft(draft: ReceiptDraft, today: string): ReceiptErrors {
   const errors: ReceiptErrors = {};
   if (!draft.customer_name.trim()) errors.customer_name = "Falta el nombre de quien pagó";
-  if (!Number.isFinite(draft.amount) || draft.amount <= 0) errors.amount = "Poné un monto mayor a cero";
+  if (!Number.isFinite(draft.subtotal) || draft.subtotal <= 0) {
+    errors.subtotal = "Poné un precio mayor a cero";
+  } else if (!Number.isFinite(draft.discount_amount) || draft.discount_amount < 0) {
+    errors.discount_amount = "No se entiende el descuento";
+  } else if (draft.discount_amount >= draft.subtotal) {
+    errors.discount_amount = "El descuento tiene que ser menor al precio";
+  } else if (!Number.isFinite(draft.amount) || draft.amount <= 0) {
+    errors.amount = "Poné un monto mayor a cero";
+  } else if (draft.amount !== computeTotal(draft.subtotal, draft.discount_amount, draft.currency)) {
+    errors.amount = "El total no coincide con el precio menos el descuento";
+  }
   if (!isValidISODate(draft.payment_date)) errors.payment_date = "Fecha de pago inválida";
   else if (draft.payment_date > today) errors.payment_date = "La fecha de pago no puede ser futura";
   if (!isValidISODate(draft.period_start)) errors.period_start = "Fecha de adquisición inválida";
@@ -267,6 +322,7 @@ export interface ReceiptHtmlOptions {
 export function buildSubscriptionReceiptHtml(r: SubscriptionReceipt, options: ReceiptHtmlOptions = {}): string {
   const logo = options.logoUrl ?? "/f7-logo.png";
   const voided = Boolean(r.voided_at);
+  const hasDiscount = r.discount_amount > 0;
   const issuerLines = (r.issuer_details ?? "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -300,6 +356,11 @@ h2 { margin: 6mm 0 1.5mm; font-size: 10.5px; text-transform: uppercase; letter-s
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 2mm 0; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; }
 th { width: 55mm; font-weight: 600; color: #333; }
+.breakdown { margin-top: 6mm; padding: 2mm 5mm; border: 1px solid #ccd6dd; border-radius: 3mm; }
+.breakdown .line { display: flex; justify-content: space-between; gap: 6mm; padding: 1.5mm 0; font-size: 12px; }
+.breakdown .line + .line { border-top: 1px solid #e3e9ed; }
+.breakdown .discount { color: #0e7a8b; font-weight: 600; }
+.breakdown + .amount { margin-top: 3mm; }
 .amount { display: flex; justify-content: space-between; align-items: center; gap: 6mm; margin-top: 6mm; padding: 5mm 6mm; border-radius: 3mm; background: #0b1d33; color: #fff; }
 .amount .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: #8fd9e6; }
 .amount .big { font-size: 26px; font-weight: 700; white-space: nowrap; }
@@ -330,9 +391,17 @@ ${voided ? `<div class="watermark">ANULADO</div>` : ""}
 <h1>Comprobante de pago de suscripción</h1>
 <div class="muted">${escapeHtml(r.description)}</div>
 
+${
+  hasDiscount
+    ? `<div class="breakdown">
+  <div class="line"><span>Precio</span><span>${escapeHtml(formatMoney(r.subtotal, r.currency))}</span></div>
+  <div class="line discount"><span>Descuento${r.discount_note ? ` · ${escapeHtml(r.discount_note)}` : ""}</span><span>− ${escapeHtml(formatMoney(r.discount_amount, r.currency))}</span></div>
+</div>`
+    : ""
+}
 <div class="amount">
   <div>
-    <div class="label">Monto recibido</div>
+    <div class="label">${hasDiscount ? "Total recibido" : "Monto recibido"}</div>
     ${words ? `<div class="words">${escapeHtml(words)}</div>` : ""}
   </div>
   <div class="big">${escapeHtml(formatMoney(r.amount, r.currency))}</div>
@@ -367,10 +436,37 @@ ${
 </div></body></html>`;
 }
 
+// Espera (hasta 3 s) a que carguen las imágenes del documento para que el
+// logo no salga vacío al imprimir o al armar el PDF.
+export function waitForImages(doc: Document): Promise<void> {
+  const images = Array.from(doc.images).map(
+    (img) =>
+      img.complete
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          })
+  );
+  const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, 3000));
+  return Promise.race([Promise.all(images).then(() => undefined), timeout]);
+}
+
+// "Recibo-F7-0001-Servi-Smart.pdf": con el nombre del cliente se reconoce el archivo al mandarlo.
+export function receiptPdfFileName(receipt: Pick<SubscriptionReceipt, "receipt_number" | "customer_name">): string {
+  const slug = receipt.customer_name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/g, "");
+  return `Recibo-${receipt.receipt_number}${slug ? `-${slug}` : ""}.pdf`;
+}
+
 // Imprime en un iframe aislado (mismo criterio que el comprobante de compra de
 // equipos): el trabajo de impresión lleva solo el recibo, sin el CSS de la app.
-// Espera a que cargue el logo para que no salga vacío.
-export function printSubscriptionReceipt(receipt: SubscriptionReceipt): void {
+export function printSubscriptionReceipt(receipt: SubscriptionReceipt, options: ReceiptHtmlOptions = {}): void {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
@@ -382,22 +478,11 @@ export function printSubscriptionReceipt(receipt: SubscriptionReceipt): void {
   if (!doc || !win) return cleanup();
 
   doc.open();
-  doc.write(buildSubscriptionReceiptHtml(receipt, { logoUrl: `${window.location.origin}/f7-logo.png` }));
+  doc.write(buildSubscriptionReceiptHtml(receipt, options));
   doc.close();
 
-  const images = Array.from(doc.images).map(
-    (img) =>
-      img.complete
-        ? Promise.resolve()
-        : new Promise<void>((resolve) => {
-            img.addEventListener("load", () => resolve(), { once: true });
-            img.addEventListener("error", () => resolve(), { once: true });
-          })
-  );
-  const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, 3000));
-
   win.addEventListener("afterprint", cleanup, { once: true });
-  void Promise.race([Promise.all(images), timeout]).then(() => {
+  void waitForImages(doc).then(() => {
     window.setTimeout(() => {
       win.focus();
       win.print();

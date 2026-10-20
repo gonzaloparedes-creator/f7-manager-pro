@@ -13,15 +13,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Ban, Loader2, Printer, Receipt as ReceiptIcon, Search } from "lucide-react";
+import { Ban, Download, Loader2, Printer, Receipt as ReceiptIcon, Search } from "lucide-react";
 import { PLAN_LABELS, type Cycle, type PlanType } from "@/lib/plans";
+import { f7LogoUrl, loadF7LogoDataUri } from "@/lib/f7Logo";
 import {
   CURRENCY_LABELS,
   CYCLE_LABELS,
   DEFAULT_ISSUER_NAME,
   PAYMENT_METHODS,
   buildSubscriptionReceiptHtml,
+  computeDiscountAmount,
   computePeriodEnd,
+  computeTotal,
   defaultAmount,
   defaultDescription,
   formatDateISO,
@@ -30,11 +33,13 @@ import {
   printSubscriptionReceipt,
   todayInAsuncion,
   validateDraft,
+  type DiscountMode,
   type ReceiptCurrency,
   type ReceiptDraft,
   type ReceiptErrors,
   type SubscriptionReceipt,
 } from "@/lib/subscriptionReceipt";
+import { downloadSubscriptionReceiptPdf } from "@/lib/subscriptionReceiptPdf";
 
 const db = supabase as any;
 
@@ -54,6 +59,9 @@ interface FormState {
   billing_cycle: Cycle;
   currency: ReceiptCurrency;
   amount: string;
+  discount_mode: DiscountMode;
+  discount_value: string;
+  discount_note: string;
   period_start: string;
   period_end: string;
   payment_date: string;
@@ -94,6 +102,9 @@ function emptyForm(today: string): FormState {
     billing_cycle: "mensual",
     currency: "PYG",
     amount: "",
+    discount_mode: "percent",
+    discount_value: "",
+    discount_note: "",
     period_start: today,
     period_end: "",
     payment_date: today,
@@ -107,6 +118,26 @@ function emptyForm(today: string): FormState {
 }
 
 const orNull = (value: string) => (value.trim() ? value.trim() : null);
+
+// La base devuelve los importes como numéricos; se pasan a número una sola vez, acá.
+function normalizeReceipt(row: any): SubscriptionReceipt {
+  const amount = Number(row.amount);
+  return {
+    ...row,
+    amount,
+    subtotal: Number(row.subtotal ?? row.amount),
+    discount_amount: Number(row.discount_amount ?? 0),
+  };
+}
+
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, ms]);
+  return debounced;
+}
 
 function ReceiptPreview({ html }: { html: string }) {
   const wrap = useRef<HTMLDivElement>(null);
@@ -154,8 +185,19 @@ export default function SuperAdminReceipts() {
   const [voidTarget, setVoidTarget] = useState<SubscriptionReceipt | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [voiding, setVoiding] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  // El logo viaja dentro del recibo (imagen incrustada): no depende de volver a pedirlo al servidor.
+  const [logoSrc, setLogoSrc] = useState<string>(() => f7LogoUrl());
 
   useEffect(() => { document.title = "Recibos de pagos — F7 Manager Pro"; }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadF7LogoDataUri().then((uri) => {
+      if (!cancelled && uri) setLogoSrc(uri);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,7 +208,7 @@ export default function SuperAdminReceipts() {
     if (companiesRes.error) toast.error("No se pudieron cargar las empresas");
     if (receiptsRes.error) toast.error("No se pudieron cargar los recibos", { description: receiptsRes.error.message });
     setCompanies((companiesRes.data ?? []) as CompanyOption[]);
-    const rows = ((receiptsRes.data ?? []) as SubscriptionReceipt[]).map((r) => ({ ...r, amount: Number(r.amount) }));
+    const rows = ((receiptsRes.data ?? []) as any[]).map(normalizeReceipt);
     setReceipts(rows);
     // El emisor se hereda del último recibo para no volver a escribirlo.
     const last = rows[0];
@@ -190,6 +232,14 @@ export default function SuperAdminReceipts() {
       : "";
   const description = touched.description ? form.description : defaultDescription(form.plan_type, form.billing_cycle);
 
+  // Precio de la lista (o el que se escribió) − descuento = lo que se recibe.
+  const subtotal = parseMoneyInput(amountText, form.currency);
+  const discountAmount = Number.isFinite(subtotal)
+    ? computeDiscountAmount(subtotal, form.discount_mode, form.discount_value, form.currency)
+    : 0;
+  const total =
+    Number.isFinite(subtotal) && Number.isFinite(discountAmount) ? computeTotal(subtotal, discountAmount, form.currency) : NaN;
+
   const draft: ReceiptDraft = useMemo(
     () => ({
       company_id: form.company_id === NO_COMPANY ? null : form.company_id,
@@ -202,7 +252,10 @@ export default function SuperAdminReceipts() {
       period_start: form.period_start,
       period_end: periodEnd,
       payment_date: form.payment_date,
-      amount: parseMoneyInput(amountText, form.currency),
+      subtotal,
+      discount_amount: discountAmount,
+      discount_note: discountAmount > 0 ? orNull(form.discount_note) : null,
+      amount: total,
       currency: form.currency,
       payment_method: form.payment_method,
       payment_reference: orNull(form.payment_reference),
@@ -211,25 +264,33 @@ export default function SuperAdminReceipts() {
       issuer_name: form.issuer_name,
       issuer_details: orNull(form.issuer_details),
     }),
-    [form, amountText, periodEnd, description]
+    [form, subtotal, discountAmount, total, periodEnd, description]
   );
 
-  const previewHtml = useMemo(
-    () =>
-      buildSubscriptionReceiptHtml(
-        {
-          ...draft,
-          amount: Number.isFinite(draft.amount) ? draft.amount : 0,
-          id: "preview",
-          receipt_number: "F7-____",
-          created_at: new Date().toISOString(),
-          voided_at: null,
-          void_reason: null,
-        },
-        { logoUrl: `${window.location.origin}/f7-logo.png` }
-      ),
-    [draft]
-  );
+  // El logo incrustado hace pesado el documento: la vista previa espera a que se deje de escribir.
+  const previewDraft = useDebounced(draft, 200);
+  const previewHtml = useMemo(() => {
+    const price = Number.isFinite(previewDraft.subtotal) ? previewDraft.subtotal : 0;
+    const discount =
+      Number.isFinite(previewDraft.discount_amount) && previewDraft.discount_amount >= 0 && previewDraft.discount_amount < price
+        ? previewDraft.discount_amount
+        : 0;
+    return buildSubscriptionReceiptHtml(
+      {
+        ...previewDraft,
+        subtotal: price,
+        discount_amount: discount,
+        discount_note: discount > 0 ? previewDraft.discount_note : null,
+        amount: computeTotal(price, discount, previewDraft.currency),
+        id: "preview",
+        receipt_number: "F7-____",
+        created_at: new Date().toISOString(),
+        voided_at: null,
+        void_reason: null,
+      },
+      { logoUrl: logoSrc }
+    );
+  }, [previewDraft, logoSrc]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -245,11 +306,27 @@ export default function SuperAdminReceipts() {
   };
 
   const changeCurrency = (currency: ReceiptCurrency) => {
-    setForm((prev) => ({ ...prev, currency }));
+    // Un descuento fijo en guaraníes no sirve en dólares (y al revés): se borra. El porcentaje se mantiene.
+    setForm((prev) => ({ ...prev, currency, discount_value: prev.discount_mode === "fixed" ? "" : prev.discount_value }));
     setTouched((prev) => ({ ...prev, amount: false }));
   };
 
-  const submit = async () => {
+  const currentLogo = async () => (await loadF7LogoDataUri()) ?? f7LogoUrl();
+
+  const downloadPdf = async (receipt: SubscriptionReceipt) => {
+    setPdfBusy(receipt.id);
+    try {
+      await downloadSubscriptionReceiptPdf(receipt, { logoUrl: await currentLogo() });
+      toast.success(`PDF del recibo ${receipt.receipt_number} descargado`);
+    } catch (err) {
+      console.error("No se pudo generar el PDF del recibo", err);
+      toast.error("No se pudo generar el PDF", { description: "Probá de nuevo o usá Imprimir y elegí guardar como PDF." });
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
+  const submit = async (action: "pdf" | "print") => {
     const found = validateDraft(draft, today);
     setErrors(found);
     if (Object.keys(found).length > 0) {
@@ -258,18 +335,21 @@ export default function SuperAdminReceipts() {
     }
     setSaving(true);
     const { data, error } = await db.from("subscription_receipts").insert(draft).select("*").single();
-    setSaving(false);
     if (error || !data) {
+      setSaving(false);
       toast.error("No se pudo generar el recibo", { description: error?.message });
       return;
     }
-    const saved: SubscriptionReceipt = { ...data, amount: Number(data.amount) };
+    const saved = normalizeReceipt(data);
     setReceipts((prev) => [saved, ...prev]);
     toast.success(`Recibo ${saved.receipt_number} generado`);
-    printSubscriptionReceipt(saved);
+    // El recibo ya está guardado: el formulario se limpia pase lo que pase con el PDF, para no emitir uno doble.
     setForm((prev) => ({ ...emptyForm(todayInAsuncion()), issuer_name: prev.issuer_name, issuer_details: prev.issuer_details }));
     setTouched((prev) => ({ ...NO_TOUCH, issuer: prev.issuer }));
     setErrors({});
+    setSaving(false);
+    if (action === "pdf") await downloadPdf(saved);
+    else printSubscriptionReceipt(saved, { logoUrl: await currentLogo() });
   };
 
   const confirmVoid = async () => {
@@ -291,7 +371,7 @@ export default function SuperAdminReceipts() {
       toast.error("No se pudo anular el recibo", { description: error?.message });
       return;
     }
-    setReceipts((prev) => prev.map((r) => (r.id === data.id ? { ...data, amount: Number(data.amount) } : r)));
+    setReceipts((prev) => prev.map((r) => (r.id === data.id ? normalizeReceipt(data) : r)));
     toast.success(`Recibo ${voidTarget.receipt_number} anulado`);
     setVoidTarget(null);
     setVoidReason("");
@@ -318,6 +398,7 @@ export default function SuperAdminReceipts() {
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
 
   const listPrice = amountToInput(suggestedAmount, form.currency);
+  const busy = saving || pdfBusy !== null;
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -330,7 +411,7 @@ export default function SuperAdminReceipts() {
             <h1 className="text-2xl font-bold tracking-tight">Recibos de pagos</h1>
             <p className="text-sm text-muted-foreground">
               Generá el recibo de lo que te paga cada negocio por su plan de F7 Manager Pro. Queda guardado con número
-              correlativo y se puede volver a imprimir o guardar como PDF.
+              correlativo y se descarga en PDF para mandarlo por WhatsApp, o se imprime.
             </p>
           </div>
         </div>
@@ -418,7 +499,7 @@ export default function SuperAdminReceipts() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="rc-amount">Monto recibido</Label>
+                  <Label htmlFor="rc-amount">Precio del plan</Label>
                   <Input
                     id="rc-amount"
                     data-testid="rc-amount"
@@ -441,6 +522,71 @@ export default function SuperAdminReceipts() {
                       </button>
                     )}
                   </p>
+                  <FieldError message={errors.subtotal} />
+                </div>
+                <div className="space-y-3 rounded-md border p-3" data-testid="rc-discount">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label htmlFor="rc-discount-value">Descuento (opcional)</Label>
+                    <div className="inline-flex rounded-md border p-0.5" role="group" aria-label="Tipo de descuento">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={form.discount_mode === "percent" ? "default" : "ghost"}
+                        className="h-7 px-3"
+                        aria-pressed={form.discount_mode === "percent"}
+                        data-testid="rc-discount-percent"
+                        onClick={() => setForm((prev) => ({ ...prev, discount_mode: "percent", discount_value: "" }))}
+                      >
+                        %
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={form.discount_mode === "fixed" ? "default" : "ghost"}
+                        className="h-7 px-3"
+                        aria-pressed={form.discount_mode === "fixed"}
+                        data-testid="rc-discount-fixed"
+                        onClick={() => setForm((prev) => ({ ...prev, discount_mode: "fixed", discount_value: "" }))}
+                      >
+                        {form.currency === "PYG" ? "Gs." : "US$"}
+                      </Button>
+                    </div>
+                  </div>
+                  <Input
+                    id="rc-discount-value"
+                    data-testid="rc-discount-value"
+                    inputMode="decimal"
+                    placeholder={
+                      form.discount_mode === "percent" ? "Ej: 10" : form.currency === "PYG" ? "Ej: 14.000" : "Ej: 2,50"
+                    }
+                    value={form.discount_value}
+                    onChange={(e) => set("discount_value", e.target.value)}
+                  />
+                  <FieldError message={errors.discount_amount} />
+                  {form.discount_value.trim() && (
+                    <div>
+                      <Label htmlFor="rc-discount-note">Motivo del descuento (opcional)</Label>
+                      <Input
+                        id="rc-discount-note"
+                        data-testid="rc-discount-note"
+                        placeholder="Ej: Promo de lanzamiento"
+                        value={form.discount_note}
+                        maxLength={150}
+                        onChange={(e) => set("discount_note", e.target.value)}
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2 border-t pt-3 text-sm" data-testid="rc-total">
+                    <span className="text-muted-foreground">
+                      Total a recibir
+                      {discountAmount > 0 && Number.isFinite(total) && (
+                        <span className="ml-1 text-xs">
+                          ({formatMoney(subtotal, form.currency)} − {formatMoney(discountAmount, form.currency)})
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-semibold">{Number.isFinite(total) ? formatMoney(total, form.currency) : "—"}</span>
+                  </div>
                   <FieldError message={errors.amount} />
                 </div>
               </section>
@@ -548,10 +694,16 @@ export default function SuperAdminReceipts() {
                 </div>
               </details>
 
-              <Button className="w-full" size="lg" onClick={() => void submit()} disabled={saving} data-testid="rc-submit">
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                Generar recibo e imprimir
-              </Button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                <Button size="lg" onClick={() => void submit("pdf")} disabled={busy} data-testid="rc-submit">
+                  {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                  Generar recibo y descargar PDF
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => void submit("print")} disabled={busy} data-testid="rc-submit-print">
+                  <Printer className="mr-2 h-4 w-4" />
+                  Generar e imprimir
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -605,7 +757,14 @@ export default function SuperAdminReceipts() {
                         <TableCell className="max-w-[16rem] truncate" title={r.customer_name}>{r.customer_name}</TableCell>
                         <TableCell className="whitespace-nowrap">{PLAN_LABELS[r.plan_type] ?? r.plan_type} · {CYCLE_LABELS[r.billing_cycle] ?? r.billing_cycle}</TableCell>
                         <TableCell className="whitespace-nowrap">{formatDateISO(r.period_end)}</TableCell>
-                        <TableCell className={`whitespace-nowrap text-right font-medium ${r.voided_at ? "line-through" : ""}`}>{formatMoney(r.amount, r.currency)}</TableCell>
+                        <TableCell className={`whitespace-nowrap text-right font-medium ${r.voided_at ? "line-through" : ""}`}>
+                          {formatMoney(r.amount, r.currency)}
+                          {r.discount_amount > 0 && (
+                            <span className="block text-xs font-normal text-muted-foreground" title={r.discount_note ?? undefined}>
+                              Desc. {formatMoney(r.discount_amount, r.currency)}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {r.voided_at ? (
                             <Badge variant="destructive" title={r.void_reason ?? undefined}>Anulado</Badge>
@@ -614,7 +773,23 @@ export default function SuperAdminReceipts() {
                           )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right">
-                          <Button size="sm" variant="outline" onClick={() => printSubscriptionReceipt(r)} data-testid={`rc-print-${r.receipt_number}`}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void downloadPdf(r)}
+                            disabled={busy}
+                            data-testid={`rc-pdf-${r.receipt_number}`}
+                          >
+                            {pdfBusy === r.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}
+                            PDF
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-1"
+                            onClick={() => void currentLogo().then((logoUrl) => printSubscriptionReceipt(r, { logoUrl }))}
+                            data-testid={`rc-print-${r.receipt_number}`}
+                          >
                             <Printer className="mr-1.5 h-3.5 w-3.5" /> Imprimir
                           </Button>
                           {!r.voided_at && (

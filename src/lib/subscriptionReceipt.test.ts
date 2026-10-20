@@ -4,13 +4,18 @@ import {
   addMonthsISO,
   amountInWords,
   buildSubscriptionReceiptHtml,
+  computeDiscountAmount,
   computePeriodEnd,
+  computeTotal,
   defaultAmount,
   defaultDescription,
   formatDateISO,
   formatMoney,
   integerToWords,
   parseMoneyInput,
+  parsePercentInput,
+  receiptPdfFileName,
+  roundMoney,
   todayInAsuncion,
   validateDraft,
   type ReceiptDraft,
@@ -28,6 +33,9 @@ const draft: ReceiptDraft = {
   period_start: "2026-10-20",
   period_end: "2026-11-19",
   payment_date: "2026-10-20",
+  subtotal: 140000,
+  discount_amount: 0,
+  discount_note: null,
   amount: 140000,
   currency: "PYG",
   payment_method: "Transferencia bancaria",
@@ -108,6 +116,53 @@ describe("montos", () => {
   });
 });
 
+describe("descuento", () => {
+  it("redondea según la moneda", () => {
+    expect(roundMoney(12345.6, "PYG")).toBe(12346);
+    expect(roundMoney(2.675, "USD")).toBe(2.68);
+    expect(roundMoney(1.005, "USD")).toBe(1.01);
+    expect(roundMoney(NaN, "PYG")).toBeNaN();
+  });
+
+  it("interpreta el porcentaje que se escribe", () => {
+    expect(parsePercentInput("10")).toBe(10);
+    expect(parsePercentInput("12,5")).toBe(12.5);
+    expect(parsePercentInput("7.25")).toBe(7.25);
+    expect(parsePercentInput(" 15 ")).toBe(15);
+    expect(parsePercentInput("")).toBeNaN();
+    expect(parsePercentInput("-5")).toBeNaN();
+    expect(parsePercentInput("10%")).toBeNaN();
+    expect(parsePercentInput("1,234")).toBeNaN();
+  });
+
+  it("calcula el descuento en porcentaje", () => {
+    expect(computeDiscountAmount(140000, "percent", "10", "PYG")).toBe(14000);
+    expect(computeDiscountAmount(1120000, "percent", "15", "PYG")).toBe(168000);
+    expect(computeDiscountAmount(100001, "percent", "10", "PYG")).toBe(10000);
+    expect(computeDiscountAmount(22, "percent", "10", "USD")).toBe(2.2);
+    expect(computeDiscountAmount(150, "percent", "12,5", "USD")).toBe(18.75);
+  });
+
+  it("calcula el descuento en monto fijo", () => {
+    expect(computeDiscountAmount(140000, "fixed", "20.000", "PYG")).toBe(20000);
+    expect(computeDiscountAmount(22, "fixed", "2,50", "USD")).toBe(2.5);
+  });
+
+  it("vacío es sin descuento y lo ilegible no se adivina", () => {
+    expect(computeDiscountAmount(140000, "percent", "", "PYG")).toBe(0);
+    expect(computeDiscountAmount(140000, "fixed", "   ", "PYG")).toBe(0);
+    expect(computeDiscountAmount(140000, "percent", "diez", "PYG")).toBeNaN();
+    expect(computeDiscountAmount(140000, "fixed", "14,5", "PYG")).toBeNaN();
+  });
+
+  it("el total es precio menos descuento, sin arrastrar decimales", () => {
+    expect(computeTotal(140000, 14000, "PYG")).toBe(126000);
+    expect(computeTotal(22, 2.2, "USD")).toBe(19.8);
+    expect(computeTotal(0.3, 0.1, "USD")).toBe(0.2);
+    expect(computeTotal(140000, 0, "PYG")).toBe(140000);
+  });
+});
+
 describe("monto en letras", () => {
   it.each([
     [0, "cero"],
@@ -166,10 +221,33 @@ describe("validateDraft", () => {
 
   it("pide lo mínimo", () => {
     const errors = validateDraft(
-      { ...draft, customer_name: "  ", amount: 0, payment_method: "", description: " ", issuer_name: "" },
+      { ...draft, customer_name: "  ", subtotal: 0, amount: 0, payment_method: "", description: " ", issuer_name: "" },
       today
     );
-    expect(Object.keys(errors).sort()).toEqual(["amount", "customer_name", "description", "issuer_name", "payment_method"]);
+    expect(Object.keys(errors).sort()).toEqual(["customer_name", "description", "issuer_name", "payment_method", "subtotal"]);
+  });
+
+  it("acepta un descuento que cierra con el total", () => {
+    const withDiscount = { ...draft, discount_amount: 14000, discount_note: "Promo", amount: 126000 };
+    expect(validateDraft(withDiscount, today)).toEqual({});
+  });
+
+  it("rechaza un descuento ilegible, negativo o que deja el total en cero", () => {
+    expect(validateDraft({ ...draft, discount_amount: NaN, amount: NaN }, today).discount_amount).toMatch(/no se entiende/i);
+    expect(validateDraft({ ...draft, discount_amount: -1000, amount: 141000 }, today).discount_amount).toMatch(/no se entiende/i);
+    expect(validateDraft({ ...draft, discount_amount: 140000, amount: 0 }, today).discount_amount).toMatch(/menor al precio/);
+    expect(validateDraft({ ...draft, discount_amount: 200000, amount: -60000 }, today).discount_amount).toMatch(/menor al precio/);
+  });
+
+  it("rechaza un total que no coincide con precio menos descuento", () => {
+    const errors = validateDraft({ ...draft, discount_amount: 14000, amount: 130000 }, today);
+    expect(errors.amount).toMatch(/no coincide/);
+    expect(validateDraft({ ...draft, amount: 139999 }, today).amount).toMatch(/no coincide/);
+  });
+
+  it("valida el descuento en dólares con centavos", () => {
+    const usd = { ...draft, currency: "USD" as const, subtotal: 22.5, discount_amount: 2.25, amount: 20.25 };
+    expect(validateDraft(usd, today)).toEqual({});
   });
 
   it("rechaza fecha de pago futura y vencimiento anterior al inicio", () => {
@@ -232,11 +310,79 @@ describe("recibo impreso", () => {
   });
 
   it("muestra dólares", () => {
-    const html = buildSubscriptionReceiptHtml({ ...receipt, amount: 22, currency: "USD" });
+    const html = buildSubscriptionReceiptHtml({ ...receipt, subtotal: 22, amount: 22, currency: "USD" });
     expect(html).toContain("US$ 22");
     expect(html).toContain("Veintidós dólares estadounidenses");
   });
 
+  it("sin descuento no muestra el desglose", () => {
+    const html = buildSubscriptionReceiptHtml(receipt);
+    expect(html).not.toContain('class="breakdown"');
+    expect(html).not.toContain("Descuento");
+    expect(html).toContain("Monto recibido");
+    expect(html).not.toContain("Total recibido");
+  });
+
+  it("con descuento muestra precio, descuento con su motivo y el total", () => {
+    const html = buildSubscriptionReceiptHtml({
+      ...receipt,
+      discount_amount: 14000,
+      discount_note: "Promo lanzamiento",
+      amount: 126000,
+    });
+    expect(html).toContain('class="breakdown"');
+    expect(html).toContain("Gs. 140.000");
+    expect(html).toContain("Descuento · Promo lanzamiento");
+    expect(html).toContain("− Gs. 14.000");
+    expect(html).toContain("Total recibido");
+    expect(html).toContain("Gs. 126.000");
+    expect(html).toContain("Ciento veintiséis mil guaraníes");
+  });
+
+  it("el descuento sin motivo no deja un separador suelto", () => {
+    const html = buildSubscriptionReceiptHtml({ ...receipt, discount_amount: 14000, amount: 126000 });
+    expect(html).toContain("<span>Descuento</span>");
+    expect(html).not.toContain("Descuento ·");
+  });
+
+  it("escapa el motivo del descuento", () => {
+    const html = buildSubscriptionReceiptHtml({
+      ...receipt,
+      discount_amount: 14000,
+      discount_note: "<script>x</script>",
+      amount: 126000,
+    });
+    expect(html).not.toContain("<script>x</script>");
+    expect(html).toContain("&lt;script&gt;x&lt;/script&gt;");
+  });
+});
+
+describe("nombre del archivo PDF", () => {
+  const named = (customer_name: string) => receiptPdfFileName({ receipt_number: "F7-0001", customer_name });
+
+  it("lleva el número y el cliente", () => {
+    expect(named("Servi Smart")).toBe("Recibo-F7-0001-Servi-Smart.pdf");
+  });
+
+  it("saca tildes y símbolos", () => {
+    expect(named("Taller Peña & Hnos.")).toBe("Recibo-F7-0001-Taller-Pena-Hnos.pdf");
+    expect(named("  Ñandú / Cía  ")).toBe("Recibo-F7-0001-Nandu-Cia.pdf");
+  });
+
+  it("recorta los nombres largos sin dejar un guion al final", () => {
+    const name = named("Distribuidora Internacional de Repuestos Electronicos del Este S.A.");
+    expect(name.endsWith(".pdf")).toBe(true);
+    expect(name).not.toMatch(/-\.pdf$/);
+    expect(name.length).toBeLessThanOrEqual("Recibo-F7-0001-".length + 40 + ".pdf".length);
+  });
+
+  it("sin nombre legible queda solo el número", () => {
+    expect(named("")).toBe("Recibo-F7-0001.pdf");
+    expect(named("???")).toBe("Recibo-F7-0001.pdf");
+  });
+});
+
+describe("descripción", () => {
   it("describe el plan por defecto", () => {
     expect(defaultDescription("pro", "anual")).toBe("Suscripción a F7 Manager Pro, Plan Pro (ciclo anual)");
   });
