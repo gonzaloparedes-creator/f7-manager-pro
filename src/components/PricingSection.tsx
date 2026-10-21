@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2 } from "lucide-react";
@@ -21,7 +21,15 @@ function fmt(amount: number, currency: Currency) {
   return `${amount.toLocaleString("es-PY")} Gs.`;
 }
 
-export function PricingSection({ onContact }: { onContact: (message?: string) => void }) {
+export function PricingSection({
+  onContact,
+  ctaLabel,
+  note,
+}: {
+  onContact: (message?: string) => void;
+  ctaLabel?: string;
+  note?: ReactNode;
+}) {
   const [segment, setSegment] = useState<Segment>("taller");
   const [currency, setCurrency] = useState<Currency>("gs");
   const [cycle, setCycle] = useState<Cycle>("mensual");
@@ -79,11 +87,11 @@ export function PricingSection({ onContact }: { onContact: (message?: string) =>
         <div className="mt-7 pt-2">
           {opts.accent ? (
             <Button onClick={() => onContact(PLAN_MESSAGES[plan])} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-              {opts.cta}
+              {ctaLabel ?? opts.cta}
             </Button>
           ) : (
             <Button onClick={() => onContact(PLAN_MESSAGES[plan])} variant="outline" className="w-full border-primary/40 text-foreground hover:bg-primary/10 hover:text-primary">
-              {opts.cta}
+              {ctaLabel ?? opts.cta}
             </Button>
           )}
         </div>
@@ -206,6 +214,8 @@ export function PricingSection({ onContact }: { onContact: (message?: string) =>
             })}
           </div>
         )}
+
+        {note && <div className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted-foreground">{note}</div>}
       </div>
     </section>
   );

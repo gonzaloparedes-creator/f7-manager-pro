@@ -12,14 +12,17 @@ import { PricingSection } from "@/components/PricingSection";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { PRICING } from "@/lib/plans";
 import { trackMeta } from "@/lib/metaPixel";
+import { OFFER_GUARANTEE_DAYS, offerStatus, type OfferStatus } from "@/lib/ofertaOffer";
 import {
   ArrowRight,
   Camera,
   ChevronDown,
   ClipboardList,
+  Clock,
   Cloud,
   CheckCircle2,
   Laptop,
+  Lock,
   MessageCircle,
   QrCode,
   ShieldCheck,
@@ -30,23 +33,20 @@ import {
   Wallet,
 } from "lucide-react";
 
-const PAGE_TITLE = "F7 Manager Pro · Sistema para talleres de reparación · Probalo 14 días gratis";
-const PAGE_DESCRIPTION =
-  "Ordená tus órdenes de trabajo, avisale al cliente por WhatsApp y mirá cuánto ganás en cada reparación. Hecho en Paraguay. Probalo 14 días gratis, sin tarjeta.";
+const GUARANTEE = `${OFFER_GUARANTEE_DAYS} días`;
+const CTA_LABEL = `Empezar con garantía de ${GUARANTEE}`;
+
+const PAGE_TITLE = `F7 Manager Pro · Sistema para talleres de reparación · Garantía de ${GUARANTEE}`;
+const PAGE_DESCRIPTION = `Ordená tus órdenes de trabajo, avisale al cliente por WhatsApp y mirá cuánto ganás en cada reparación. Hecho en Paraguay. Si en ${GUARANTEE} no te sirve, te devolvemos todo tu dinero.`;
 
 // Mensaje que llega a Gonzalo: la marca "Vi su anuncio" permite distinguir los
 // contactos que vienen de la campaña de los de la landing orgánica.
-const OFERTA_MESSAGE =
-  "¡Hola! Vi el anuncio de F7 Manager Pro y quiero probarlo 14 días gratis en mi taller.";
+const OFERTA_MESSAGE = `¡Hola! Vi el anuncio de F7 Manager Pro y quiero empezar con la garantía de ${GUARANTEE} en mi taller.`;
 const AD_TAG = " (Vi su anuncio)";
 
 function contactWhatsApp(origin: string, message?: string) {
   trackMeta("Contact", { content_name: "oferta", content_category: origin });
   openUpgradeWhatsApp(message ? message + AD_TAG : OFERTA_MESSAGE);
-}
-
-function trackLead(origin: string) {
-  trackMeta("Lead", { content_name: "oferta", content_category: origin });
 }
 
 const starterGs = PRICING.starter.mensual.gs.toLocaleString("es-PY");
@@ -211,11 +211,40 @@ const solutionBlocks: {
   },
 ];
 
-const faqs = [
+const guaranteeSteps = [
   {
-    q: "¿Necesito tarjeta para probarlo?",
-    a: "No. Probás 14 días gratis, sin tarjeta y sin compromiso.",
+    title: "Nos escribís por WhatsApp",
+    text: "Elegís tu plan y coordinamos el pago. Te entregamos tu recibo.",
   },
+  {
+    title: `Lo usás ${GUARANTEE} en tu taller`,
+    text: "Con órdenes reales: fotos, avisos a tus clientes y la ganancia de cada reparación.",
+  },
+  {
+    title: "Si no te sirve, te devolvemos todo",
+    text: `Nos avisás por WhatsApp dentro de los ${GUARANTEE} y te reintegramos lo que pagaste.`,
+  },
+];
+
+function buildFaqs(offer: OfferStatus) {
+  return [
+    {
+      q: `¿Cómo funciona la garantía de ${GUARANTEE}?`,
+      a: `Elegís tu plan, coordinamos el pago por WhatsApp y lo usás ${GUARANTEE} en tu taller con órdenes reales. Si no te sirve, nos avisás por WhatsApp dentro de ese plazo y te devolvemos todo lo que pagaste.`,
+    },
+    ...(offer.active
+      ? [
+          {
+            q: "¿Qué significa «precio congelado»?",
+            a: `Quienes se suman hasta el ${offer.deadlineLabel} mantienen el precio de hoy de su plan mientras sigan suscriptos. Pasada esa fecha, los precios pueden cambiar.`,
+          },
+        ]
+      : []),
+    ...baseFaqs,
+  ];
+}
+
+const baseFaqs = [
   {
     q: "¿Tengo que instalar algo?",
     a: "No. F7 funciona desde el navegador del celular, la tablet o la computadora. No hay nada que descargar.",
@@ -230,7 +259,7 @@ const faqs = [
   },
   {
     q: "¿Cómo se paga?",
-    a: "Coordinamos el pago con vos por WhatsApp y te entregamos tu recibo.",
+    a: "Coordinamos el pago con vos por WhatsApp y te entregamos tu recibo. Si dentro de la garantía decidís que no es para vos, el reintegro se coordina por el mismo medio.",
   },
   {
     q: "Tengo más de un local o empleados, ¿me sirve?",
@@ -261,6 +290,8 @@ export default function Oferta() {
   const finalCtaRef = useRef<HTMLDivElement>(null);
   const [heroCtaVisible, setHeroCtaVisible] = useState(true);
   const [finalCtaVisible, setFinalCtaVisible] = useState(false);
+  const [now] = useState(() => new Date());
+  const offer = offerStatus(now);
 
   useEffect(() => {
     trackMeta("ViewContent", { content_name: "oferta" });
@@ -296,6 +327,21 @@ export default function Oferta() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background pb-24 text-foreground md:pb-0">
+      {/* AVISO DE OFERTA (solo mientras la fecha límite real no haya pasado) */}
+      {offer.active && (
+        <div className="border-b border-secondary/40 bg-secondary/10">
+          <div className="container flex items-start justify-center gap-2 py-2 text-center text-xs sm:items-center sm:text-sm">
+            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-secondary sm:mt-0" />
+            <p>
+              Precio congelado para quienes se suman hasta el{" "}
+              <span className="whitespace-nowrap font-semibold">{offer.deadlineLabel}</span>
+              <span className="mx-1.5 text-muted-foreground">·</span>
+              <span className="font-bold text-secondary">{offer.urgencyText}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* NAV */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="container flex h-14 items-center justify-between">
@@ -314,7 +360,7 @@ export default function Oferta() {
               onClick={() => contactWhatsApp("header")}
               className="hidden bg-primary text-primary-foreground hover:bg-primary/90 md:inline-flex"
             >
-              Probar 14 días gratis
+              Empezar ahora
             </Button>
           </div>
         </div>
@@ -348,7 +394,7 @@ export default function Oferta() {
                   onClick={() => contactWhatsApp("hero")}
                   className="h-12 bg-primary px-7 text-base text-primary-foreground shadow-elevated hover:bg-primary/90"
                 >
-                  Probar 14 días gratis <ArrowRight className="h-4 w-4" />
+                  {CTA_LABEL} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   asChild
@@ -361,18 +407,12 @@ export default function Oferta() {
                   </a>
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Sin tarjeta · Sin instalar nada · Soporte por WhatsApp en español
+              <p className="max-w-md text-sm font-medium">
+                <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-primary" />
+                Si en {GUARANTEE} no te sirve, te devolvemos todo tu dinero.
               </p>
-              <p className="text-sm text-muted-foreground">
-                ¿Preferís probarlo vos solo?{" "}
-                <Link
-                  to="/register"
-                  onClick={() => trackLead("hero")}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Creá tu cuenta gratis
-                </Link>
+              <p className="text-xs text-muted-foreground">
+                Sin instalar nada · Soporte por WhatsApp en español
               </p>
             </div>
 
@@ -615,20 +655,54 @@ export default function Oferta() {
         </div>
       </section>
 
-      {/* LO QUE TENÉS AL EMPEZAR */}
-      <section className="py-16 md:py-24">
+      {/* GARANTÍA */}
+      <section id="garantia" className="scroll-mt-16 py-16 md:py-24">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <Kicker>Lo que tenés al empezar</Kicker>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <ShieldCheck className="h-7 w-7" />
+            </div>
+            <div className="mt-4">
+              <Kicker>Garantía de {GUARANTEE}</Kicker>
+            </div>
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-              Probalo en tu taller, <span className="text-primary">sin riesgo</span>.
+              Si en {GUARANTEE} no te sirve, <span className="text-primary">te devolvemos todo tu dinero</span>.
             </h2>
+            <p className="mt-4 text-muted-foreground">
+              El riesgo es nuestro, no tuyo. Lo usás con órdenes reales de tu taller y decidís con datos, no con
+              promesas.
+            </p>
           </div>
-          <Card className="mx-auto mt-10 max-w-xl border-primary/40 p-6 shadow-[0_0_40px_-14px_hsl(var(--primary)/0.5)]">
-            <ul className="space-y-3.5 text-sm">
+
+          <div className="mx-auto mt-10 grid max-w-4xl gap-4 md:grid-cols-3">
+            {guaranteeSteps.map((step, i) => (
+              <Card key={step.title} className="border-border p-5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                  {i + 1}
+                </span>
+                <h3 className="mt-3 font-bold">{step.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{step.text}</p>
+              </Card>
+            ))}
+          </div>
+
+          {offer.active && (
+            <div className="mx-auto mt-6 flex max-w-2xl items-start gap-3 rounded-xl border border-secondary/40 bg-secondary/10 p-4">
+              <Lock className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
+              <div className="text-sm">
+                <p className="font-semibold">Precio congelado hasta el {offer.deadlineLabel}</p>
+                <p className="mt-0.5 text-muted-foreground">
+                  Si te sumás antes de esa fecha, mantenés el precio de hoy de tu plan mientras sigas suscripto.{" "}
+                  <span className="font-semibold text-secondary">{offer.urgencyText}.</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          <Card className="mx-auto mt-6 max-w-2xl border-primary/40 p-6 shadow-[0_0_40px_-14px_hsl(var(--primary)/0.5)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Y además</p>
+            <ul className="mt-4 space-y-3.5 text-sm">
               {[
-                ["14 días de prueba gratis", "Para que lo uses con órdenes reales."],
-                ["Sin tarjeta y sin compromiso", "No te pedimos datos de pago para empezar."],
                 ["Soporte por WhatsApp, en español", "Una persona real te contesta."],
                 ["Tutorial paso a paso", "Dentro del sistema, para cada módulo."],
                 ["Precios en guaraníes", "También podés elegir dólares."],
@@ -644,17 +718,34 @@ export default function Oferta() {
             </ul>
             <Button
               size="lg"
-              onClick={() => contactWhatsApp("oferta")}
+              onClick={() => contactWhatsApp("garantia")}
               className="mt-6 h-12 w-full bg-primary text-base text-primary-foreground shadow-elevated hover:bg-primary/90"
             >
-              Probar 14 días gratis <ArrowRight className="h-4 w-4" />
+              {CTA_LABEL} <ArrowRight className="h-4 w-4" />
             </Button>
           </Card>
         </div>
       </section>
 
       {/* PLANES */}
-      <PricingSection onContact={(message) => contactWhatsApp("planes", message)} />
+      <PricingSection
+        onContact={(message) => contactWhatsApp("planes", message)}
+        ctaLabel="Elegir este plan"
+        note={
+          <>
+            <p className="font-medium text-foreground">
+              <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-primary" />
+              Todos los planes incluyen la garantía de {GUARANTEE}: si no te sirve, te devolvemos todo tu dinero.
+            </p>
+            {offer.active && (
+              <p className="mt-2">
+                Precio congelado para quienes se suman hasta el {offer.deadlineLabel}.{" "}
+                <span className="font-semibold text-secondary">{offer.urgencyText}.</span>
+              </p>
+            )}
+          </>
+        }
+      />
 
       {/* PREGUNTAS FRECUENTES */}
       <section className="border-t border-border/60 py-16 md:py-24">
@@ -664,7 +755,7 @@ export default function Oferta() {
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">Antes de empezar</h2>
           </div>
           <Accordion type="single" collapsible className="mx-auto mt-8 max-w-2xl">
-            {faqs.map((item, i) => (
+            {buildFaqs(offer).map((item, i) => (
               <AccordionItem key={item.q} value={`faq-${i}`}>
                 <AccordionTrigger className="text-left text-base">{item.q}</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
@@ -689,26 +780,23 @@ export default function Oferta() {
                 Tu próxima reparación, <span className="text-primary">ya ordenada</span>.
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-                Probalo <span className="font-semibold text-foreground">14 días gratis</span>. Sin tarjeta, sin
-                compromiso. Si no te sirve, no pagás nada.
+                Usalo <span className="font-semibold text-foreground">{GUARANTEE}</span> en tu taller. Si no te
+                sirve, <span className="font-semibold text-foreground">te devolvemos todo tu dinero</span>.
               </p>
-              <div ref={finalCtaRef} className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+              {offer.active && (
+                <p className="mx-auto mt-3 max-w-xl text-sm">
+                  <Lock className="mr-1.5 inline h-4 w-4 align-[-3px] text-secondary" />
+                  Precio congelado para quienes se suman hasta el {offer.deadlineLabel}.{" "}
+                  <span className="font-semibold text-secondary">{offer.urgencyText}.</span>
+                </p>
+              )}
+              <div ref={finalCtaRef} className="mt-8 flex justify-center">
                 <Button
                   size="lg"
                   onClick={() => contactWhatsApp("final")}
-                  className="h-12 bg-primary px-7 text-base text-primary-foreground shadow-elevated hover:bg-primary/90"
+                  className="h-12 w-full bg-primary px-7 text-base text-primary-foreground shadow-elevated hover:bg-primary/90 sm:w-auto"
                 >
-                  Probar 14 días gratis <ArrowRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="h-12 border-primary/40 px-7 text-base text-primary hover:bg-primary/10 hover:text-primary"
-                >
-                  <Link to="/register" onClick={() => trackLead("final")}>
-                    Crear mi cuenta gratis
-                  </Link>
+                  {CTA_LABEL} <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
               <p className="mt-5 text-xs text-muted-foreground">
@@ -748,22 +836,14 @@ export default function Oferta() {
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
         aria-hidden={!showStickyBar}
       >
-        <div className="mx-auto flex max-w-md items-center gap-3">
+        <div className="mx-auto max-w-md">
           <Button
             onClick={() => contactWhatsApp("barra-fija")}
             tabIndex={showStickyBar ? 0 : -1}
-            className="h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+            className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Probar 14 días gratis <ArrowRight className="h-4 w-4" />
+            {CTA_LABEL} <ArrowRight className="h-4 w-4" />
           </Button>
-          <Link
-            to="/register"
-            onClick={() => trackLead("barra-fija")}
-            tabIndex={showStickyBar ? 0 : -1}
-            className="shrink-0 text-xs font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Crear cuenta
-          </Link>
         </div>
       </div>
     </div>
