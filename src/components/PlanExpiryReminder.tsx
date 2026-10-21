@@ -25,6 +25,7 @@ export default function PlanExpiryReminder() {
   if (!info || info.tone === "ok") return null;
 
   const expired = info.tone === "expired";
+  const trial = info.kind === "trial";
   if (!expired && (dismissedFor === info.expiresAt || wasDismissed(info.expiresAt))) return null;
 
   const dismiss = () => {
@@ -51,14 +52,16 @@ export default function PlanExpiryReminder() {
           {" · "}
           {expired
             ? `${accessHeadline(info.daysToSuspension, info.accessUntil).toLowerCase()}, después se suspende la cuenta`
-            : `tu plan vence el ${formatDateISO(info.expiresAt)}`}
+            : trial
+              ? `tu prueba gratis termina el ${formatDateISO(info.expiresAt)}`
+              : `tu plan vence el ${formatDateISO(info.expiresAt)}`}
         </span>
       </p>
       <Link
         to="/configuracion?tab=suscripcion"
         className="shrink-0 whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline"
       >
-        Ver mi plan
+        {trial ? "Elegir un plan" : "Ver mi plan"}
       </Link>
       {!expired && (
         <button

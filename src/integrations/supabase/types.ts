@@ -327,6 +327,7 @@ export type Database = {
           staff_can_view_products: boolean
           staff_can_view_stock: boolean
           ticket_width_mm: number
+          trial_ends_at: string | null
           updated_at: string
           use_device_classification: boolean
           use_device_type_presets: boolean
@@ -367,6 +368,7 @@ export type Database = {
           staff_can_view_products?: boolean
           staff_can_view_stock?: boolean
           ticket_width_mm?: number
+          trial_ends_at?: string | null
           updated_at?: string
           use_device_classification?: boolean
           use_device_type_presets?: boolean
@@ -407,6 +409,7 @@ export type Database = {
           staff_can_view_products?: boolean
           staff_can_view_stock?: boolean
           ticket_width_mm?: number
+          trial_ends_at?: string | null
           updated_at?: string
           use_device_classification?: boolean
           use_device_type_presets?: boolean
@@ -421,6 +424,41 @@ export type Database = {
             columns: ["referral_partner_id"]
             isOneToOne: false
             referencedRelation: "referral_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_contact_log: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          message: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          message?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_contact_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1856,12 +1894,15 @@ export type Database = {
           access_until: string
           billing_cycle: string
           blocked: boolean
+          company_created_at: string
           grace_days: number
           is_active: boolean
+          kind: string
           lapsed: boolean
           plan_expires_at: string
           plan_paid_from: string
           today: string
+          trial_ends_at: string
         }[]
       }
       get_user_company: { Args: { _user_id: string }; Returns: string }
@@ -1875,6 +1916,19 @@ export type Database = {
       is_branch_restricted: { Args: { _user_id: string }; Returns: boolean }
       is_company_active: { Args: { _company_id: string }; Returns: boolean }
       plan_grace_days: { Args: never; Returns: number }
+      trial_default_days: { Args: never; Returns: number }
+      superadmin_followup_overview: {
+        Args: never
+        Returns: {
+          admin_name: string
+          admin_phone: string
+          company_id: string
+          last_contact_at: string
+          last_contact_kind: string
+          last_order_at: string
+          orders_count: number
+        }[]
+      }
       plan_is_lapsed: {
         Args: { _expires: string; _grace: number; _today: string }
         Returns: boolean

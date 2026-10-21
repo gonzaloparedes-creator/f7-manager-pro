@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   accessHeadline,
+  companyExpiryInfo,
+  dateInAsuncion,
   DEFAULT_GRACE_DAYS,
+  DEFAULT_TRIAL_DAYS,
   diffDaysISO,
   expiryPhase,
   expiryHeadline,
@@ -12,6 +15,7 @@ import {
   renewalStart,
   suggestedExpiry,
   timeSinceLabel,
+  trialExpiryInfo,
 } from "./planExpiry";
 
 const row = (from: string | null, to: string | null, cycle: string | null = "mensual") => ({
@@ -229,5 +233,129 @@ describe("suspensión automática (vencimiento + gracia)", () => {
     expect(planExpiryInfo(p, "2026-12-31", 3)!.accessUntil).toBe("2027-01-02");
     expect(planExpiryInfo(p, "2027-01-02", 3)!.phase).toBe("grace");
     expect(planExpiryInfo(p, "2027-01-03", 3)!.phase).toBe("suspended");
+  });
+});
+
+describe("pruebas gratis", () => {
+  // Alta el 10/10, la prueba termina el 23/10 (14 días contando ambos extremos).
+  const trial = { trial_ends_at: "2026-10-23", created_at: "2026-10-10" };
+  const at = (today: string, grace = 3) => trialExpiryInfo(trial, today, grace)!;
+
+  it("la prueba dura 14 días", () => {
+    expect(DEFAULT_TRIAL_DAYS).toBe(14);
+    expect(at("2026-10-10").totalDays).toBe(14);
+  });
+
+  it("devuelve null sin fecha de fin de prueba o con una inválida", () => {
+    expect(trialExpiryInfo({ trial_ends_at: null, created_at: "2026-10-10" }, "2026-10-21")).toBeNull();
+    expect(trialExpiryInfo({}, "2026-10-21")).toBeNull();
+    expect(trialExpiryInfo({ trial_ends_at: "2026-13-40", created_at: "2026-10-10" }, "2026-10-21")).toBeNull();
+  });
+
+  it("es de tipo prueba, sin ciclo de cobro, y cuenta desde el alta", () => {
+    const info = at("2026-10-21");
+    expect(info.kind).toBe("trial");
+    expect(info.cycle).toBeNull();
+    expect(info.paidFrom).toBe("2026-10-10");
+    expect(info.expiresAt).toBe("2026-10-23");
+    expect(info.daysLeft).toBe(2);
+    expect(info.tone).toBe("soon");
+    expect(info.headline).toBe("Quedan 2 días");
+  });
+
+  it("redacta 'Termina' en lugar de 'Vence'", () => {
+    expect(at("2026-10-23").headline).toBe("Termina hoy");
+    expect(at("2026-10-24").headline).toBe("Terminó ayer");
+    expect(at("2026-10-26").headline).toBe("Terminó hace 3 días");
+    expect(expiryHeadline(0, "trial")).toBe("Termina hoy");
+    expect(expiryHeadline(0, "paid")).toBe("Vence hoy");
+    expect(expiryHeadline(-1, "trial")).toBe("Terminó ayer");
+  });
+
+  it("se suspende sola al terminar la gracia", () => {
+    expect(at("2026-10-23").phase).toBe("active");
+    expect(at("2026-10-24").phase).toBe("grace");
+    expect(at("2026-10-26").phase).toBe("grace");
+    expect(at("2026-10-26").accessUntil).toBe("2026-10-26");
+    expect(at("2026-10-27").phase).toBe("suspended");
+  });
+
+  it("si el alta es posterior al fin (dato raro), asume 14 días hacia atrás", () => {
+    const odd = trialExpiryInfo({ trial_ends_at: "2026-10-23", created_at: "2026-11-01" }, "2026-10-21")!;
+    expect(odd.paidFrom).toBe("2026-10-10");
+    expect(odd.totalDays).toBe(14);
+  });
+
+  it("sin fecha de alta también asume 14 días", () => {
+    const info = trialExpiryInfo({ trial_ends_at: "2026-10-23" }, "2026-10-21")!;
+    expect(info.paidFrom).toBe("2026-10-10");
+  });
+
+  it("toma la fecha de alta de Asunción de un timestamp", () => {
+    // 01:30 UTC del 11/10 todavía es el 10/10 a la noche en Asunción.
+    const info = trialExpiryInfo({ trial_ends_at: "2026-10-23", created_at: "2026-10-11T01:30:00Z" }, "2026-10-21")!;
+    expect(info.paidFrom).toBe("2026-10-10");
+  });
+});
+
+describe("companyExpiryInfo (pago o prueba)", () => {
+  const base = { created_at: "2026-10-10", trial_ends_at: "2026-10-23" };
+
+  it("sin ninguna fecha no hay nada que controlar", () => {
+    expect(companyExpiryInfo({ ...row(null, null, null), created_at: "2026-01-01" }, "2026-10-21")).toBeNull();
+  });
+
+  it("solo con prueba, rige la prueba", () => {
+    const info = companyExpiryInfo({ ...row(null, null, null), ...base }, "2026-10-21")!;
+    expect(info.kind).toBe("trial");
+    expect(info.expiresAt).toBe("2026-10-23");
+  });
+
+  it("un pago cargado manda por encima de la prueba", () => {
+    const info = companyExpiryInfo({ ...row("2026-10-22", "2026-11-21"), ...base }, "2026-10-26")!;
+    expect(info.kind).toBe("paid");
+    expect(info.cycle).toBe("mensual");
+    expect(info.expiresAt).toBe("2026-11-21");
+    expect(info.phase).toBe("active");
+  });
+
+  it("un pago inválido no tapa a la prueba", () => {
+    const info = companyExpiryInfo({ ...row("2026-10-22", null), ...base }, "2026-10-21")!;
+    expect(info.kind).toBe("trial");
+  });
+});
+
+describe("filtro 'en-prueba'", () => {
+  const paid = planExpiryInfo(row("2026-10-01", "2026-10-25"), "2026-10-21");
+  const trial = trialExpiryInfo({ trial_ends_at: "2026-10-23", created_at: "2026-10-10" }, "2026-10-21");
+
+  it("deja pasar solo las pruebas", () => {
+    expect(matchesExpiryFilter(trial, "en-prueba")).toBe(true);
+    expect(matchesExpiryFilter(paid, "en-prueba")).toBe(false);
+    expect(matchesExpiryFilter(null, "en-prueba")).toBe(false);
+  });
+
+  it("las pruebas no cuentan como planes pagos por vencer o vencidos", () => {
+    expect(matchesExpiryFilter(trial, "por-vencer")).toBe(false);
+    expect(matchesExpiryFilter(trial, "al-dia")).toBe(false);
+    const ended = trialExpiryInfo({ trial_ends_at: "2026-10-01", created_at: "2026-09-18" }, "2026-10-21");
+    expect(matchesExpiryFilter(ended, "vencidas")).toBe(false);
+  });
+
+  it("'sin-pago' no incluye a quien está en prueba", () => {
+    expect(matchesExpiryFilter(trial, "sin-pago")).toBe(false);
+  });
+});
+
+describe("dateInAsuncion", () => {
+  it("deja una fecha sola como está", () => {
+    expect(dateInAsuncion("2026-10-21")).toBe("2026-10-21");
+  });
+  it("pasa un timestamp UTC a la fecha de Asunción", () => {
+    expect(dateInAsuncion("2026-10-21T01:30:00Z")).toBe("2026-10-20");
+    expect(dateInAsuncion("2026-10-21T15:00:00Z")).toBe("2026-10-21");
+  });
+  it("un valor ilegible conserva su parte de fecha", () => {
+    expect(dateInAsuncion("2026-10-21Tnope")).toBe("2026-10-21");
   });
 });

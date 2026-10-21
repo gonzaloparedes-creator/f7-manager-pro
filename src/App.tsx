@@ -30,6 +30,7 @@ import SuperAdminSuppliers from "./pages/SuperAdminSuppliers.tsx";
 import SuperAdminFundadores from "./pages/SuperAdminFundadores.tsx";
 import SuperAdminMetrics from "./pages/SuperAdminMetrics.tsx";
 import SuperAdminReceipts from "./pages/SuperAdminReceipts.tsx";
+import SuperAdminSubscriptions from "./pages/SuperAdminSubscriptions.tsx";
 import Presentacion from "./pages/Presentacion.tsx";
 import Oferta from "./pages/Oferta.tsx";
 import AppLayout from "./components/AppLayout.tsx";
@@ -70,6 +71,7 @@ const App = () => (
           <Route path="/superadmin/fundadores" element={<SuperAdminFundadores />} />
           <Route path="/superadmin/metricas" element={<SuperAdminMetrics />} />
           <Route path="/superadmin/recibos" element={<SuperAdminReceipts />} />
+          <Route path="/superadmin/suscripciones" element={<SuperAdminSubscriptions />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ordenes/nueva" element={<NewOrder />} />

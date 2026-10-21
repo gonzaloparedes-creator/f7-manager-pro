@@ -10,7 +10,7 @@ import { BarChart3, MapPin, Smartphone, AlertTriangle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { countryLabel } from "@/lib/locations";
 import { monthKey, monthLabel, lastMonths, daysSince } from "@/lib/dateBuckets";
-import { planExpiryInfo } from "@/lib/planExpiry";
+import { companyExpiryInfo } from "@/lib/planExpiry";
 import { todayInAsuncion } from "@/lib/subscriptionReceipt";
 import { usePlanGraceDays } from "@/hooks/usePlanGraceDays";
 
@@ -28,6 +28,7 @@ interface CompanyRow {
   billing_cycle: string | null;
   plan_paid_from: string | null;
   plan_expires_at: string | null;
+  trial_ends_at: string | null;
 }
 interface OrderRow { company_id: string; created_at: string; device_type: string }
 
@@ -60,7 +61,7 @@ export default function SuperAdminMetrics() {
     const [{ data: companiesData, error }, { data: ordersData }] = await Promise.all([
       supabase
         .from("companies")
-        .select("id, name, created_at, plan_type, is_active, founder_cohort, is_paying, country, department, city, billing_cycle, plan_paid_from, plan_expires_at")
+        .select("id, name, created_at, plan_type, is_active, founder_cohort, is_paying, country, department, city, billing_cycle, plan_paid_from, plan_expires_at, trial_ends_at")
         .order("created_at", { ascending: false }),
       supabase.from("orders").select("company_id, created_at, device_type"),
     ]);
@@ -82,7 +83,7 @@ export default function SuperAdminMetrics() {
     const ids = new Set<string>();
     companies.forEach((c) => {
       if (!c.is_active) return;
-      if (planExpiryInfo(c, today, graceDays)?.phase === "suspended") return;
+      if (companyExpiryInfo(c, today, graceDays)?.phase === "suspended") return;
       ids.add(c.id);
     });
     return ids;

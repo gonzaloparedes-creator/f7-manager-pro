@@ -10,16 +10,29 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Activity, ArrowLeft, CalendarCheck, ChevronDown, Receipt, Search, ShieldCheck, Star, X } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  BellRing,
+  CalendarCheck,
+  ChevronDown,
+  FlaskConical,
+  Pencil,
+  Receipt,
+  Search,
+  ShieldCheck,
+  Star,
+  X,
+} from "lucide-react";
 import { COUNTRIES, PY_DEPARTMENTS, countryLabel } from "@/lib/locations";
 import { monthKey, monthLabel, lastMonths, daysSince } from "@/lib/dateBuckets";
 import { cn } from "@/lib/utils";
-import { PLAN_LABELS, type Cycle, type PlanType } from "@/lib/plans";
+import { PLAN_LABELS, type PlanType } from "@/lib/plans";
 import { CYCLE_LABELS, formatDateISO, todayInAsuncion } from "@/lib/subscriptionReceipt";
 import {
+  companyExpiryInfo,
   expirySortKey,
   matchesExpiryFilter,
-  planExpiryInfo,
   timeSinceLabel,
   type ExpiryFilter,
   type ExpiryTone,
@@ -27,7 +40,8 @@ import {
 } from "@/lib/planExpiry";
 import PlanExpiryBar from "@/components/PlanExpiryBar";
 import { usePlanGraceDays } from "@/hooks/usePlanGraceDays";
-import MarkPaidDialog, { type PaymentPatch } from "@/components/MarkPaidDialog";
+import MarkPaidDialog from "@/components/MarkPaidDialog";
+import TrialDialog from "@/components/TrialDialog";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -47,6 +61,7 @@ interface Company {
   billing_cycle: string | null;
   plan_paid_from: string | null;
   plan_expires_at: string | null;
+  trial_ends_at: string | null;
 }
 
 interface Partner {
@@ -70,7 +85,8 @@ const FILTERS: { key: ExpiryFilter; label: string; countClass: string }[] = [
   { key: "vencidas", label: "Vencidas", countClass: "text-destructive" },
   { key: "por-vencer", label: "Por vencer", countClass: "text-secondary" },
   { key: "al-dia", label: "Al día", countClass: "text-primary" },
-  { key: "sin-pago", label: "Sin pago", countClass: "text-muted-foreground" },
+  { key: "en-prueba", label: "En prueba", countClass: "text-primary" },
+  { key: "sin-pago", label: "Sin fechas", countClass: "text-muted-foreground" },
 ];
 
 const ACCENT: Record<ExpiryTone | "none", string> = {
@@ -104,7 +120,8 @@ export default function MasterAdmin() {
   const [busy, setBusy] = useState<string | null>(null);
   const [cityDrafts, setCityDrafts] = useState<Record<string, string>>({});
   const [detailCompany, setDetailCompany] = useState<Company | null>(null);
-  const [payCompany, setPayCompany] = useState<Company | null>(null);
+  const [payTarget, setPayTarget] = useState<{ company: Company; editing: boolean } | null>(null);
+  const [trialCompany, setTrialCompany] = useState<Company | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ExpiryFilter>("todas");
@@ -125,7 +142,7 @@ export default function MasterAdmin() {
       supabase
         .from("companies")
         .select(
-          "id, name, created_at, plan_type, is_active, is_paying, founder_cohort, referral_partner_id, country, department, city, billing_cycle, plan_paid_from, plan_expires_at"
+          "id, name, created_at, plan_type, is_active, is_paying, founder_cohort, referral_partner_id, country, department, city, billing_cycle, plan_paid_from, plan_expires_at, trial_ends_at"
         )
         .order("created_at", { ascending: false }),
       supabase.from("referral_partners").select("id, name").order("name"),
@@ -167,7 +184,7 @@ export default function MasterAdmin() {
     toast.success(value ? "Marcada como Fundador" : "Ya no es Fundador");
   }
 
-  function applyPayment(id: string, patch: PaymentPatch) {
+  function applyPatch(id: string, patch: Partial<Company>) {
     setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
 
@@ -175,12 +192,19 @@ export default function MasterAdmin() {
   const graceDays = usePlanGraceDays();
   const infos = useMemo(() => {
     const map = new Map<string, PlanExpiryInfo | null>();
-    companies.forEach((c) => map.set(c.id, planExpiryInfo(c, today, graceDays)));
+    companies.forEach((c) => map.set(c.id, companyExpiryInfo(c, today, graceDays)));
     return map;
   }, [companies, today, graceDays]);
 
   const counts = useMemo(() => {
-    const result: Record<ExpiryFilter, number> = { todas: 0, vencidas: 0, "por-vencer": 0, "al-dia": 0, "sin-pago": 0 };
+    const result: Record<ExpiryFilter, number> = {
+      todas: 0,
+      vencidas: 0,
+      "por-vencer": 0,
+      "al-dia": 0,
+      "en-prueba": 0,
+      "sin-pago": 0,
+    };
     (Object.keys(result) as ExpiryFilter[]).forEach((key) => {
       result[key] = companies.filter((c) => matchesExpiryFilter(infos.get(c.id) ?? null, key)).length;
     });
@@ -227,18 +251,26 @@ export default function MasterAdmin() {
           >
             <ArrowLeft className="h-4 w-4" /> Super Admin
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <ShieldCheck className="h-5 w-5" />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold tracking-tight">Gestión de empresas</h1>
+                <p className="text-sm text-muted-foreground">Cuentas, planes y vencimientos de cada negocio</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight">Gestión de empresas</h1>
-              <p className="text-sm text-muted-foreground">Cuentas, planes y vencimientos de cada negocio</p>
-            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/superadmin/suscripciones">
+                <BellRing className="mr-1.5 h-4 w-4" />
+                Suscripciones y seguimiento
+              </Link>
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" role="group" aria-label="Filtrar por estado del plan">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="group" aria-label="Filtrar por estado del plan">
           {FILTERS.map((f) => (
             <button
               key={f.key}
@@ -347,7 +379,9 @@ export default function MasterAdmin() {
                 }
                 onUpdate={(patch) => updateCompany(c.id, patch)}
                 onToggleFounder={(value) => toggleFounder(c.id, value)}
-                onPay={() => setPayCompany(c)}
+                onPay={() => setPayTarget({ company: c, editing: false })}
+                onEditDates={() => setPayTarget({ company: c, editing: true })}
+                onTrial={() => setTrialCompany(c)}
                 onActivity={() => setDetailCompany(c)}
               />
             ))}
@@ -355,7 +389,13 @@ export default function MasterAdmin() {
         )}
       </div>
 
-      <MarkPaidDialog company={payCompany} onClose={() => setPayCompany(null)} onSaved={applyPayment} />
+      <MarkPaidDialog
+        company={payTarget?.company ?? null}
+        editing={payTarget?.editing ?? false}
+        onClose={() => setPayTarget(null)}
+        onSaved={applyPatch}
+      />
+      <TrialDialog company={trialCompany} onClose={() => setTrialCompany(null)} onSaved={applyPatch} />
       <CompanyDetailDialog company={detailCompany} onClose={() => setDetailCompany(null)} />
     </div>
   );
@@ -375,6 +415,8 @@ interface CompanyCardProps {
   onUpdate: (patch: Partial<Company>) => Promise<boolean>;
   onToggleFounder: (value: boolean) => void;
   onPay: () => void;
+  onEditDates: () => void;
+  onTrial: () => void;
   onActivity: () => void;
 }
 
@@ -400,12 +442,15 @@ function CompanyCard({
   onUpdate,
   onToggleFounder,
   onPay,
+  onEditDates,
+  onTrial,
   onActivity,
 }: CompanyCardProps) {
   const planLabel = PLAN_LABELS[c.plan_type as PlanType] ?? c.plan_type;
-  const cycleLabel = info ? CYCLE_LABELS[info.cycle as Cycle] : null;
+  const cycleLabel = info?.cycle ? CYCLE_LABELS[info.cycle] : null;
   const createdIso = c.created_at.slice(0, 10);
   const lapsed = info?.phase === "suspended";
+  const isTrial = info?.kind === "trial";
   const panelId = `empresa-${c.id}`;
 
   return (
@@ -427,7 +472,10 @@ function CompanyCard({
                   <span className="break-words font-semibold leading-tight">{c.name}</span>
                   {c.founder_cohort && <Star className="h-3.5 w-3.5 shrink-0 fill-secondary text-secondary" aria-label="Fundador" />}
                   {!c.is_active && <Badge variant="destructive">Suspendida</Badge>}
-                  {c.is_active && lapsed && <Badge variant="destructive">Suspendida por vencimiento</Badge>}
+                  {c.is_active && lapsed && (
+                    <Badge variant="destructive">{isTrial ? "Prueba terminada" : "Suspendida por vencimiento"}</Badge>
+                  )}
+                  {isTrial && !lapsed && <Badge variant="outline">Prueba gratis</Badge>}
                 </span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {planLabel}
@@ -450,7 +498,7 @@ function CompanyCard({
           {info ? (
             <PlanExpiryBar info={info} />
           ) : (
-            <div className="text-xs text-muted-foreground">Sin pago registrado</div>
+            <div className="text-xs text-muted-foreground">Sin pago ni prueba registrados</div>
           )}
         </div>
 
@@ -463,21 +511,24 @@ function CompanyCard({
                   <PlanExpiryBar info={info} variant="large" />
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Todavía no tiene un pago registrado. Con <span className="font-medium text-foreground">Pagado</span> cargás desde
-                    cuándo pagó y se arma la cuenta regresiva.
+                    Todavía no tiene un pago ni una prueba registrados, así que no se suspende por tiempo. Con{" "}
+                    <span className="font-medium text-foreground">Pagado</span> cargás desde cuándo pagó y se arma la cuenta
+                    regresiva; con <span className="font-medium text-foreground">Dar prueba gratis</span> le fijás una fecha de fin.
                   </p>
                 )}
                 <dl className="space-y-2 border-t border-border pt-3">
                   <DetailRow label="Plan">{planLabel}</DetailRow>
                   {info && cycleLabel && <DetailRow label="Ciclo">{cycleLabel}</DetailRow>}
-                  {info && <DetailRow label="Pagó desde">{formatDateISO(info.paidFrom)}</DetailRow>}
-                  {info && <DetailRow label="Vence">{formatDateISO(info.expiresAt)}</DetailRow>}
+                  {info && <DetailRow label={isTrial ? "Prueba desde" : "Pagó desde"}>{formatDateISO(info.paidFrom)}</DetailRow>}
+                  {info && <DetailRow label={isTrial ? "Termina" : "Vence"}>{formatDateISO(info.expiresAt)}</DetailRow>}
                   {info && (
                     <DetailRow label="Acceso hasta">
                       {formatDateISO(info.accessUntil)}
                       <span className="block text-xs font-normal text-muted-foreground">
                         {lapsed
-                          ? "Bloqueada por vencimiento"
+                          ? isTrial
+                            ? "Bloqueada: terminó la prueba"
+                            : "Bloqueada por vencimiento"
                           : info.graceDays > 0
                             ? `Incluye ${info.graceDays} ${info.graceDays === 1 ? "día" : "días"} de gracia`
                             : "Sin días de gracia"}
@@ -491,8 +542,20 @@ function CompanyCard({
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={onPay}>
                     <CalendarCheck className="mr-1.5 h-4 w-4" />
-                    {info ? "Registrar nuevo pago" : "Registrar pago"}
+                    {info?.kind === "paid" ? "Registrar nuevo pago" : "Registrar pago"}
                   </Button>
+                  {info?.kind === "paid" && (
+                    <Button size="sm" variant="outline" onClick={onEditDates}>
+                      <Pencil className="mr-1.5 h-4 w-4" />
+                      Editar fechas
+                    </Button>
+                  )}
+                  {!c.plan_expires_at && (
+                    <Button size="sm" variant="outline" onClick={onTrial}>
+                      <FlaskConical className="mr-1.5 h-4 w-4" />
+                      {isTrial ? "Controlar prueba" : "Dar prueba gratis"}
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" asChild>
                     <Link to={`/superadmin/recibos?empresa=${c.id}`}>
                       <Receipt className="mr-1.5 h-4 w-4" />

@@ -21,20 +21,26 @@ function wasDismissed(expiresAt: string): boolean {
   }
 }
 
-function titleFor(daysLeft: number): string {
+function titleFor(daysLeft: number, trial: boolean): string {
+  if (trial) {
+    if (daysLeft > 1) return `Tu prueba gratis termina en ${daysLeft} días`;
+    if (daysLeft === 1) return "Tu prueba gratis termina mañana";
+    if (daysLeft === 0) return "Tu prueba gratis termina hoy";
+    return "Tu prueba gratis terminó";
+  }
   if (daysLeft > 1) return `Tu plan vence en ${daysLeft} días`;
   if (daysLeft === 1) return "Tu plan vence mañana";
   if (daysLeft === 0) return "Tu plan vence hoy";
   return "Tu plan venció";
 }
 
-// Tarjeta del tablero principal: avisa a quien administra la cuenta que el plan está por vencer
+// Tarjeta del tablero principal: avisa a quien administra la cuenta que el plan (o la prueba gratis) está por vencer
 // (naranja, se puede ocultar por sesión) o que ya venció y falta poco para la suspensión (roja, fija).
 export default function PlanExpiryNotice() {
   const { isAdmin } = useUserRole();
   const { canManageCompany } = useStaffPermissions();
   const { info } = usePlanExpiry();
-  const renew = useRenewPlan();
+  const renew = useRenewPlan(info?.kind === "trial" ? "trial" : "paid");
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
 
   if (!isAdmin || !canManageCompany || !info || info.tone === "ok") return null;
@@ -43,6 +49,7 @@ export default function PlanExpiryNotice() {
   if (!grace && (dismissedFor === info.expiresAt || wasDismissed(info.expiresAt))) return null;
 
   const suspendsOn = formatDateISO(addDaysISO(info.accessUntil, 1));
+  const trial = info.kind === "trial";
 
   const dismiss = () => {
     try {
@@ -77,12 +84,16 @@ export default function PlanExpiryNotice() {
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <h2 className={cn("text-base font-semibold md:text-lg", grace ? "text-destructive" : "text-secondary")}>
-              {titleFor(info.daysLeft)}
+              {titleFor(info.daysLeft, trial)}
             </h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {grace
-                ? `Tu plan terminó el ${formatDateISO(info.expiresAt)}. ${accessHeadline(info.daysToSuspension, info.accessUntil)}: si no lo renovás, la cuenta se suspende el ${suspendsOn}.`
-                : `Vence el ${formatDateISO(info.expiresAt)}. Renovalo a tiempo: si pasa la fecha, la cuenta se suspende sola el ${suspendsOn}.`}
+              {trial
+                ? grace
+                  ? `Tu prueba gratis terminó el ${formatDateISO(info.expiresAt)}. ${accessHeadline(info.daysToSuspension, info.accessUntil)}: si no elegís un plan, la cuenta se suspende el ${suspendsOn}.`
+                  : `Termina el ${formatDateISO(info.expiresAt)}. Elegí un plan a tiempo: si pasa la fecha, la cuenta se suspende sola el ${suspendsOn}. Tus datos quedan guardados.`
+                : grace
+                  ? `Tu plan terminó el ${formatDateISO(info.expiresAt)}. ${accessHeadline(info.daysToSuspension, info.accessUntil)}: si no lo renovás, la cuenta se suspende el ${suspendsOn}.`
+                  : `Vence el ${formatDateISO(info.expiresAt)}. Renovalo a tiempo: si pasa la fecha, la cuenta se suspende sola el ${suspendsOn}.`}
             </p>
           </div>
 
@@ -90,7 +101,7 @@ export default function PlanExpiryNotice() {
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button onClick={renew} className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
-              <RefreshCw className="mr-2 h-4 w-4" /> Renovar mi plan
+              <RefreshCw className="mr-2 h-4 w-4" /> {trial ? "Elegir un plan" : "Renovar mi plan"}
             </Button>
             <Button asChild variant="outline">
               <Link to="/configuracion?tab=suscripcion">Ver mi suscripción</Link>

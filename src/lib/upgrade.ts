@@ -18,3 +18,7 @@ export function openUpgradeWhatsApp(customMessage?: string) {
 export function renewPlanMessage(planLabel: string, companyName?: string | null): string {
   return `¡Hola! Quiero renovar mi Plan ${planLabel} de F7 Manager Pro${companyName ? ` (${companyName})` : ""}.`;
 }
+
+export function choosePlanMessage(companyName?: string | null): string {
+  return `¡Hola! Estoy probando F7 Manager Pro${companyName ? ` (${companyName})` : ""} y quiero elegir un plan para seguir usándolo.`;
+}

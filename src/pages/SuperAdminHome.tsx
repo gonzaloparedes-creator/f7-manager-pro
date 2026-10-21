@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Globe2, Building2, Rocket, BarChart3, Receipt } from "lucide-react";
+import { ShieldCheck, Globe2, Building2, Rocket, BarChart3, Receipt, BellRing } from "lucide-react";
 
 export default function SuperAdminHome() {
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -35,6 +35,12 @@ export default function SuperAdminHome() {
       icon: Building2,
       title: "Gestión de Empresas",
       desc: "Planes, estado y administración global de talleres.",
+    },
+    {
+      to: "/superadmin/suscripciones",
+      icon: BellRing,
+      title: "Suscripciones y seguimiento",
+      desc: "Clientes que pagan, pruebas gratis y a quién escribirle hoy con mensajes de WhatsApp ya armados.",
     },
     {
       to: "/superadmin/fundadores",

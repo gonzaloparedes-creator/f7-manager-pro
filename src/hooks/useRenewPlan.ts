@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
 import { usePlan } from "@/hooks/usePlan";
 import { PLAN_LABELS } from "@/lib/plans";
-import { openUpgradeWhatsApp, renewPlanMessage } from "@/lib/upgrade";
+import { choosePlanMessage, openUpgradeWhatsApp, renewPlanMessage } from "@/lib/upgrade";
 
-// Abre WhatsApp con el pedido de renovación ya escrito (plan + nombre del negocio).
+// Abre WhatsApp con el pedido ya escrito: renovar el plan (plan + negocio) o, en la prueba gratis, elegir un plan.
 // El nombre se trae al montar para que el clic abra la ventana al instante.
-export function useRenewPlan() {
+export function useRenewPlan(kind: "paid" | "trial" = "paid") {
   const { companyId } = useCompany();
   const { plan } = usePlan();
   const [companyName, setCompanyName] = useState("");
@@ -29,7 +29,10 @@ export function useRenewPlan() {
   }, [companyId]);
 
   return useCallback(
-    () => openUpgradeWhatsApp(renewPlanMessage(PLAN_LABELS[plan], companyName)),
-    [plan, companyName]
+    () =>
+      openUpgradeWhatsApp(
+        kind === "trial" ? choosePlanMessage(companyName) : renewPlanMessage(PLAN_LABELS[plan], companyName)
+      ),
+    [kind, plan, companyName]
   );
 }

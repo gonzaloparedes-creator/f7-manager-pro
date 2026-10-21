@@ -19,7 +19,7 @@ import {
   isValidISODate,
   todayInAsuncion,
 } from "@/lib/subscriptionReceipt";
-import { planExpiryInfo, renewalStart, suggestedExpiry } from "@/lib/planExpiry";
+import { companyExpiryInfo, planExpiryInfo, renewalStart, suggestedExpiry } from "@/lib/planExpiry";
 import { usePlanGraceDays } from "@/hooks/usePlanGraceDays";
 
 const PLAN_ORDER: PlanType[] = ["starter", "pro", "business", "retail"];
@@ -34,6 +34,8 @@ export interface PayableCompany {
   billing_cycle: string | null;
   plan_paid_from: string | null;
   plan_expires_at: string | null;
+  created_at?: string | null;
+  trial_ends_at?: string | null;
 }
 
 export interface PaymentPatch {
@@ -41,21 +43,32 @@ export interface PaymentPatch {
   billing_cycle: Cycle | null;
   plan_paid_from: string | null;
   plan_expires_at: string | null;
+  trial_ends_at?: string | null;
   is_paying?: boolean;
   is_active?: boolean;
 }
 
 interface MarkPaidDialogProps {
   company: PayableCompany | null;
+  // Corregir las fechas del período actual en vez de registrar un pago nuevo.
+  editing?: boolean;
   onClose: () => void;
   onSaved: (companyId: string, patch: PaymentPatch) => void;
 }
 
-export default function MarkPaidDialog({ company, onClose, onSaved }: MarkPaidDialogProps) {
+export default function MarkPaidDialog({ company, editing = false, onClose, onSaved }: MarkPaidDialogProps) {
   return (
     <Dialog open={!!company} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto">
-        {company && <MarkPaidForm key={company.id} company={company} onClose={onClose} onSaved={onSaved} />}
+        {company && (
+          <MarkPaidForm
+            key={`${company.id}-${editing ? "edit" : "pay"}`}
+            company={company}
+            editing={editing}
+            onClose={onClose}
+            onSaved={onSaved}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -63,10 +76,12 @@ export default function MarkPaidDialog({ company, onClose, onSaved }: MarkPaidDi
 
 function MarkPaidForm({
   company,
+  editing: editingRequested,
   onClose,
   onSaved,
 }: {
   company: PayableCompany;
+  editing: boolean;
   onClose: () => void;
   onSaved: MarkPaidDialogProps["onSaved"];
 }) {
@@ -75,13 +90,16 @@ function MarkPaidForm({
   const today = useMemo(() => todayInAsuncion(), []);
   const continueFrom = useMemo(() => renewalStart(company.plan_expires_at, today), [company.plan_expires_at, today]);
   const canContinue = continueFrom !== today;
+  const editing = editingRequested && !!company.plan_paid_from && !!company.plan_expires_at;
 
   const [plan, setPlan] = useState<PlanType>(
     PLAN_ORDER.includes(company.plan_type as PlanType) ? (company.plan_type as PlanType) : "pro"
   );
   const [cycle, setCycle] = useState<Cycle>(CYCLES.includes(company.billing_cycle as Cycle) ? (company.billing_cycle as Cycle) : "mensual");
-  const [paidFrom, setPaidFrom] = useState(continueFrom);
-  const [expiresOverride, setExpiresOverride] = useState<string | null>(null);
+  const [paidFrom, setPaidFrom] = useState(editing ? (company.plan_paid_from as string).slice(0, 10) : continueFrom);
+  const [expiresOverride, setExpiresOverride] = useState<string | null>(
+    editing ? (company.plan_expires_at as string).slice(0, 10) : null
+  );
   const [markPaying, setMarkPaying] = useState(true);
   const [reactivate, setReactivate] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -108,12 +126,26 @@ function MarkPaidForm({
   // Estado actual de la empresa (antes de guardar): si hoy está bloqueada por vencimiento, el pago la destraba.
   const currentInfo = useMemo(
     () =>
-      planExpiryInfo(
-        { billing_cycle: company.billing_cycle, plan_paid_from: company.plan_paid_from, plan_expires_at: company.plan_expires_at },
+      companyExpiryInfo(
+        {
+          billing_cycle: company.billing_cycle,
+          plan_paid_from: company.plan_paid_from,
+          plan_expires_at: company.plan_expires_at,
+          trial_ends_at: company.trial_ends_at,
+          created_at: company.created_at,
+        },
         today,
         graceDays
       ),
-    [company.billing_cycle, company.plan_paid_from, company.plan_expires_at, today, graceDays]
+    [
+      company.billing_cycle,
+      company.plan_paid_from,
+      company.plan_expires_at,
+      company.trial_ends_at,
+      company.created_at,
+      today,
+      graceDays,
+    ]
   );
   const wouldBeSuspended = preview?.phase === "suspended";
 
@@ -137,26 +169,32 @@ function MarkPaidForm({
       plan_paid_from: paidFrom,
       plan_expires_at: expiresAt,
     };
-    if (markPaying && !company.is_paying) patch.is_paying = true;
-    if (!company.is_active && reactivate) patch.is_active = true;
+    if (!editing) {
+      if (markPaying && !company.is_paying) patch.is_paying = true;
+      if (!company.is_active && reactivate) patch.is_active = true;
+    }
 
     const { error: saveError } = await supabase.from("companies").update(patch).eq("id", company.id);
     setSaving(false);
     if (saveError) {
-      toast.error("No se pudo registrar el pago", { description: saveError.message });
+      toast.error(editing ? "No se pudieron guardar las fechas" : "No se pudo registrar el pago", {
+        description: saveError.message,
+      });
       return;
     }
     onSaved(company.id, patch);
     onClose();
-    toast.success(`Pago registrado: ${company.name}`, {
+    toast.success(editing ? `Fechas actualizadas: ${company.name}` : `Pago registrado: ${company.name}`, {
       description: `Plan ${PLAN_LABELS[plan]} ${CYCLE_LABELS[cycle].toLowerCase()} · vence el ${formatDateISO(expiresAt)}`,
-      action: { label: "Emitir recibo", onClick: () => navigate(`/superadmin/recibos?empresa=${company.id}`) },
+      ...(editing
+        ? {}
+        : { action: { label: "Emitir recibo", onClick: () => navigate(`/superadmin/recibos?empresa=${company.id}`) } }),
     });
   };
 
   const clearDates = async () => {
     setSaving(true);
-    const patch: PaymentPatch = { billing_cycle: null, plan_paid_from: null, plan_expires_at: null };
+    const patch: PaymentPatch = { billing_cycle: null, plan_paid_from: null, plan_expires_at: null, trial_ends_at: null };
     const { error: clearError } = await supabase.from("companies").update(patch).eq("id", company.id);
     setSaving(false);
     setConfirmClear(false);
@@ -174,13 +212,15 @@ function MarkPaidForm({
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <CalendarCheck className="h-5 w-5 text-primary" />
-          Registrar pago
+          {editing ? "Editar fechas del plan" : "Registrar pago"}
         </DialogTitle>
         <DialogDescription>
           {company.name}
           {company.plan_paid_from && company.plan_expires_at
             ? ` · período actual hasta el ${formatDateISO(company.plan_expires_at)}`
-            : " · todavía sin pago registrado"}
+            : company.trial_ends_at
+              ? ` · en prueba gratis hasta el ${formatDateISO(company.trial_ends_at)}`
+              : " · todavía sin pago registrado"}
         </DialogDescription>
       </DialogHeader>
 
@@ -222,7 +262,7 @@ function MarkPaidForm({
             <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => changeFrom(today)}>
               Hoy
             </Button>
-            {canContinue && (
+            {canContinue && !editing && (
               <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => changeFrom(continueFrom)}>
                 A continuación ({formatDateISO(continueFrom)})
               </Button>
@@ -281,7 +321,7 @@ function MarkPaidForm({
           </p>
         )}
 
-        {(!company.is_paying || !company.is_active) && (
+        {!editing && (!company.is_paying || !company.is_active) && (
           <div className="space-y-3 rounded-lg border border-border p-3">
             {!company.is_paying && (
               <div className="flex items-center justify-between gap-3">
@@ -317,7 +357,7 @@ function MarkPaidForm({
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button type="button" onClick={save} disabled={saving || !!error || (wouldBeSuspended && !ackLapsed)}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar pago
+            {editing ? "Guardar fechas" : "Registrar pago"}
           </Button>
         </div>
       </DialogFooter>
@@ -326,7 +366,7 @@ function MarkPaidForm({
         open={confirmClear}
         onOpenChange={setConfirmClear}
         title="¿Borrar las fechas de pago?"
-        description={`${company.name} vuelve a quedar sin período registrado (no se toca el plan ni la suspensión manual). Los recibos ya emitidos no cambian.${
+        description={`${company.name} vuelve a quedar sin fechas, ni de pago ni de prueba gratis (no se toca el plan ni la suspensión manual). Los recibos ya emitidos no cambian.${
           currentInfo && currentInfo.phase !== "active"
             ? " Atención: sin fechas la cuenta deja de controlarse por vencimiento, así que recupera el acceso."
             : ""

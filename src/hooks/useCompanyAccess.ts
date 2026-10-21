@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
-import type { PlanPeriodRow } from "@/lib/planExpiry";
+import type { CompanyPeriodRow } from "@/lib/planExpiry";
 
 // Estado de acceso de la propia empresa, calculado en la base (get_my_company_access):
 // la fecha de "hoy" y los días de gracia vienen del servidor, no del reloj del usuario.
@@ -15,7 +15,10 @@ export interface CompanyAccess {
   graceDays: number;
   accessUntil: string | null;
   today: string;
-  period: PlanPeriodRow;
+  // "paid" = hay un pago cargado; "trial" = solo prueba gratis; "none" = sin fechas.
+  kind: "paid" | "trial" | "none";
+  // Pago cargado y prueba gratis de la empresa (el pago manda sobre la prueba).
+  period: CompanyPeriodRow;
 }
 
 const DEDUPE_MS = 5000;
@@ -32,10 +35,13 @@ async function loadAccess(): Promise<CompanyAccess | null> {
     graceDays: row.grace_days,
     accessUntil: row.access_until ?? null,
     today: row.today,
+    kind: row.kind === "paid" || row.kind === "trial" ? row.kind : "none",
     period: {
       billing_cycle: row.billing_cycle ?? null,
       plan_paid_from: row.plan_paid_from ?? null,
       plan_expires_at: row.plan_expires_at ?? null,
+      trial_ends_at: row.trial_ends_at ?? null,
+      created_at: row.company_created_at ?? null,
     },
   };
 }

@@ -50,7 +50,7 @@ function ExpiryTrack({ info, thick }: TrackProps) {
       aria-valuemax={100}
       aria-valuenow={info.remainingPct}
       aria-valuetext={info.headline}
-      aria-label="Tiempo que queda del plan"
+      aria-label={info.kind === "trial" ? "Tiempo que queda de la prueba gratis" : "Tiempo que queda del plan"}
       className={cn("relative w-full rounded-full", styles.track, thick ? "h-3" : "h-2")}
     >
       <div
@@ -73,6 +73,24 @@ function ExpiryTrack({ info, thick }: TrackProps) {
   );
 }
 
+// "Vence 20/11/2026" / "Venció 20/11/2026"; en la prueba gratis "Termina" / "Terminó".
+function endLabel(info: PlanExpiryInfo): string {
+  if (info.kind === "trial") return info.daysLeft < 0 ? "Terminó" : "Termina";
+  return info.daysLeft < 0 ? "Venció" : "Vence";
+}
+
+function largeCaption(info: PlanExpiryInfo): string {
+  const subject = info.kind === "trial" ? "tu prueba" : "tu plan";
+  const endVerb = info.kind === "trial" ? "termine" : "venza";
+  const endsNow = info.kind === "trial" ? "termina hoy" : "vence hoy";
+  const endedVerb = info.kind === "trial" ? "terminó" : "venció";
+  if (info.daysLeft > 1) return `días para que ${endVerb} ${subject}`;
+  if (info.daysLeft === 1) return `día para que ${endVerb} ${subject}`;
+  if (info.daysLeft === 0) return `${subject} ${endsNow}`;
+  if (info.daysLeft === -1) return `día desde que ${endedVerb} ${subject}`;
+  return `días desde que ${endedVerb} ${subject}`;
+}
+
 interface PlanExpiryBarProps {
   info: PlanExpiryInfo;
   variant?: "compact" | "large";
@@ -88,7 +106,7 @@ export default function PlanExpiryBar({ info, variant = "compact", className }: 
         <div className="flex items-baseline justify-between gap-3">
           <span className={cn("text-sm font-semibold", styles.text)}>{info.headline}</span>
           <span className="whitespace-nowrap text-xs text-muted-foreground">
-            {info.daysLeft < 0 ? "Venció" : "Vence"} {formatDateISO(info.expiresAt)}
+            {endLabel(info)} {formatDateISO(info.expiresAt)}
           </span>
         </div>
         <ExpiryTrack info={info} thick={false} />
@@ -97,16 +115,7 @@ export default function PlanExpiryBar({ info, variant = "compact", className }: 
   }
 
   const bigNumber = info.daysLeft >= 0 ? String(info.daysLeft) : String(Math.abs(info.daysLeft));
-  const caption =
-    info.daysLeft > 1
-      ? "días para que venza tu plan"
-      : info.daysLeft === 1
-        ? "día para que venza tu plan"
-        : info.daysLeft === 0
-          ? "tu plan vence hoy"
-          : info.daysLeft === -1
-            ? "día desde que venció tu plan"
-            : "días desde que venció tu plan";
+  const caption = largeCaption(info);
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -118,7 +127,7 @@ export default function PlanExpiryBar({ info, variant = "compact", className }: 
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>Desde {formatDateISO(info.paidFrom)}</span>
         <span className="text-right">
-          {info.daysLeft < 0 ? "Venció" : "Vence"} {formatDateISO(info.expiresAt)}
+          {endLabel(info)} {formatDateISO(info.expiresAt)}
         </span>
       </div>
     </div>

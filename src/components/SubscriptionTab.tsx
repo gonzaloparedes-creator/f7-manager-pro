@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Check, Crown, Clock, CalendarClock, RefreshCw } from "lucide-react";
-import { openUpgradeWhatsApp, renewPlanMessage } from "@/lib/upgrade";
+import { choosePlanMessage, openUpgradeWhatsApp, renewPlanMessage } from "@/lib/upgrade";
 import { PLAN_LABELS, PLAN_FEATURES, PRICING, PLAN_MESSAGES, TALLER_LADDER, type PlanType } from "@/lib/plans";
 import { usePlanExpiry } from "@/hooks/usePlanExpiry";
 import PlanExpiryBar from "@/components/PlanExpiryBar";
@@ -47,8 +47,9 @@ export default function SubscriptionTab() {
     );
   };
 
+  const trial = expiry?.kind === "trial";
   const renew = () => {
-    openUpgradeWhatsApp(renewPlanMessage(PLAN_LABELS[plan], companyName));
+    openUpgradeWhatsApp(trial ? choosePlanMessage(companyName) : renewPlanMessage(PLAN_LABELS[plan], companyName));
   };
 
   // Próximos escalones disponibles arriba del plan actual (Starter -> Pro -> Business).
@@ -86,25 +87,33 @@ export default function SubscriptionTab() {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <CalendarClock className={expiry.tone === "ok" ? "h-4 w-4 text-primary" : expiry.tone === "soon" ? "h-4 w-4 text-secondary" : "h-4 w-4 text-destructive"} />
-                  Vencimiento de tu plan
+                  {trial ? "Tu prueba gratis" : "Vencimiento de tu plan"}
                 </div>
-                <Badge variant="outline">{CYCLE_LABELS[expiry.cycle]}</Badge>
+                <Badge variant="outline">{expiry.cycle ? CYCLE_LABELS[expiry.cycle] : "Prueba gratis"}</Badge>
               </div>
               <PlanExpiryBar info={expiry} variant="large" />
               <p className="text-xs text-muted-foreground">
-                {expiry.graceDays > 0
-                  ? `Después del vencimiento tenés ${expiry.graceDays} ${expiry.graceDays === 1 ? "día" : "días"} para renovar (hasta el ${formatDateISO(expiry.accessUntil)}); si no, la cuenta se suspende sola.`
-                  : "Si el plan no se renueva a tiempo, la cuenta se suspende sola al día siguiente del vencimiento."}
+                {trial
+                  ? expiry.graceDays > 0
+                    ? `Cuando termina la prueba tenés ${expiry.graceDays} ${expiry.graceDays === 1 ? "día" : "días"} para elegir un plan (hasta el ${formatDateISO(expiry.accessUntil)}); si no, la cuenta se pausa sola. Tus datos quedan guardados.`
+                    : "Si no elegís un plan cuando termina la prueba, la cuenta se pausa sola al día siguiente. Tus datos quedan guardados."
+                  : expiry.graceDays > 0
+                    ? `Después del vencimiento tenés ${expiry.graceDays} ${expiry.graceDays === 1 ? "día" : "días"} para renovar (hasta el ${formatDateISO(expiry.accessUntil)}); si no, la cuenta se suspende sola.`
+                    : "Si el plan no se renueva a tiempo, la cuenta se suspende sola al día siguiente del vencimiento."}
               </p>
               {expiry.tone !== "ok" && (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    {expiry.tone === "expired"
-                      ? `Tu plan ya venció. ${accessHeadline(expiry.daysToSuspension, expiry.accessUntil)}. Escribinos y lo renovamos.`
-                      : "Tu plan está por vencer. Escribinos para renovarlo a tiempo."}
+                    {trial
+                      ? expiry.tone === "expired"
+                        ? `Tu prueba gratis ya terminó. ${accessHeadline(expiry.daysToSuspension, expiry.accessUntil)}. Escribinos y activamos tu plan.`
+                        : "Tu prueba gratis está por terminar. Escribinos y elegimos el plan que te convenga."
+                      : expiry.tone === "expired"
+                        ? `Tu plan ya venció. ${accessHeadline(expiry.daysToSuspension, expiry.accessUntil)}. Escribinos y lo renovamos.`
+                        : "Tu plan está por vencer. Escribinos para renovarlo a tiempo."}
                   </p>
                   <Button onClick={renew} className="shrink-0 bg-secondary text-secondary-foreground hover:bg-secondary/90">
-                    <RefreshCw className="mr-2 h-4 w-4" /> Renovar mi plan
+                    <RefreshCw className="mr-2 h-4 w-4" /> {trial ? "Elegir un plan" : "Renovar mi plan"}
                   </Button>
                 </div>
               )}

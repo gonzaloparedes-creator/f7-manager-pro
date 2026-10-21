@@ -2,13 +2,13 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { CalendarX2, ShieldAlert } from "lucide-react";
-import { openUpgradeWhatsApp } from "@/lib/upgrade";
+import { choosePlanMessage, openUpgradeWhatsApp } from "@/lib/upgrade";
 import { formatDateISO } from "@/lib/subscriptionReceipt";
 import type { SuspensionReason } from "@/hooks/useCompanyStatus";
 
 interface SuspendedAccountProps {
   reason?: SuspensionReason;
-  // Último día cubierto por el plan (solo cuando la suspensión es por vencimiento).
+  // Último día cubierto por el plan o la prueba (solo cuando la suspensión es por plazo).
   expiresAt?: string | null;
 }
 
@@ -19,7 +19,8 @@ export default function SuspendedAccount({ reason = "manual", expiresAt = null }
     navigate("/login", { replace: true });
   };
 
-  const expired = reason === "expired";
+  const trial = reason === "trial";
+  const expired = reason === "expired" || trial;
   const Icon = expired ? CalendarX2 : ShieldAlert;
 
   return (
@@ -28,7 +29,15 @@ export default function SuspendedAccount({ reason = "manual", expiresAt = null }
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-destructive/15 text-destructive">
           <Icon className="h-7 w-7" />
         </div>
-        {expired ? (
+        {trial ? (
+          <>
+            <h1 className="text-2xl font-bold">Tu prueba gratis terminó</h1>
+            <p className="text-muted-foreground">
+              {expiresAt ? `La prueba de F7 Manager Pro terminó el ${formatDateISO(expiresAt)}` : "La prueba de F7 Manager Pro terminó"} y
+              la cuenta quedó en pausa. Tus datos están guardados: apenas elijas un plan, todo vuelve a funcionar.
+            </p>
+          </>
+        ) : expired ? (
           <>
             <h1 className="text-2xl font-bold">Tu plan venció</h1>
             <p className="text-muted-foreground">
@@ -48,18 +57,20 @@ export default function SuspendedAccount({ reason = "manual", expiresAt = null }
           <Button
             onClick={() =>
               openUpgradeWhatsApp(
-                expired
-                  ? "Hola, el plan de mi cuenta de F7 Manager Pro venció y quiero renovarlo."
-                  : "Hola, mi cuenta de F7 Manager Pro fue suspendida y quiero reactivarla."
+                trial
+                  ? choosePlanMessage()
+                  : expired
+                    ? "Hola, el plan de mi cuenta de F7 Manager Pro venció y quiero renovarlo."
+                    : "Hola, mi cuenta de F7 Manager Pro fue suspendida y quiero reactivarla."
               )
             }
             className="w-full"
           >
-            {expired ? "Renovar mi plan" : "Contactar para reactivar"}
+            {trial ? "Elegir un plan" : expired ? "Renovar mi plan" : "Contactar para reactivar"}
           </Button>
           {expired && (
             <Button onClick={() => window.location.reload()} variant="secondary" className="w-full">
-              Ya renové, volver a entrar
+              {trial ? "Ya activé mi plan, volver a entrar" : "Ya renové, volver a entrar"}
             </Button>
           )}
           <Button onClick={signOut} variant="outline" className="w-full">
