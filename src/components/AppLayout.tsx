@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import QuickActionsFab from "@/components/QuickActionsFab";
 import WhatsAppOfferProvider from "@/components/WhatsAppOfferProvider";
 import PendingMessagesProvider from "@/components/PendingMessagesProvider";
+import PlanExpiryReminder from "@/components/PlanExpiryReminder";
 import { usePendingMessages } from "@/hooks/usePendingMessages";
 
 const baseNav = [
@@ -295,6 +296,7 @@ function AppLayoutContent() {
       </header>
 
       <main className="md:pl-64 pb-20 md:pb-0">
+        {isAdmin && canManageCompany && <PlanExpiryReminder />}
         <div className="mx-auto max-w-6xl p-4 md:p-8 animate-fade-in">
           <Outlet />
         </div>

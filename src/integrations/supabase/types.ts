@@ -296,6 +296,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          billing_cycle: string | null
           city: string | null
           commission_enabled: boolean
           country: string
@@ -310,6 +311,8 @@ export type Database = {
           logo_url: string | null
           name: string
           order_seq: number
+          plan_expires_at: string | null
+          plan_paid_from: string | null
           plan_type: string
           postsale_birthday_enabled: boolean
           postsale_review_enabled: boolean
@@ -333,6 +336,7 @@ export type Database = {
           whatsapp_queue_since: string
         }
         Insert: {
+          billing_cycle?: string | null
           city?: string | null
           commission_enabled?: boolean
           country?: string
@@ -347,6 +351,8 @@ export type Database = {
           logo_url?: string | null
           name: string
           order_seq?: number
+          plan_expires_at?: string | null
+          plan_paid_from?: string | null
           plan_type?: string
           postsale_birthday_enabled?: boolean
           postsale_review_enabled?: boolean
@@ -370,6 +376,7 @@ export type Database = {
           whatsapp_queue_since?: string
         }
         Update: {
+          billing_cycle?: string | null
           city?: string | null
           commission_enabled?: boolean
           country?: string
@@ -384,6 +391,8 @@ export type Database = {
           logo_url?: string | null
           name?: string
           order_seq?: number
+          plan_expires_at?: string | null
+          plan_paid_from?: string | null
           plan_type?: string
           postsale_birthday_enabled?: boolean
           postsale_review_enabled?: boolean

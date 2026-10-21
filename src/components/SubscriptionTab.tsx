@@ -6,15 +6,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Check, Crown, Clock } from "lucide-react";
+import { Sparkles, Check, Crown, Clock, CalendarClock, RefreshCw } from "lucide-react";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { PLAN_LABELS, PLAN_FEATURES, PRICING, PLAN_MESSAGES, TALLER_LADDER, type PlanType } from "@/lib/plans";
+import { usePlanExpiry } from "@/hooks/usePlanExpiry";
+import PlanExpiryBar from "@/components/PlanExpiryBar";
+import { CYCLE_LABELS } from "@/lib/subscriptionReceipt";
 
 const TRIAL_DAYS = 14;
 
 export default function SubscriptionTab() {
   const { companyId } = useCompany();
   const { plan, isStarter, isRetail } = usePlan();
+  const { info: expiry } = usePlanExpiry();
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState<string>("");
 
@@ -39,6 +43,12 @@ export default function SubscriptionTab() {
   const contact = (targetPlan: PlanType) => {
     openUpgradeWhatsApp(
       `${PLAN_MESSAGES[targetPlan]}${companyName ? ` (${companyName})` : ""}`,
+    );
+  };
+
+  const renew = () => {
+    openUpgradeWhatsApp(
+      `¡Hola! Quiero renovar mi Plan ${PLAN_LABELS[plan]} de F7 Manager Pro${companyName ? ` (${companyName})` : ""}.`,
     );
   };
 
@@ -71,8 +81,34 @@ export default function SubscriptionTab() {
             </div>
           </div>
 
-          {/* Trial — solo aplica mientras estás en Starter (el plan por defecto) */}
-          {isStarter && (
+          {/* Vencimiento del plan pagado: "Queda tanto para que venza tu plan" */}
+          {expiry && (
+            <div className="space-y-4 rounded-md border border-border bg-muted/30 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CalendarClock className={expiry.tone === "ok" ? "h-4 w-4 text-primary" : expiry.tone === "soon" ? "h-4 w-4 text-secondary" : "h-4 w-4 text-destructive"} />
+                  Vencimiento de tu plan
+                </div>
+                <Badge variant="outline">{CYCLE_LABELS[expiry.cycle]}</Badge>
+              </div>
+              <PlanExpiryBar info={expiry} variant="large" />
+              {expiry.tone !== "ok" && (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {expiry.tone === "expired"
+                      ? "Tu plan ya venció. Escribinos y lo renovamos."
+                      : "Tu plan está por vencer. Escribinos para renovarlo a tiempo."}
+                  </p>
+                  <Button onClick={renew} className="shrink-0 bg-secondary text-secondary-foreground hover:bg-secondary/90">
+                    <RefreshCw className="mr-2 h-4 w-4" /> Renovar mi plan
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Trial — solo aplica mientras estás en Starter (el plan por defecto) y no hay un pago registrado */}
+          {isStarter && !expiry && (
             <div className="space-y-2 rounded-md border border-border bg-muted/30 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-medium">

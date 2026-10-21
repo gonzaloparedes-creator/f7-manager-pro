@@ -824,7 +824,11 @@ export const tutorialCategories: TutorialCategory[] = [
       {
         id: "suscripcion",
         title: "Suscripción",
-        body: ["Información sobre tu plan actual y su facturación."],
+        body: [
+          "Acá ves tu plan actual y cuánto le queda: una barra con los días que faltan para que venza y la fecha de vencimiento. Va de turquesa (al día) a naranja (falta una semana o menos) y a rojo (ya venció).",
+          "Cuando falta una semana o menos, o ya venció, los administradores ven además un aviso fino arriba de la pantalla con el botón \"Ver mi plan\". Lo podés ocultar con la X y vuelve a aparecer en tu próxima sesión mientras siga pendiente.",
+          "El botón \"Renovar mi plan\" abre WhatsApp con el mensaje armado para coordinar el pago. El vencimiento es solo informativo: tu cuenta no se bloquea sola; si no ves ninguna fecha todavía, es que aún no se registró tu primer pago.",
+        ],
       },
     ],
   },

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,7 @@ import {
   type SubscriptionReceipt,
 } from "@/lib/subscriptionReceipt";
 import { downloadSubscriptionReceiptPdf } from "@/lib/subscriptionReceiptPdf";
+import { planExpiryInfo } from "@/lib/planExpiry";
 
 const db = supabase as any;
 
@@ -47,6 +48,9 @@ interface CompanyOption {
   id: string;
   name: string;
   plan_type: string;
+  billing_cycle: string | null;
+  plan_paid_from: string | null;
+  plan_expires_at: string | null;
 }
 
 interface FormState {
@@ -186,6 +190,8 @@ export default function SuperAdminReceipts() {
   const [voidReason, setVoidReason] = useState("");
   const [voiding, setVoiding] = useState(false);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const prefilledRef = useRef(false);
   // El logo viaja dentro del recibo (imagen incrustada): no depende de volver a pedirlo al servidor.
   const [logoSrc, setLogoSrc] = useState<string>(() => f7LogoUrl());
 
@@ -202,7 +208,7 @@ export default function SuperAdminReceipts() {
   const load = useCallback(async () => {
     setLoading(true);
     const [companiesRes, receiptsRes] = await Promise.all([
-      db.from("companies").select("id, name, plan_type").order("name"),
+      db.from("companies").select("id, name, plan_type, billing_cycle, plan_paid_from, plan_expires_at").order("name"),
       db.from("subscription_receipts").select("*").order("created_at", { ascending: false }).limit(500),
     ]);
     if (companiesRes.error) toast.error("No se pudieron cargar las empresas");
@@ -222,6 +228,26 @@ export default function SuperAdminReceipts() {
   useEffect(() => {
     if (isSuperAdmin) void load();
   }, [isSuperAdmin, load]);
+
+  // Venir desde "Pagado" (/superadmin/recibos?empresa=<id>) deja el recibo armado con el período registrado.
+  useEffect(() => {
+    const companyId = searchParams.get("empresa");
+    if (!companyId || prefilledRef.current || companies.length === 0) return;
+    const company = companies.find((c) => c.id === companyId);
+    if (!company) return;
+    prefilledRef.current = true;
+    const plan = PLAN_ORDER.includes(company.plan_type as PlanType) ? (company.plan_type as PlanType) : "pro";
+    const period = planExpiryInfo(company);
+    setForm((prev) => ({
+      ...prev,
+      company_id: company.id,
+      customer_name: company.name,
+      plan_type: plan,
+      ...(period ? { billing_cycle: period.cycle, period_start: period.paidFrom, period_end: period.expiresAt } : {}),
+    }));
+    if (period) setTouched((prev) => ({ ...prev, period_end: true }));
+    setSearchParams({}, { replace: true });
+  }, [companies, searchParams, setSearchParams]);
 
   const suggestedAmount = defaultAmount(form.plan_type, form.billing_cycle, form.currency);
   const amountText = touched.amount ? form.amount : amountToInput(suggestedAmount, form.currency);
