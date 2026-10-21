@@ -62,7 +62,7 @@ function AppLayoutContent() {
   const { isAdmin } = useUserRole();
   const { canViewProducts, canViewGastos, canViewCaja, canManageCompany } = useStaffPermissions();
   const { isSuperAdmin } = useSuperAdmin();
-  const { isActive, loading: statusLoading } = useCompanyStatus();
+  const { isActive, reason: suspensionReason, expiresAt: planExpiresAt, loading: statusLoading } = useCompanyStatus();
   const { isStarter, isBusiness, isRetail, loading: planLoading } = usePlan();
   const hasExternalInventory = isBusiness || isRetail;
   const navigate = useNavigate();
@@ -112,7 +112,7 @@ function AppLayoutContent() {
   }
 
   if (isActive === false && !isSuperAdmin) {
-    return <SuspendedAccount />;
+    return <SuspendedAccount reason={suspensionReason ?? "manual"} expiresAt={planExpiresAt} />;
   }
 
   // Nueva orden es una pantalla completa por pasos: sin sidebar, barra
@@ -296,7 +296,8 @@ function AppLayoutContent() {
       </header>
 
       <main className="md:pl-64 pb-20 md:pb-0">
-        {isAdmin && canManageCompany && <PlanExpiryReminder />}
+        {/* En el tablero principal el aviso es la tarjeta grande de Dashboard; la franja fina es para el resto de las pantallas. */}
+        {isAdmin && canManageCompany && pathname !== "/dashboard" && <PlanExpiryReminder />}
         <div className="mx-auto max-w-6xl p-4 md:p-8 animate-fade-in">
           <Outlet />
         </div>

@@ -10,6 +10,9 @@ import { BarChart3, MapPin, Smartphone, AlertTriangle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { countryLabel } from "@/lib/locations";
 import { monthKey, monthLabel, lastMonths, daysSince } from "@/lib/dateBuckets";
+import { planExpiryInfo } from "@/lib/planExpiry";
+import { todayInAsuncion } from "@/lib/subscriptionReceipt";
+import { usePlanGraceDays } from "@/hooks/usePlanGraceDays";
 
 interface CompanyRow {
   id: string;
@@ -22,6 +25,9 @@ interface CompanyRow {
   country: string;
   department: string | null;
   city: string | null;
+  billing_cycle: string | null;
+  plan_paid_from: string | null;
+  plan_expires_at: string | null;
 }
 interface OrderRow { company_id: string; created_at: string; device_type: string }
 
@@ -40,6 +46,7 @@ export default function SuperAdminMetrics() {
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const graceDays = usePlanGraceDays();
 
   useEffect(() => { document.title = "Panel de Métricas — F7 Manager Pro"; }, []);
 
@@ -53,7 +60,7 @@ export default function SuperAdminMetrics() {
     const [{ data: companiesData, error }, { data: ordersData }] = await Promise.all([
       supabase
         .from("companies")
-        .select("id, name, created_at, plan_type, is_active, founder_cohort, is_paying, country, department, city")
+        .select("id, name, created_at, plan_type, is_active, founder_cohort, is_paying, country, department, city, billing_cycle, plan_paid_from, plan_expires_at")
         .order("created_at", { ascending: false }),
       supabase.from("orders").select("company_id, created_at, device_type"),
     ]);
@@ -69,15 +76,27 @@ export default function SuperAdminMetrics() {
 
   const months = useMemo(() => lastMonths(6), []);
 
+  // Activa = no suspendida a mano y sin el plan vencido más allá de la gracia.
+  const operational = useMemo(() => {
+    const today = todayInAsuncion();
+    const ids = new Set<string>();
+    companies.forEach((c) => {
+      if (!c.is_active) return;
+      if (planExpiryInfo(c, today, graceDays)?.phase === "suspended") return;
+      ids.add(c.id);
+    });
+    return ids;
+  }, [companies, graceDays]);
+
   const summary = useMemo(() => {
     const thisMonth = months[months.length - 1];
     return {
       total: companies.length,
-      active: companies.filter((c) => c.is_active).length,
+      active: operational.size,
       paying: companies.filter((c) => c.is_paying).length,
       newThisMonth: companies.filter((c) => monthKey(c.created_at) === thisMonth).length,
     };
-  }, [companies, months]);
+  }, [companies, months, operational]);
 
   const companiesByMonth = useMemo(() => {
     const counts = new Map<string, number>();
@@ -144,7 +163,7 @@ export default function SuperAdminMetrics() {
       if (!cur || o.created_at > cur) lastOrder.set(o.company_id, o.created_at);
     });
     return companies
-      .filter((c) => c.is_active)
+      .filter((c) => operational.has(c.id))
       .map((c) => {
         const last = lastOrder.get(c.id) ?? null;
         const days = last ? daysSince(last) : daysSince(c.created_at);
@@ -152,7 +171,7 @@ export default function SuperAdminMetrics() {
       })
       .filter((c) => c.days > 30)
       .sort((a, b) => b.days - a.days);
-  }, [companies, orders]);
+  }, [companies, orders, operational]);
 
   if (roleLoading) {
     return (

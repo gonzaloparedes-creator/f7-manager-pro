@@ -14,3 +14,7 @@ export function openUpgradeWhatsApp(customMessage?: string) {
   const url = `https://wa.me/${UPGRADE_PHONE}?text=${encodeURIComponent(msg)}`;
   window.open(url, "_blank", "noopener,noreferrer");
 }
+
+export function renewPlanMessage(planLabel: string, companyName?: string | null): string {
+  return `¡Hola! Quiero renovar mi Plan ${planLabel} de F7 Manager Pro${companyName ? ` (${companyName})` : ""}.`;
+}

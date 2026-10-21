@@ -1,35 +1,18 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useCompany } from "@/hooks/useCompany";
+import { useCompanyAccess } from "@/hooks/useCompanyAccess";
 
+export type SuspensionReason = "manual" | "expired";
+
+// isActive === false significa "bloqueada": suspendida a mano o con el plazo vencido.
+// Si no se pudo leer el estado, no se bloquea (isActive = true).
 export function useCompanyStatus() {
-  const { companyId, loading: companyLoading } = useCompany();
-  const [isActive, setIsActive] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { access, loading } = useCompanyAccess();
 
-  useEffect(() => {
-    let active = true;
-    if (companyLoading) return;
-    if (!companyId) {
-      setIsActive(true);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    supabase
-      .from("companies")
-      .select("is_active")
-      .eq("id", companyId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!active) return;
-        setIsActive((data as any)?.is_active ?? true);
-        setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [companyId, companyLoading]);
+  const reason: SuspensionReason | null = !access || !access.blocked ? null : !access.isActive ? "manual" : "expired";
 
-  return { isActive, loading: loading || companyLoading };
+  return {
+    isActive: loading ? null : access ? !access.blocked : true,
+    reason,
+    expiresAt: access?.period.plan_expires_at ?? null,
+    loading,
+  };
 }

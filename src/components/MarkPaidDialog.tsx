@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { CalendarCheck, Loader2 } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -19,6 +20,7 @@ import {
   todayInAsuncion,
 } from "@/lib/subscriptionReceipt";
 import { planExpiryInfo, renewalStart, suggestedExpiry } from "@/lib/planExpiry";
+import { usePlanGraceDays } from "@/hooks/usePlanGraceDays";
 
 const PLAN_ORDER: PlanType[] = ["starter", "pro", "business", "retail"];
 const CYCLES: Cycle[] = ["mensual", "semestral", "anual"];
@@ -69,6 +71,7 @@ function MarkPaidForm({
   onSaved: MarkPaidDialogProps["onSaved"];
 }) {
   const navigate = useNavigate();
+  const graceDays = usePlanGraceDays();
   const today = useMemo(() => todayInAsuncion(), []);
   const continueFrom = useMemo(() => renewalStart(company.plan_expires_at, today), [company.plan_expires_at, today]);
   const canContinue = continueFrom !== today;
@@ -83,6 +86,7 @@ function MarkPaidForm({
   const [reactivate, setReactivate] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [ackLapsed, setAckLapsed] = useState(false);
 
   const fromValid = isValidISODate(paidFrom);
   const expiresAt = expiresOverride ?? (fromValid ? suggestedExpiry(paidFrom, cycle) : "");
@@ -97,21 +101,35 @@ function MarkPaidForm({
     () =>
       error
         ? null
-        : planExpiryInfo({ billing_cycle: cycle, plan_paid_from: paidFrom, plan_expires_at: expiresAt }, today),
-    [error, cycle, paidFrom, expiresAt, today]
+        : planExpiryInfo({ billing_cycle: cycle, plan_paid_from: paidFrom, plan_expires_at: expiresAt }, today, graceDays),
+    [error, cycle, paidFrom, expiresAt, today, graceDays]
   );
+
+  // Estado actual de la empresa (antes de guardar): si hoy está bloqueada por vencimiento, el pago la destraba.
+  const currentInfo = useMemo(
+    () =>
+      planExpiryInfo(
+        { billing_cycle: company.billing_cycle, plan_paid_from: company.plan_paid_from, plan_expires_at: company.plan_expires_at },
+        today,
+        graceDays
+      ),
+    [company.billing_cycle, company.plan_paid_from, company.plan_expires_at, today, graceDays]
+  );
+  const wouldBeSuspended = preview?.phase === "suspended";
 
   const changeFrom = (value: string) => {
     setPaidFrom(value);
     setExpiresOverride(null);
+    setAckLapsed(false);
   };
   const changeCycle = (value: Cycle) => {
     setCycle(value);
     setExpiresOverride(null);
+    setAckLapsed(false);
   };
 
   const save = async () => {
-    if (error) return;
+    if (error || (wouldBeSuspended && !ackLapsed)) return;
     setSaving(true);
     const patch: PaymentPatch = {
       plan_type: plan,
@@ -233,6 +251,36 @@ function MarkPaidForm({
           )
         )}
 
+        {preview && preview.phase === "suspended" && (
+          <div role="alert" className="space-y-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm">
+            <div className="flex gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <p>
+                <span className="font-semibold text-destructive">Este período ya terminó.</span> El acceso llegó hasta el{" "}
+                {formatDateISO(preview.accessUntil)}: si lo guardás así, la cuenta queda suspendida ahora mismo. Si el cliente
+                pagó más recientemente, corregí la fecha de pago.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="pay-ack" checked={ackLapsed} onCheckedChange={(v) => setAckLapsed(v === true)} />
+              <Label htmlFor="pay-ack" className="text-sm font-normal">
+                Entiendo que la cuenta quedará suspendida
+              </Label>
+            </div>
+          </div>
+        )}
+        {preview && preview.phase === "grace" && (
+          <p className="rounded-lg border border-secondary/50 bg-secondary/10 p-3 text-sm">
+            <span className="font-semibold text-secondary">Este período ya venció.</span> La cuenta sigue funcionando
+            hasta el {formatDateISO(preview.accessUntil)} y después se suspende sola.
+          </p>
+        )}
+        {preview && preview.phase === "active" && currentInfo?.phase === "suspended" && (
+          <p className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm">
+            Hoy la cuenta está suspendida por vencimiento: al guardar este pago vuelve a funcionar sola.
+          </p>
+        )}
+
         {(!company.is_paying || !company.is_active) && (
           <div className="space-y-3 rounded-lg border border-border p-3">
             {!company.is_paying && (
@@ -267,7 +315,7 @@ function MarkPaidForm({
         )}
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button type="button" onClick={save} disabled={saving || !!error}>
+          <Button type="button" onClick={save} disabled={saving || !!error || (wouldBeSuspended && !ackLapsed)}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Registrar pago
           </Button>
@@ -278,7 +326,11 @@ function MarkPaidForm({
         open={confirmClear}
         onOpenChange={setConfirmClear}
         title="¿Borrar las fechas de pago?"
-        description={`${company.name} vuelve a quedar sin período registrado (no se toca el plan ni el estado de la cuenta). Los recibos ya emitidos no cambian.`}
+        description={`${company.name} vuelve a quedar sin período registrado (no se toca el plan ni la suspensión manual). Los recibos ya emitidos no cambian.${
+          currentInfo && currentInfo.phase !== "active"
+            ? " Atención: sin fechas la cuenta deja de controlarse por vencimiento, así que recupera el acceso."
+            : ""
+        }`}
         confirmLabel="Borrar fechas"
         confirmingLabel="Borrando..."
         loading={saving}

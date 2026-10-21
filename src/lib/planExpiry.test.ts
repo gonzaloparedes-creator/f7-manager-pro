@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  accessHeadline,
+  DEFAULT_GRACE_DAYS,
   diffDaysISO,
+  expiryPhase,
   expiryHeadline,
   expirySortKey,
   expiryTone,
@@ -158,5 +161,73 @@ describe("filtros y orden", () => {
     expect(sorted[1]).toBe(expirySortKey(soon));
     expect(sorted[2]).toBe(expirySortKey(ok));
     expect(sorted[3]).toBe(Number.POSITIVE_INFINITY);
+  });
+});
+
+describe("suspensión automática (vencimiento + gracia)", () => {
+  // Vence el 24/10 con 3 días de gracia: acceso hasta el 27/10, bloqueada desde el 28/10.
+  const period = row("2026-09-25", "2026-10-24");
+  const at = (today: string, grace = 3) => planExpiryInfo(period, today, grace)!;
+
+  it("la gracia por defecto es de 3 días", () => {
+    expect(DEFAULT_GRACE_DAYS).toBe(3);
+    expect(planExpiryInfo(period, "2026-10-21")!.graceDays).toBe(3);
+  });
+
+  it("calcula el último día de acceso", () => {
+    expect(at("2026-10-21").accessUntil).toBe("2026-10-27");
+    expect(at("2026-10-21", 0).accessUntil).toBe("2026-10-24");
+    expect(at("2026-10-21", 7).accessUntil).toBe("2026-10-31");
+  });
+
+  it("antes y el día del vencimiento sigue activa", () => {
+    expect(at("2026-10-21").phase).toBe("active");
+    expect(at("2026-10-24").phase).toBe("active");
+    expect(at("2026-10-24").daysToSuspension).toBe(3);
+  });
+
+  it("después del vencimiento entra en gracia hasta el último día de acceso", () => {
+    expect(at("2026-10-25").phase).toBe("grace");
+    expect(at("2026-10-25").tone).toBe("expired");
+    expect(at("2026-10-27").phase).toBe("grace");
+    expect(at("2026-10-27").daysToSuspension).toBe(0);
+  });
+
+  it("al día siguiente del último día de acceso queda suspendida", () => {
+    expect(at("2026-10-28").phase).toBe("suspended");
+    expect(at("2026-10-28").daysToSuspension).toBe(-1);
+    expect(at("2026-11-30").phase).toBe("suspended");
+  });
+
+  it("sin gracia se suspende el día después de vencer", () => {
+    expect(at("2026-10-24", 0).phase).toBe("active");
+    expect(at("2026-10-25", 0).phase).toBe("suspended");
+  });
+
+  it("una gracia negativa o con decimales se normaliza", () => {
+    expect(at("2026-10-25", -2).accessUntil).toBe("2026-10-24");
+    expect(at("2026-10-25", 2.9).accessUntil).toBe("2026-10-26");
+  });
+
+  it("expiryPhase solo mira los días", () => {
+    expect(expiryPhase(5, 8)).toBe("active");
+    expect(expiryPhase(0, 3)).toBe("active");
+    expect(expiryPhase(-1, 2)).toBe("grace");
+    expect(expiryPhase(-4, 0)).toBe("grace");
+    expect(expiryPhase(-5, -1)).toBe("suspended");
+  });
+
+  it("redacta cuánto acceso queda", () => {
+    expect(accessHeadline(-1, "2026-10-27")).toBe("Cuenta suspendida");
+    expect(accessHeadline(0, "2026-10-27")).toBe("Hoy es tu último día de acceso");
+    expect(accessHeadline(1, "2026-10-27")).toBe("Mañana es tu último día de acceso");
+    expect(accessHeadline(3, "2026-10-27")).toBe("Acceso hasta el 27/10/2026");
+  });
+
+  it("cruza el fin de mes y de año", () => {
+    const p = row("2026-12-01", "2026-12-30");
+    expect(planExpiryInfo(p, "2026-12-31", 3)!.accessUntil).toBe("2027-01-02");
+    expect(planExpiryInfo(p, "2027-01-02", 3)!.phase).toBe("grace");
+    expect(planExpiryInfo(p, "2027-01-03", 3)!.phase).toBe("suspended");
   });
 });

@@ -826,8 +826,9 @@ export const tutorialCategories: TutorialCategory[] = [
         title: "Suscripción",
         body: [
           "Acá ves tu plan actual y cuánto le queda: una barra con los días que faltan para que venza y la fecha de vencimiento. Va de turquesa (al día) a naranja (falta una semana o menos) y a rojo (ya venció).",
-          "Cuando falta una semana o menos, o ya venció, los administradores ven además un aviso fino arriba de la pantalla con el botón \"Ver mi plan\". Lo podés ocultar con la X y vuelve a aparecer en tu próxima sesión mientras siga pendiente.",
-          "El botón \"Renovar mi plan\" abre WhatsApp con el mensaje armado para coordinar el pago. El vencimiento es solo informativo: tu cuenta no se bloquea sola; si no ves ninguna fecha todavía, es que aún no se registró tu primer pago.",
+          "Cuando falta una semana o menos, los administradores ven una tarjeta naranja arriba del Inicio con la barra de días y el botón \"Renovar mi plan\". Podés ocultarla con la X; vuelve a aparecer en tu próxima sesión mientras siga pendiente. En el resto de las pantallas ves una franja fina con el mismo aviso.",
+          "Si el plan se vence (mensual, semestral o anual), tenés 3 días de gracia para renovarlo: la cuenta sigue funcionando y el aviso pasa a rojo diciendo hasta qué día tenés acceso. Pasado ese plazo la cuenta se suspende sola: ves una pantalla \"Tu plan venció\", no se pueden cargar datos nuevos y la vitrina online deja de mostrarse. Tus datos quedan guardados.",
+          "Apenas se registra tu pago, la cuenta vuelve a funcionar sola (tocá \"Ya renové, volver a entrar\" si seguías en la pantalla de suspensión). El botón \"Renovar mi plan\" abre WhatsApp con el mensaje armado para coordinar el pago. Si todavía no ves ninguna fecha, es que aún no se registró tu primer pago y la cuenta no se bloquea por vencimiento.",
         ],
       },
     ],

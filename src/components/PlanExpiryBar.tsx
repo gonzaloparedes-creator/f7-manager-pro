@@ -87,7 +87,9 @@ export default function PlanExpiryBar({ info, variant = "compact", className }: 
       <div className={cn("space-y-1.5", className)}>
         <div className="flex items-baseline justify-between gap-3">
           <span className={cn("text-sm font-semibold", styles.text)}>{info.headline}</span>
-          <span className="whitespace-nowrap text-xs text-muted-foreground">Vence {formatDateISO(info.expiresAt)}</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
+            {info.daysLeft < 0 ? "Venció" : "Vence"} {formatDateISO(info.expiresAt)}
+          </span>
         </div>
         <ExpiryTrack info={info} thick={false} />
       </div>
@@ -115,7 +117,9 @@ export default function PlanExpiryBar({ info, variant = "compact", className }: 
       <ExpiryTrack info={info} thick />
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>Desde {formatDateISO(info.paidFrom)}</span>
-        <span className="text-right">Vence {formatDateISO(info.expiresAt)}</span>
+        <span className="text-right">
+          {info.daysLeft < 0 ? "Venció" : "Vence"} {formatDateISO(info.expiresAt)}
+        </span>
       </div>
     </div>
   );

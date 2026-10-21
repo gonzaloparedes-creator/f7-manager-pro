@@ -2,6 +2,7 @@ import type { Cycle } from "@/lib/plans";
 import {
   addDaysISO,
   computePeriodEnd,
+  formatDateISO,
   isValidISODate,
   todayInAsuncion,
 } from "@/lib/subscriptionReceipt";
@@ -9,7 +10,13 @@ import {
 // Cuántos días antes del vencimiento la barra pasa a naranja y se avisa.
 export const EXPIRY_WARNING_DAYS = 7;
 
+// Mientras no se sepa el valor real (lo define la base: plan_grace_days()).
+export const DEFAULT_GRACE_DAYS = 3;
+
 export type ExpiryTone = "ok" | "soon" | "expired";
+
+// active = plan vigente; grace = venció pero todavía hay acceso; suspended = acceso cortado.
+export type ExpiryPhase = "active" | "grace" | "suspended";
 
 // Lo que guarda companies: el período vigente (último pago registrado).
 export interface PlanPeriodRow {
@@ -29,6 +36,12 @@ export interface PlanExpiryInfo {
   remainingPct: number;
   tone: ExpiryTone;
   headline: string;
+  graceDays: number;
+  // Último día con acceso: vencimiento + días de gracia (inclusive).
+  accessUntil: string;
+  // Días hasta el último día de acceso (0 = hoy es el último); negativo = ya suspendida.
+  daysToSuspension: number;
+  phase: ExpiryPhase;
 }
 
 const DAY_MS = 86_400_000;
@@ -61,8 +74,25 @@ export function expiryTone(daysLeft: number): ExpiryTone {
   return "ok";
 }
 
+export function expiryPhase(daysLeft: number, daysToSuspension: number): ExpiryPhase {
+  if (daysLeft >= 0) return "active";
+  return daysToSuspension >= 0 ? "grace" : "suspended";
+}
+
+// "Hoy es tu último día de acceso" / "Mañana es tu último día de acceso" / "Acceso hasta el 27/10/2026".
+export function accessHeadline(daysToSuspension: number, accessUntil: string): string {
+  if (daysToSuspension < 0) return "Cuenta suspendida";
+  if (daysToSuspension === 0) return "Hoy es tu último día de acceso";
+  if (daysToSuspension === 1) return "Mañana es tu último día de acceso";
+  return `Acceso hasta el ${formatDateISO(accessUntil)}`;
+}
+
 // null = la empresa todavía no tiene un pago registrado.
-export function planExpiryInfo(row: PlanPeriodRow, today: string = todayInAsuncion()): PlanExpiryInfo | null {
+export function planExpiryInfo(
+  row: PlanPeriodRow,
+  today: string = todayInAsuncion(),
+  graceDays: number = DEFAULT_GRACE_DAYS
+): PlanExpiryInfo | null {
   const { billing_cycle, plan_paid_from, plan_expires_at } = row;
   if (!isCycle(billing_cycle) || !plan_paid_from || !plan_expires_at) return null;
   const paidFrom = plan_paid_from.slice(0, 10);
@@ -72,6 +102,9 @@ export function planExpiryInfo(row: PlanPeriodRow, today: string = todayInAsunci
   const daysLeft = diffDaysISO(today, expiresAt);
   const totalDays = diffDaysISO(paidFrom, expiresAt) + 1;
   const remainingPct = Math.min(100, Math.max(0, Math.round(((daysLeft + 1) / totalDays) * 100)));
+  const grace = Math.max(0, Math.floor(graceDays));
+  const accessUntil = addDaysISO(expiresAt, grace);
+  const daysToSuspension = diffDaysISO(today, accessUntil);
 
   return {
     cycle: billing_cycle,
@@ -82,6 +115,10 @@ export function planExpiryInfo(row: PlanPeriodRow, today: string = todayInAsunci
     remainingPct,
     tone: expiryTone(daysLeft),
     headline: expiryHeadline(daysLeft),
+    graceDays: grace,
+    accessUntil,
+    daysToSuspension,
+    phase: expiryPhase(daysLeft, daysToSuspension),
   };
 }
 

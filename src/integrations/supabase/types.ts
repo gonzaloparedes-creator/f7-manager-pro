@@ -1850,6 +1850,20 @@ export type Database = {
         }[]
       }
       get_user_branch: { Args: { _user_id: string }; Returns: string }
+      get_my_company_access: {
+        Args: never
+        Returns: {
+          access_until: string
+          billing_cycle: string
+          blocked: boolean
+          grace_days: number
+          is_active: boolean
+          lapsed: boolean
+          plan_expires_at: string
+          plan_paid_from: string
+          today: string
+        }[]
+      }
       get_user_company: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -1860,6 +1874,11 @@ export type Database = {
       }
       is_branch_restricted: { Args: { _user_id: string }; Returns: boolean }
       is_company_active: { Args: { _company_id: string }; Returns: boolean }
+      plan_grace_days: { Args: never; Returns: number }
+      plan_is_lapsed: {
+        Args: { _expires: string; _grace: number; _today: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       recurring_expense_is_due: {
         Args: {

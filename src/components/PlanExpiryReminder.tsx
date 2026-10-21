@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarClock, X } from "lucide-react";
 import { usePlanExpiry } from "@/hooks/usePlanExpiry";
+import { accessHeadline } from "@/lib/planExpiry";
 import { formatDateISO } from "@/lib/subscriptionReceipt";
 import { cn } from "@/lib/utils";
 
@@ -16,14 +17,15 @@ function wasDismissed(expiresAt: string): boolean {
 }
 
 // Aviso fino para quien administra la cuenta: solo aparece cuando falta una semana o menos (o ya venció).
+// Una vez vencido el plan (días de gracia) no se puede ocultar: la cuenta está por suspenderse.
 export default function PlanExpiryReminder() {
   const { info } = usePlanExpiry();
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
 
   if (!info || info.tone === "ok") return null;
-  if (dismissedFor === info.expiresAt || wasDismissed(info.expiresAt)) return null;
 
   const expired = info.tone === "expired";
+  if (!expired && (dismissedFor === info.expiresAt || wasDismissed(info.expiresAt))) return null;
 
   const dismiss = () => {
     try {
@@ -47,7 +49,9 @@ export default function PlanExpiryReminder() {
         <span className={cn("font-semibold", expired ? "text-destructive" : "text-secondary")}>{info.headline}</span>
         <span className="text-muted-foreground">
           {" · "}
-          {expired ? "tu plan venció el" : "tu plan vence el"} {formatDateISO(info.expiresAt)}
+          {expired
+            ? `${accessHeadline(info.daysToSuspension, info.accessUntil).toLowerCase()}, después se suspende la cuenta`
+            : `tu plan vence el ${formatDateISO(info.expiresAt)}`}
         </span>
       </p>
       <Link
@@ -56,14 +60,16 @@ export default function PlanExpiryReminder() {
       >
         Ver mi plan
       </Link>
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label="Ocultar aviso de vencimiento"
-        className="shrink-0 rounded-sm p-1 text-muted-foreground hover:text-foreground"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      {!expired && (
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Ocultar aviso de vencimiento"
+          className="shrink-0 rounded-sm p-1 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }

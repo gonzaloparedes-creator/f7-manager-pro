@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Check, Crown, Clock, CalendarClock, RefreshCw } from "lucide-react";
-import { openUpgradeWhatsApp } from "@/lib/upgrade";
+import { openUpgradeWhatsApp, renewPlanMessage } from "@/lib/upgrade";
 import { PLAN_LABELS, PLAN_FEATURES, PRICING, PLAN_MESSAGES, TALLER_LADDER, type PlanType } from "@/lib/plans";
 import { usePlanExpiry } from "@/hooks/usePlanExpiry";
 import PlanExpiryBar from "@/components/PlanExpiryBar";
-import { CYCLE_LABELS } from "@/lib/subscriptionReceipt";
+import { CYCLE_LABELS, formatDateISO } from "@/lib/subscriptionReceipt";
+import { accessHeadline } from "@/lib/planExpiry";
 
 const TRIAL_DAYS = 14;
 
@@ -47,9 +48,7 @@ export default function SubscriptionTab() {
   };
 
   const renew = () => {
-    openUpgradeWhatsApp(
-      `¡Hola! Quiero renovar mi Plan ${PLAN_LABELS[plan]} de F7 Manager Pro${companyName ? ` (${companyName})` : ""}.`,
-    );
+    openUpgradeWhatsApp(renewPlanMessage(PLAN_LABELS[plan], companyName));
   };
 
   // Próximos escalones disponibles arriba del plan actual (Starter -> Pro -> Business).
@@ -92,11 +91,16 @@ export default function SubscriptionTab() {
                 <Badge variant="outline">{CYCLE_LABELS[expiry.cycle]}</Badge>
               </div>
               <PlanExpiryBar info={expiry} variant="large" />
+              <p className="text-xs text-muted-foreground">
+                {expiry.graceDays > 0
+                  ? `Después del vencimiento tenés ${expiry.graceDays} ${expiry.graceDays === 1 ? "día" : "días"} para renovar (hasta el ${formatDateISO(expiry.accessUntil)}); si no, la cuenta se suspende sola.`
+                  : "Si el plan no se renueva a tiempo, la cuenta se suspende sola al día siguiente del vencimiento."}
+              </p>
               {expiry.tone !== "ok" && (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
                     {expiry.tone === "expired"
-                      ? "Tu plan ya venció. Escribinos y lo renovamos."
+                      ? `Tu plan ya venció. ${accessHeadline(expiry.daysToSuspension, expiry.accessUntil)}. Escribinos y lo renovamos.`
                       : "Tu plan está por vencer. Escribinos para renovarlo a tiempo."}
                   </p>
                   <Button onClick={renew} className="shrink-0 bg-secondary text-secondary-foreground hover:bg-secondary/90">

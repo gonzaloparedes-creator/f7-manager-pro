@@ -19,6 +19,7 @@ import NewBatchOrderDialog from "@/components/NewBatchOrderDialog";
 import DeliveryCalendarDialog from "@/components/DeliveryCalendarDialog";
 import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
 import EvolutionMigrationBanner from "@/components/EvolutionMigrationBanner";
+import PlanExpiryNotice from "@/components/PlanExpiryNotice";
 import OrderCard, { type OrderListItem } from "@/components/OrderCard";
 import OrdersBoard from "@/components/OrdersBoard";
 import { cn } from "@/lib/utils";
@@ -211,6 +212,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <PlanExpiryNotice />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">

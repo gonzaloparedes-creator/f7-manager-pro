@@ -26,6 +26,7 @@ import {
   type PlanExpiryInfo,
 } from "@/lib/planExpiry";
 import PlanExpiryBar from "@/components/PlanExpiryBar";
+import { usePlanGraceDays } from "@/hooks/usePlanGraceDays";
 import MarkPaidDialog, { type PaymentPatch } from "@/components/MarkPaidDialog";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -171,11 +172,12 @@ export default function MasterAdmin() {
   }
 
   const today = todayInAsuncion();
+  const graceDays = usePlanGraceDays();
   const infos = useMemo(() => {
     const map = new Map<string, PlanExpiryInfo | null>();
-    companies.forEach((c) => map.set(c.id, planExpiryInfo(c, today)));
+    companies.forEach((c) => map.set(c.id, planExpiryInfo(c, today, graceDays)));
     return map;
-  }, [companies, today]);
+  }, [companies, today, graceDays]);
 
   const counts = useMemo(() => {
     const result: Record<ExpiryFilter, number> = { todas: 0, vencidas: 0, "por-vencer": 0, "al-dia": 0, "sin-pago": 0 };
@@ -403,6 +405,7 @@ function CompanyCard({
   const planLabel = PLAN_LABELS[c.plan_type as PlanType] ?? c.plan_type;
   const cycleLabel = info ? CYCLE_LABELS[info.cycle as Cycle] : null;
   const createdIso = c.created_at.slice(0, 10);
+  const lapsed = info?.phase === "suspended";
   const panelId = `empresa-${c.id}`;
 
   return (
@@ -424,6 +427,7 @@ function CompanyCard({
                   <span className="break-words font-semibold leading-tight">{c.name}</span>
                   {c.founder_cohort && <Star className="h-3.5 w-3.5 shrink-0 fill-secondary text-secondary" aria-label="Fundador" />}
                   {!c.is_active && <Badge variant="destructive">Suspendida</Badge>}
+                  {c.is_active && lapsed && <Badge variant="destructive">Suspendida por vencimiento</Badge>}
                 </span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {planLabel}
@@ -468,6 +472,18 @@ function CompanyCard({
                   {info && cycleLabel && <DetailRow label="Ciclo">{cycleLabel}</DetailRow>}
                   {info && <DetailRow label="Pagó desde">{formatDateISO(info.paidFrom)}</DetailRow>}
                   {info && <DetailRow label="Vence">{formatDateISO(info.expiresAt)}</DetailRow>}
+                  {info && (
+                    <DetailRow label="Acceso hasta">
+                      {formatDateISO(info.accessUntil)}
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {lapsed
+                          ? "Bloqueada por vencimiento"
+                          : info.graceDays > 0
+                            ? `Incluye ${info.graceDays} ${info.graceDays === 1 ? "día" : "días"} de gracia`
+                            : "Sin días de gracia"}
+                      </span>
+                    </DetailRow>
+                  )}
                   <DetailRow label="Cliente que paga">
                     {c.is_paying ? <Badge>Sí</Badge> : <Badge variant="outline">No</Badge>}
                   </DetailRow>
@@ -500,7 +516,9 @@ function CompanyCard({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card p-3">
-                    <Label htmlFor={`${panelId}-activa`} className="text-sm">{c.is_active ? "Activa" : "Suspendida"}</Label>
+                    <Label htmlFor={`${panelId}-activa`} className="text-sm">
+                      {!c.is_active ? "Suspendida" : lapsed ? "Activa (vencida)" : "Activa"}
+                    </Label>
                     <Switch
                       id={`${panelId}-activa`}
                       checked={c.is_active}
