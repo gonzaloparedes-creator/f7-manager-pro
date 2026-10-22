@@ -2,6 +2,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DEFAULT_SERVICE_TERMS, formatPYG, STATUS_LABELS, type OrderStatus } from "@/lib/orders";
+import { receiptWarranty } from "@/lib/receiptWarranty";
 
 interface PrintOrder {
   order_number: string;
@@ -26,6 +27,7 @@ interface PrintOrder {
   checklist?: { label: string; status: "ok" | "fail" }[] | null;
   received_by_name?: string | null;
   warranty_days?: number | null;
+  delivered_at?: string | null;
 }
 
 interface PrintReceiptProps {
@@ -184,27 +186,64 @@ function InfoGrid({ order, statusLabel }: { order: PrintOrder; statusLabel?: str
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2 border-t border-black/30 pt-1 text-[11px]">
-        <div>
-          <div className="text-black/60">Presupuesto</div>
-          <div className="font-semibold">{formatPYG(order.quote_amount)}</div>
+      <div className="border-t border-black/30 pt-1 text-[11px]">
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <div className="text-black/60">Presupuesto</div>
+            <div className="font-semibold">{formatPYG(order.quote_amount)}</div>
+          </div>
+          <div>
+            <div className="text-black/60">Seña / Pagado</div>
+            <div className="font-semibold">{formatPYG(order.deposit_amount)}</div>
+          </div>
+          <div>
+            <div className="text-black/60">Saldo</div>
+            <div className="font-bold">{formatPYG(balance)}</div>
+          </div>
         </div>
-        <div>
-          <div className="text-black/60">Seña / Pagado</div>
-          <div className="font-semibold">{formatPYG(order.deposit_amount)}</div>
-        </div>
-        <div>
-          <div className="text-black/60">Saldo</div>
-          <div className="font-bold">{formatPYG(balance)}</div>
-        </div>
+        <WarrantyInfo order={order} />
       </div>
     </>
+  );
+}
+
+function WarrantyInfo({ order }: { order: PrintOrder }) {
+  const warranty = receiptWarranty(order);
+
+  if (warranty.kind === "none") {
+    return (
+      <div data-testid="receipt-warranty" className="mt-1">
+        <span className="text-black/60">Garantía: </span>
+        <span className="font-bold uppercase">Sin garantía</span>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="receipt-warranty" className="mt-1">
+      <span className="text-black/60">Garantía: </span>
+      <span className="font-semibold">{warranty.daysLabel} desde la entrega</span>
+      {warranty.endsOn ? (
+        <>
+          <span className="text-black/60"> · válida hasta </span>
+          <span className="font-bold">{warranty.endsOn}</span>
+          {warranty.estimated && <span className="text-black/60"> (estimada, se confirma al entregar)</span>}
+        </>
+      ) : (
+        <span className="text-black/60"> · el vencimiento se confirma al entregar el equipo</span>
+      )}
+    </div>
   );
 }
 
 export function PrintReceipt({ order, businessName, serviceTerms, statusLabel }: PrintReceiptProps) {
   const shopName = businessName?.trim() || "F7 Manager Pro";
   const trackingUrl = `${window.location.origin}/tracking/${order.tracking_token || order.order_number}`;
+  // Un párrafo por cláusula con separación corta, en vez de una línea en blanco entera, para ganar alto en la media hoja.
+  const termsParagraphs = (serviceTerms ?? DEFAULT_SERVICE_TERMS)
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   return (
     <div className="print-receipt">
@@ -280,8 +319,10 @@ export function PrintReceipt({ order, businessName, serviceTerms, statusLabel }:
 
         <div className="mt-2 border-t border-black/30 pt-1">
           <div className="text-[10px] font-semibold">Términos y condiciones</div>
-          <div className="mt-0.5 whitespace-pre-wrap text-[8px] leading-tight text-black/80">
-            {serviceTerms ?? DEFAULT_SERVICE_TERMS}
+          <div className="mt-0.5 space-y-1 text-[8px] leading-tight text-black/80">
+            {termsParagraphs.map((paragraph, i) => (
+              <p key={i} className="whitespace-pre-wrap">{paragraph}</p>
+            ))}
           </div>
         </div>
       </section>

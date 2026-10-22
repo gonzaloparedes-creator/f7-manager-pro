@@ -19,6 +19,7 @@ export default function ServiceTermsTab() {
   const { template, loading, reload } = useServiceTerms();
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [previewNoWarranty, setPreviewNoWarranty] = useState(false);
 
   useEffect(() => { if (!loading) setText(template); }, [loading, template]);
 
@@ -53,7 +54,9 @@ export default function ServiceTermsTab() {
         <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
           Usá <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{garantia_dias}}"}</code> en
           cualquier parte del texto para que se reemplace automáticamente por la garantía elegida
-          en cada orden (ej: "30 días").
+          en cada orden (ej: "30 días"). Si la orden se marca "Sin garantía", la línea que lleva
+          ese código se reemplaza entera por un aviso de que la reparación no tiene garantía, así que
+          dejá la cláusula de garantía en su propia línea.
         </div>
 
         {loading ? (
@@ -81,9 +84,31 @@ export default function ServiceTermsTab() {
             </div>
 
             <div className="space-y-2 border-t border-border pt-4">
-              <Label className="text-xs text-muted-foreground">Vista previa (con garantía de ejemplo: 30 días)</Label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label className="text-xs text-muted-foreground">
+                  Vista previa ({previewNoWarranty ? "orden sin garantía" : "con garantía de ejemplo: 30 días"})
+                </Label>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={previewNoWarranty ? "outline" : "secondary"}
+                    onClick={() => setPreviewNoWarranty(false)}
+                  >
+                    Con garantía
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={previewNoWarranty ? "secondary" : "outline"}
+                    onClick={() => setPreviewNoWarranty(true)}
+                  >
+                    Sin garantía
+                  </Button>
+                </div>
+              </div>
               <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 font-mono text-xs leading-relaxed">
-                {renderServiceTerms(text, 30)}
+                {renderServiceTerms(text, previewNoWarranty ? 0 : 30)}
               </div>
             </div>
           </>

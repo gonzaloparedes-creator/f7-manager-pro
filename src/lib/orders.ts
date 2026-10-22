@@ -232,10 +232,25 @@ export const DEFAULT_SERVICE_TERMS = `TÉRMINOS Y CONDICIONES DEL SERVICIO
 
 7. ACEPTACIÓN: La firma del presente documento implica la aceptación total de estas condiciones.`;
 
+const WARRANTY_PLACEHOLDER = "{{garantia_dias}}";
+
+export const NO_WARRANTY_CLAUSE =
+  "Esta reparación NO tiene garantía: se entrega sin cobertura sobre el trabajo realizado ni sobre los repuestos instalados.";
+
+// Con 0 días la línea que lleva el placeholder diría "cuenta con 0 días de
+// garantía", así que esa línea se reemplaza entera por NO_WARRANTY_CLAUSE,
+// conservando su número o título ("1. GARANTÍA: "). El resto del texto no se toca.
 export function renderServiceTerms(template: string, warrantyDays: number | null | undefined) {
   const days = Number(warrantyDays ?? 0);
-  const phrase = `${days} ${days === 1 ? "día" : "días"}`;
-  return template.replaceAll("{{garantia_dias}}", phrase);
+  if (days > 0) {
+    return template.replaceAll(WARRANTY_PLACEHOLDER, `${days} ${days === 1 ? "día" : "días"}`);
+  }
+  // Un texto de una sola línea no se puede recortar sin perder las demás condiciones.
+  if (!template.includes("\n")) return template.replaceAll(WARRANTY_PLACEHOLDER, "0 días (SIN GARANTÍA)");
+  return template.replace(/^[^\n]*\{\{garantia_dias\}\}[^\n]*$/gm, (line) => {
+    const lead = /^\s*(?:(?:[-•*]|\d+\s*[.)-])\s*)?(?:garant[ií]a[^:\n]{0,20}:\s*)?/i.exec(line)?.[0] ?? "";
+    return `${lead}${NO_WARRANTY_CLAUSE}`;
+  });
 }
 
 // Mensaje de WhatsApp por defecto para cada estado cuando la empresa nunca
