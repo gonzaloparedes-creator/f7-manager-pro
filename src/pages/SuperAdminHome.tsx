@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Globe2, Building2, Rocket, BarChart3, Receipt, BellRing } from "lucide-react";
+import { ShieldCheck, Globe2, Building2, Rocket, BarChart3, Receipt, BellRing, Landmark } from "lucide-react";
 
 export default function SuperAdminHome() {
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -53,6 +53,12 @@ export default function SuperAdminHome() {
       icon: Receipt,
       title: "Recibos de pagos",
       desc: "Generá e imprimí el recibo de lo que te paga cada negocio por su plan, con logo de F7, plan y fechas.",
+    },
+    {
+      to: "/superadmin/finanzas",
+      icon: Landmark,
+      title: "Finanzas F7",
+      desc: "Ingresos, gastos fijos y variables, y cuentas entre los dos socios: cuánto hay en caja y quién le debe a quién.",
     },
   ];
 
