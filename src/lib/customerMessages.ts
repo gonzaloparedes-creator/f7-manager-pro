@@ -26,7 +26,7 @@ export const MESSAGE_VARIABLES: {
   postSaleOnly?: boolean;
 }[] = [
   { key: "cliente", label: "Cliente", example: "Juan Pérez" },
-  { key: "equipo", label: "Equipo", example: "Celular" },
+  { key: "equipo", label: "Equipo", example: "Celular Samsung Galaxy S23" },
   { key: "orden", label: "N° de orden", example: "ORD-0001" },
   { key: "estado", label: "Estado", example: "Listo para retirar" },
   { key: "link", label: "Link de seguimiento", example: "https://f7manager.com/tracking/ORD-0001" },
@@ -144,6 +144,8 @@ export interface OrderMessageSource {
   alternative_phone?: string | null;
   secondary_phone?: string | null;
   device_type: string;
+  marca?: string | null;
+  modelo?: string | null;
   order_number: string;
   tracking_token: string;
   quote_amount?: number | null;
@@ -164,6 +166,20 @@ export function recipientPhone(order: OrderMessageSource): string | null {
   );
 }
 
+// "Celular Samsung Galaxy S23": el tipo solo ("Celular") no alcanza cuando un
+// cliente deja varios equipos. Si el modelo ya empieza con la marca
+// ("Samsung" + "Samsung Galaxy S23") no se repite.
+export function equipmentLabel(order: {
+  device_type: string;
+  marca?: string | null;
+  modelo?: string | null;
+}): string {
+  const marca = order.marca?.trim() ?? "";
+  const modelo = order.modelo?.trim() ?? "";
+  const brandInModel = marca !== "" && modelo.toLowerCase().startsWith(marca.toLowerCase());
+  return [order.device_type.trim(), brandInModel ? "" : marca, modelo].filter(Boolean).join(" ");
+}
+
 export function buildOrderMessageVars(
   order: OrderMessageSource,
   ctx: { taller: string; estado?: string }
@@ -174,7 +190,7 @@ export function buildOrderMessageVars(
   const days = Number(order.warranty_days ?? 0);
   return {
     cliente: order.customer_name,
-    equipo: order.device_type,
+    equipo: equipmentLabel(order),
     orden: order.order_number,
     estado: ctx.estado ?? "",
     link: trackingUrl(order.tracking_token),
@@ -188,11 +204,17 @@ export function buildOrderMessageVars(
 // Modo Lote: un solo mensaje por cliente con todos los equipos (cada uno con
 // su link, porque cada orden tiene su propio token de seguimiento).
 export function buildBatchCreatedMessage(
-  orders: { device_type: string; order_number: string; tracking_token: string }[],
+  orders: {
+    device_type: string;
+    marca?: string | null;
+    modelo?: string | null;
+    order_number: string;
+    tracking_token: string;
+  }[],
   ctx: { cliente: string; taller: string }
 ): string {
   const lines = orders.map(
-    (o) => `• ${o.device_type} — *${o.order_number}*\n  ${trackingUrl(o.tracking_token)}`
+    (o) => `• ${equipmentLabel(o)} — *${o.order_number}*\n  ${trackingUrl(o.tracking_token)}`
   );
   const where = ctx.taller ? ` en ${ctx.taller}` : "";
   return `¡Hola ${ctx.cliente}! Recibimos tus ${orders.length} equipos${where}:\n\n${lines.join("\n")}\n\nPodés seguir el estado de cada reparación desde esos links 🔧`;

@@ -40,7 +40,7 @@ export function useMoveOrder<T extends MovableOrder>(params: {
     if (!companyId) return;
     const { data: full } = await supabase
       .from("orders")
-      .select("customer_name, customer_phone, alternative_phone, secondary_phone, device_type, order_number, tracking_token, quote_amount, deposit_amount, cargos_adicionales, warranty_days, client_id")
+      .select("customer_name, customer_phone, alternative_phone, secondary_phone, device_type, marca, modelo, order_number, tracking_token, quote_amount, deposit_amount, cargos_adicionales, warranty_days, client_id")
       .eq("id", order.id)
       .eq("company_id", companyId)
       .maybeSingle();

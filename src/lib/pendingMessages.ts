@@ -135,7 +135,7 @@ type OrderRow = OrderMessageSource & {
 };
 
 const ORDER_FIELDS =
-  "id, status, client_id, order_number, tracking_token, customer_name, customer_phone, alternative_phone, secondary_phone, device_type, quote_amount, deposit_amount, cargos_adicionales, warranty_days, quote_response, quote_responded_at";
+  "id, status, client_id, order_number, tracking_token, customer_name, customer_phone, alternative_phone, secondary_phone, device_type, marca, modelo, quote_amount, deposit_amount, cargos_adicionales, warranty_days, quote_response, quote_responded_at";
 
 const QUOTE_EVENT_BY_RESPONSE: Record<string, MessageEventKey> = {
   aceptado: "presupuesto_aceptado",

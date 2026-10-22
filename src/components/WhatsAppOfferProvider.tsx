@@ -10,6 +10,7 @@ import AvisarTecnicoDialog from "@/components/AvisarTecnicoDialog";
 import {
   buildBatchCreatedMessage,
   buildOrderMessageVars,
+  equipmentLabel,
   notifyMessageQueueChanged,
   recipientPhone,
   renderMessage,
@@ -59,7 +60,7 @@ async function prepareOffers(companyId: string, userId: string | null, request: 
   const ordersRes = await supabase
     .from("orders")
     .select(
-      "id, status, client_id, order_number, tracking_token, customer_name, customer_phone, alternative_phone, secondary_phone, device_type, quote_amount, deposit_amount, cargos_adicionales, warranty_days, assigned_technician_id"
+      "id, status, client_id, order_number, tracking_token, customer_name, customer_phone, alternative_phone, secondary_phone, device_type, marca, modelo, quote_amount, deposit_amount, cargos_adicionales, warranty_days, assigned_technician_id"
     )
     .eq("company_id", companyId)
     .in("id", request.orderIds);
@@ -142,7 +143,7 @@ async function prepareClientOffer(
     },
     ...orders.map((o) => ({
       key: o.id,
-      label: `Solo ${o.device_type} (${o.order_number})`,
+      label: `Solo ${equipmentLabel(o)} (${o.order_number})`,
       message: messageFor(o),
       eventKey: request.event,
       orderId: o.id,
