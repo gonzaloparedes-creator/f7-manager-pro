@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { openUpgradeWhatsApp, GENERAL_INTEREST_MESSAGE } from "@/lib/upgrade";
-import { OFFER_GUARANTEE_DAYS } from "@/lib/ofertaOffer";
+import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { PricingSection } from "@/components/PricingSection";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { Rich } from "@/i18n/Rich";
+import { useLanguage } from "@/i18n/useLanguage";
+import { stripRich } from "@/i18n/parseRich";
+import { usePageMeta } from "@/i18n/usePageMeta";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertTriangle,
@@ -24,73 +28,59 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-// La misma oferta que /oferta: no hay prueba gratis, hay garantía de devolución.
-const GUARANTEE = `${OFFER_GUARANTEE_DAYS} días`;
-const CTA_LABEL = `Empezar con garantía de ${GUARANTEE}`;
+// Los textos viven en src/i18n/dictionaries (es, en, pt); acá quedan los íconos y los colores.
+const PAIN_CARDS = [
+  { key: "leaks", icon: Wallet, accent: "text-secondary" },
+  { key: "chaos", icon: ClipboardList, accent: "text-primary" },
+  { key: "warranty", icon: ShieldCheck, accent: "text-destructive" },
+] as const;
 
-const painCards = [
-  {
-    icon: Wallet,
-    title: "Fugas de Dinero",
-    teaser: "¿Seguro que ganaste en esa pantalla genérica?",
-    detail:
-      "Olvidar los costos ocultos te está matando. Sin un control real de repuestos en Gs., cada reparación puede ser una pérdida silenciosa.",
-    accent: "text-secondary",
-  },
-  {
-    icon: ClipboardList,
-    title: "Caos Operativo",
-    teaser: "WhatsApp no es una herramienta de gestión.",
-    detail:
-      "Si un técnico se va, se lleva la información operativa contigo. Órdenes perdidas, clientes molestos y estado real del taller: invisible.",
-    accent: "text-primary",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Problemas de Garantía",
-    teaser: "El cliente dice que fue ayer, pero fue hace 40 días.",
-    detail:
-      "¿Cómo lo compruebas sin fotos, firmas ni fechas exactas? Una sola discusión por garantía te cuesta más que un mes de F7 Manager Pro.",
-    accent: "text-destructive",
-  },
-];
+const FEATURE_CARDS = [
+  { key: "alerts", icon: MessageSquare },
+  { key: "warranty", icon: ShieldCheck },
+  { key: "photos", icon: Camera },
+  { key: "profit", icon: TrendingUp },
+] as const;
 
-const features = [
-  {
-    icon: MessageSquare,
-    title: "Avisos Inteligentes",
-    desc: "Si el cliente deja su celular en el taller, F7 sabe a qué número alternativo enviar el WhatsApp. Automatización pura.",
-    demo: (
+export default function Presentacion() {
+  const [openCard, setOpenCard] = useState<number | null>(null);
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const { t, gs } = useLanguage();
+  const h = t.home;
+
+  usePageMeta(stripRich(h.meta.title), h.meta.description);
+
+  useEffect(() => {
+    if (!loading && user) navigate("/dashboard", { replace: true });
+  }, [user, loading, navigate]);
+
+  const contact = (message: string = h.whatsapp) => openUpgradeWhatsApp(message);
+  const goToPricing = () =>
+    document.getElementById("pricing-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const featureDemos: Record<(typeof FEATURE_CARDS)[number]["key"], ReactNode> = {
+    alerts: (
       <div className="space-y-2 text-xs">
         <div className="rounded-md bg-muted/50 px-3 py-2 text-muted-foreground line-through">
-          +595 981 111 111 (principal — en taller)
+          {h.features.alerts.primary}
         </div>
         <div className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-primary">
-          ✓ +595 982 222 222 (alternativo — esposa)
+          {h.features.alerts.alternative}
         </div>
       </div>
     ),
-  },
-  {
-    icon: ShieldCheck,
-    title: "Garantía Segura",
-    desc: "El reloj de la garantía arranca cuando el cliente retira el equipo. Olvídate de los malentendidos.",
-    demo: (
+    warranty: (
       <div className="flex flex-col gap-2 text-xs">
         <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[hsl(var(--status-listo))]/15 px-3 py-1 font-medium text-[hsl(var(--status-listo))]">
-          Garantía activa: 23 días restantes
+          {t.common.warrantyActive}
         </span>
         <span className="inline-flex w-fit items-center gap-1 rounded-full bg-destructive/15 px-3 py-1 font-medium text-destructive">
-          Garantía expirada
+          {t.common.warrantyExpired}
         </span>
       </div>
     ),
-  },
-  {
-    icon: Camera,
-    title: "Evidencia Fotográfica",
-    desc: "Foto de cómo entró, foto de cómo sale. Compresión automática para que cargue rápido incluso con datos móviles.",
-    demo: (
+    photos: (
       <div className="grid grid-cols-3 gap-1.5">
         {[0, 1, 2].map((i) => (
           <div
@@ -102,38 +92,23 @@ const features = [
         ))}
       </div>
     ),
-  },
-  {
-    icon: TrendingUp,
-    title: "Rentabilidad Real en Gs.",
-    desc: "Ver tu Ingreso NETO real, restando costos de repuestos de Hohenau u Obligado.",
-    demo: (
+    profit: (
       <div className="space-y-1 text-xs">
         <div className="flex justify-between text-muted-foreground">
-          <span>Bruto</span>
-          <span className="font-mono">Gs. 4.850.000</span>
+          <span>{h.features.profit.gross}</span>
+          <span className="font-mono">{gs(4850000)}</span>
         </div>
         <div className="flex justify-between text-muted-foreground">
-          <span>Costos</span>
-          <span className="font-mono text-destructive">- Gs. 2.120.000</span>
+          <span>{h.features.profit.costs}</span>
+          <span className="font-mono text-destructive">- {gs(2120000)}</span>
         </div>
         <div className="flex justify-between border-t border-border pt-1 text-primary font-semibold">
-          <span>NETO</span>
-          <span className="font-mono">Gs. 2.730.000</span>
+          <span>{h.features.profit.net}</span>
+          <span className="font-mono">{gs(2730000)}</span>
         </div>
       </div>
     ),
-  },
-];
-
-export default function Presentacion() {
-  const [openCard, setOpenCard] = useState<number | null>(null);
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!loading && user) navigate("/dashboard", { replace: true });
-  }, [user, loading, navigate]);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -144,18 +119,19 @@ export default function Presentacion() {
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold">
               F7
             </div>
-            <span className="font-semibold tracking-tight">Manager Pro</span>
+            <span className="text-sm font-semibold tracking-tight max-[359px]:hidden sm:text-base">Manager Pro</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/login">Ingresar</Link>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <LanguageSwitcher />
+            <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
+              <Link to="/login">{t.common.login}</Link>
             </Button>
             <Button
               size="sm"
-              onClick={() => document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={goToPricing}
+              className="bg-primary px-2.5 text-primary-foreground hover:bg-primary/90 sm:px-3"
             >
-              Ver planes
+              {t.common.viewPlans}
             </Button>
           </div>
         </div>
@@ -173,33 +149,27 @@ export default function Presentacion() {
         <div className="container relative py-20 md:py-28">
           <div className="mx-auto max-w-3xl text-center animate-fade-in">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              <Sparkles className="h-3 w-3" /> Hecho en Paraguay 🇵🇾
+              <Sparkles className="h-3 w-3" /> {h.hero.badge}
             </span>
             <h1 className="mt-4 text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-              ¿Cansado del caos de{" "}
-              <span className="text-primary">libretas y WhatsApp</span>?
+              <Rich text={h.hero.title} />
             </h1>
             <p className="mt-5 text-base md:text-lg text-muted-foreground">
-              Sabemos el dolor de perder una orden, discutir con un cliente por
-              una garantía o no saber cuántas pantallas te quedan en stock.{" "}
-              <span className="text-foreground font-medium">
-                F7 Manager Pro nació en un mostrador de reparaciones, no en una
-                oficina.
-              </span>
+              <Rich text={h.hero.text} strongClass="text-foreground font-medium" />
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button
                 size="lg"
-                onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
+                onClick={() => contact()}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevated"
               >
-                {CTA_LABEL} <ArrowRight className="h-4 w-4" />
+                {t.common.ctaGuarantee} <ArrowRight className="h-4 w-4" />
               </Button>
               <a
                 href="#solucion"
                 className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1"
               >
-                Ver cómo funciona <ChevronDown className="h-4 w-4" />
+                {t.common.howItWorks} <ChevronDown className="h-4 w-4" />
               </a>
             </div>
           </div>
@@ -210,40 +180,39 @@ export default function Presentacion() {
               <div className="mb-3 flex items-center gap-2 text-destructive">
                 <XCircle className="h-4 w-4" />
                 <span className="text-xs font-semibold uppercase tracking-wider">
-                  Antes
+                  {h.chaos.before}
                 </span>
               </div>
               <div className="space-y-2 font-mono text-[11px] text-muted-foreground">
-                <div className="rounded bg-muted/50 p-2">📓 Libreta hoja 47 — "iPhone 8 Juan, no lee"</div>
-                <div className="rounded bg-muted/50 p-2">💬 WhatsApp: "che el del moto g cuanto era?"</div>
-                <div className="rounded bg-muted/50 p-2">🧾 Papelito: "garantia 30 dias?? o 60??"</div>
-                <div className="rounded bg-muted/50 p-2">😵 "¿Dónde anoté el del Samsung?"</div>
+                {h.chaos.beforeLines.map((line) => (
+                  <div key={line} className="rounded bg-muted/50 p-2">{line}</div>
+                ))}
               </div>
             </Card>
             <Card className="border-primary/30 bg-primary/5 p-5">
               <div className="mb-3 flex items-center gap-2 text-primary">
                 <CheckCircle2 className="h-4 w-4" />
                 <span className="text-xs font-semibold uppercase tracking-wider">
-                  Con F7
+                  {h.chaos.after}
                 </span>
               </div>
               <div className="space-y-2 text-[11px]">
                 <div className="flex items-center justify-between rounded bg-card/80 p-2">
                   <span className="font-mono">#0142 · iPhone 8 Juan</span>
                   <span className="rounded-full bg-[hsl(var(--status-reparacion))]/20 px-2 py-0.5 text-[10px] text-[hsl(var(--status-reparacion))]">
-                    En reparación
+                    {t.common.statusRepair}
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded bg-card/80 p-2">
-                  <span className="font-mono">#0143 · Moto G — Gs. 180.000</span>
+                  <span className="font-mono">#0143 · Moto G — {gs(180000)}</span>
                   <span className="rounded-full bg-[hsl(var(--status-listo))]/20 px-2 py-0.5 text-[10px] text-[hsl(var(--status-listo))]">
-                    Listo
+                    {t.common.statusReady}
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded bg-card/80 p-2">
                   <span className="font-mono">#0144 · Samsung A52</span>
                   <span className="rounded-full bg-[hsl(var(--status-entregado))]/20 px-2 py-0.5 text-[10px] text-[hsl(var(--status-entregado))]">
-                    Entregado
+                    {t.common.statusDelivered}
                   </span>
                 </div>
               </div>
@@ -257,25 +226,22 @@ export default function Presentacion() {
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-secondary/10 px-3 py-1 text-xs font-medium text-secondary">
-              <AlertTriangle className="h-3 w-3" /> El costo real
+              <AlertTriangle className="h-3 w-3" /> {h.pain.pill}
             </span>
             <h2 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight">
-              Si no controlas tu taller,{" "}
-              <span className="text-secondary">estás perdiendo Gs.</span> cada día.
+              <Rich text={h.pain.title} accentClass="text-secondary" />
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Hacé clic en cada tarjeta y descubrí cuánto te está costando seguir
-              "como siempre".
-            </p>
+            <p className="mt-3 text-muted-foreground">{h.pain.text}</p>
           </div>
 
           <div className="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-3">
-            {painCards.map((c, i) => {
+            {PAIN_CARDS.map((c, i) => {
               const Icon = c.icon;
+              const copy = h.pain.cards[c.key];
               const isOpen = openCard === i;
               return (
                 <button
-                  key={c.title}
+                  key={c.key}
                   onClick={() => setOpenCard(isOpen ? null : i)}
                   className={`group text-left rounded-lg border bg-card p-6 transition-all hover-scale ${
                     isOpen
@@ -286,8 +252,8 @@ export default function Presentacion() {
                   <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-md bg-muted ${c.accent}`}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <h3 className="text-lg font-semibold">{c.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{c.teaser}</p>
+                  <h3 className="text-lg font-semibold">{copy.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{copy.teaser}</p>
                   <div
                     className={`grid transition-all duration-300 ${
                       isOpen ? "mt-3 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
@@ -295,12 +261,12 @@ export default function Presentacion() {
                   >
                     <div className="overflow-hidden">
                       <p className="border-t border-border/60 pt-3 text-sm text-foreground/90">
-                        {c.detail}
+                        {copy.detail}
                       </p>
                     </div>
                   </div>
                   <div className="mt-3 text-xs text-primary opacity-70 group-hover:opacity-100">
-                    {isOpen ? "− Ocultar" : "+ Ver más"}
+                    {isOpen ? h.pain.less : h.pain.more}
                   </div>
                 </button>
               );
@@ -314,14 +280,12 @@ export default function Presentacion() {
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              La solución
+              {h.solution.pill}
             </span>
             <h2 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight">
-              F7 Manager Pro: <span className="text-primary">el control total</span> de tu taller, en Paraguay y en Gs.
+              <Rich text={h.solution.title} />
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Órdenes ilimitadas, control financiero preciso y una imagen profesional que tus clientes respetarán.
-            </p>
+            <p className="mt-3 text-muted-foreground">{h.solution.text}</p>
           </div>
 
           {/* Mock dashboard */}
@@ -334,10 +298,10 @@ export default function Presentacion() {
             </div>
             <div className="grid gap-4 p-5 md:grid-cols-4">
               {[
-                { label: "Órdenes activas", value: "37", tone: "text-primary" },
-                { label: "Listas para retirar", value: "12", tone: "text-[hsl(var(--status-listo))]" },
-                { label: "Ingreso del mes", value: "Gs. 12.4M", tone: "text-secondary" },
-                { label: "Garantías activas", value: "84", tone: "text-[hsl(var(--status-garantia))]" },
+                { label: h.solution.kpiActive, value: "37", tone: "text-primary" },
+                { label: h.solution.kpiReady, value: "12", tone: "text-[hsl(var(--status-listo))]" },
+                { label: h.solution.kpiIncome, value: "Gs. 12.4M", tone: "text-secondary" },
+                { label: h.solution.kpiWarranties, value: "84", tone: "text-[hsl(var(--status-garantia))]" },
               ].map((k) => (
                 <div key={k.label} className="rounded-lg border border-border bg-background/40 p-4">
                   <div className="text-xs text-muted-foreground">{k.label}</div>
@@ -347,14 +311,14 @@ export default function Presentacion() {
             </div>
             <div className="border-t border-border p-5">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-semibold">Órdenes recientes</span>
-                <span className="text-xs text-muted-foreground">Hoy</span>
+                <span className="text-sm font-semibold">{h.solution.recentTitle}</span>
+                <span className="text-xs text-muted-foreground">{h.solution.today}</span>
               </div>
               <div className="space-y-2">
                 {[
-                  ["#0192", "iPhone 13 — pantalla", "En reparación", "reparacion"],
-                  ["#0191", "Redmi Note 10 — flex", "Listo", "listo"],
-                  ["#0190", "Galaxy S21 — batería", "Entregado", "entregado"],
+                  ["#0192", h.solution.recent[0], t.common.statusRepair, "reparacion"],
+                  ["#0191", h.solution.recent[1], t.common.statusReady, "listo"],
+                  ["#0190", h.solution.recent[2], t.common.statusDelivered, "entregado"],
                 ].map(([id, desc, st, key]) => (
                   <div key={id} className="flex items-center justify-between rounded-md border border-border/60 bg-background/30 px-3 py-2 text-sm">
                     <div className="flex items-center gap-3">
@@ -384,19 +348,18 @@ export default function Presentacion() {
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-              Lo que <span className="text-primary">realmente impresiona</span>.
+              <Rich text={h.features.title} />
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              4 funciones diseñadas para talleres reales, no para presentaciones bonitas.
-            </p>
+            <p className="mt-3 text-muted-foreground">{h.features.text}</p>
           </div>
 
           <div className="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-2">
-            {features.map((f) => {
+            {FEATURE_CARDS.map((f) => {
               const Icon = f.icon;
+              const copy = h.features[f.key];
               return (
                 <Card
-                  key={f.title}
+                  key={f.key}
                   className="group p-6 transition-all hover:border-primary/40 hover:shadow-elevated"
                 >
                   <div className="flex items-start gap-3">
@@ -404,12 +367,12 @@ export default function Presentacion() {
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-base font-semibold">{f.title}</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
+                      <h3 className="text-base font-semibold">{copy.title}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">{copy.desc}</p>
                     </div>
                   </div>
                   <div className="mt-4 rounded-md border border-border bg-background/40 p-3">
-                    {f.demo}
+                    {featureDemos[f.key]}
                   </div>
                 </Card>
               );
@@ -424,31 +387,27 @@ export default function Presentacion() {
           <div className="mx-auto grid max-w-5xl items-center gap-10 md:grid-cols-2">
             <div>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-secondary/30 bg-secondary/10 px-3 py-1 text-xs font-medium text-secondary">
-                Plan PRO
+                {h.growth.pill}
               </span>
               <h2 className="mt-4 text-3xl md:text-4xl font-bold tracking-tight">
-                Diseñado para <span className="text-primary">crecer</span>.
+                <Rich text={h.growth.title} />
               </h2>
-              <p className="mt-3 text-muted-foreground">
-                Empezás solo con una sucursal. Mañana sumás a tu socio, tu técnico
-                y abrís un local más. F7 escala con vos sin cambiar de sistema.
-              </p>
+              <p className="mt-3 text-muted-foreground">{h.growth.text}</p>
               <ul className="mt-5 space-y-2 text-sm">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Sucursales ilimitadas</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Hasta 5 usuarios con roles</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Reportes financieros consolidados</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> 20 fotos por orden</li>
+                {h.growth.bullets.map((bullet) => (
+                  <li key={bullet} className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> {bullet}</li>
+                ))}
               </ul>
             </div>
             <Card className="p-5">
               <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Sucursales
+                {h.growth.branches}
               </div>
               <div className="space-y-2">
                 {[
-                  ["Casa Central", "Asunción", true],
-                  ["Sucursal Este", "Ciudad del Este", false],
-                  ["Sucursal Sur", "Encarnación", false],
+                  [h.growth.branchMain, "Asunción", true],
+                  [h.growth.branchEast, "Ciudad del Este", false],
+                  [h.growth.branchSouth, "Encarnación", false],
                 ].map(([name, city, active]) => (
                   <div
                     key={name as string}
@@ -465,14 +424,14 @@ export default function Presentacion() {
                     </div>
                     {active && (
                       <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
-                        Activa
+                        {h.growth.active}
                       </span>
                     )}
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-                <Users className="h-3.5 w-3.5" /> 3 / 5 usuarios — agregá técnicos cuando quieras
+                <Users className="h-3.5 w-3.5" /> {h.growth.users}
               </div>
             </Card>
           </div>
@@ -481,11 +440,11 @@ export default function Presentacion() {
 
       {/* SECTION 5.5 — PRICING */}
       <PricingSection
-        onContact={(message) => openUpgradeWhatsApp(message)}
+        onContact={(message) => contact(message)}
         note={
           <p className="font-medium text-foreground">
             <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-primary" />
-            Todos los planes incluyen la garantía de {GUARANTEE}: si no te sirve, te devolvemos todo tu dinero.
+            {t.pricing.guaranteeNote}
           </p>
         }
       />
@@ -503,34 +462,29 @@ export default function Presentacion() {
             />
             <div className="relative">
               <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-                Deja de ser un esclavo de tu <span className="text-primary">mostrador</span>.
+                <Rich text={h.cta.title} />
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-                Empezá con la <span className="text-foreground font-semibold">garantía de {GUARANTEE}</span>:
-                si no te sirve, te devolvemos todo tu dinero. El precio de Starter es menor que el de
-                <span className="text-foreground font-semibold"> dos reparaciones genéricas al mes</span>.
-                Únete a la liga profesional de talleres.
+                <Rich text={h.cta.text} strongClass="text-foreground font-semibold" />
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <Button
                   size="lg"
-                  onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
+                  onClick={() => contact()}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevated text-base h-12 px-7"
                 >
-                  {CTA_LABEL} <ArrowRight className="h-4 w-4" />
+                  {t.common.ctaGuarantee} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={() => document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  onClick={goToPricing}
                   className="h-12 px-7 border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
                 >
-                  Ver planes
+                  {t.common.viewPlans}
                 </Button>
               </div>
-              <p className="mt-5 text-xs text-muted-foreground">
-                ⚡ Activación inmediata · 🇵🇾 Soporte en español · 💾 Tus datos siempre tuyos
-              </p>
+              <p className="mt-5 text-xs text-muted-foreground">{h.cta.trust}</p>
             </div>
           </div>
         </div>
@@ -543,15 +497,15 @@ export default function Presentacion() {
             <div className="flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground text-[10px] font-bold">
               F7
             </div>
-            <span>F7 Manager Pro · Hecho en Paraguay</span>
+            <span>{t.common.footerBrand}</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/login" className="hover:text-primary">Ingresar</Link>
+            <Link to="/login" className="hover:text-primary">{t.common.login}</Link>
             <button
-              onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
+              onClick={() => contact()}
               className="hover:text-primary"
             >
-              Empezar ahora
+              {t.common.startNow}
             </button>
           </div>
         </div>

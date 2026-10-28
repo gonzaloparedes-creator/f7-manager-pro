@@ -2,27 +2,21 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2 } from "lucide-react";
-import { type PlanType, type Cycle, PRICING, PLAN_MESSAGES, PLAN_FEATURES } from "@/lib/plans";
+import { type PlanType, type Cycle, PRICING } from "@/lib/plans";
+import { Rich } from "@/i18n/Rich";
+import { formatNumber, type Lang } from "@/i18n/language";
+import { useLanguage } from "@/i18n/useLanguage";
 
 type Currency = "gs" | "usd";
 type Segment = "taller" | "tienda";
 type Plan = PlanType;
 
-const CYCLE_LABEL: Record<Cycle, string> = {
-  mensual: "/ mes",
-  semestral: "/ semestre",
-  anual: "/ año",
-};
-
 const CYCLE_MONTHS: Record<Cycle, number> = { mensual: 1, semestral: 6, anual: 12 };
 
-function fmt(amount: number, currency: Currency) {
-  if (currency === "usd") return `$${amount.toLocaleString("en-US")}`;
-  return `${amount.toLocaleString("es-PY")} Gs.`;
+function fmt(amount: number, currency: Currency, lang: Lang, usdPrefix: string) {
+  if (currency === "usd") return `${usdPrefix}${amount.toLocaleString("en-US")}`;
+  return `${formatNumber(amount, lang)} Gs.`;
 }
-
-// No hay prueba gratis: el botón de cada plan abre WhatsApp para elegirlo.
-const PLAN_CTA = "Elegir este plan";
 
 export function PricingSection({
   onContact,
@@ -31,13 +25,19 @@ export function PricingSection({
   onContact: (message?: string) => void;
   note?: ReactNode;
 }) {
+  const { t, lang } = useLanguage();
+  const p = t.pricing;
   const [segment, setSegment] = useState<Segment>("taller");
   const [currency, setCurrency] = useState<Currency>("gs");
   const [cycle, setCycle] = useState<Cycle>("mensual");
 
+  const cycleSuffix: Record<Cycle, string> = { mensual: p.perMonth, semestral: p.perSemester, anual: p.perYear };
+  const money = (amount: number) => fmt(amount, currency, lang, p.usdPrefix);
+
+  // No hay prueba gratis: el botón de cada plan abre WhatsApp para elegirlo.
   const renderCard = (
     plan: Plan,
-    opts: { title: string; subtitle: string; features: string[]; accent?: boolean; badgeLabel?: string },
+    opts: { title: string; accent?: boolean; badgeLabel?: string },
   ) => {
     const price = PRICING[plan][cycle];
     const value = currency === "usd" ? price.usd : price.gs;
@@ -45,6 +45,7 @@ export function PricingSection({
       cycle !== "mensual"
         ? Math.round((currency === "usd" ? price.usd : price.gs) / CYCLE_MONTHS[cycle])
         : null;
+    const copy = p.plans[plan];
 
     return (
       <Card
@@ -62,22 +63,22 @@ export function PricingSection({
           </div>
         )}
         <h3 className="text-2xl font-bold">{opts.title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{opts.subtitle}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{copy.subtitle}</p>
 
         <div className="mt-6 flex items-end gap-2">
           <span className={"text-4xl font-extrabold tracking-tight " + (opts.accent ? "text-primary" : "")}>
-            {fmt(value, currency)}
+            {money(value)}
           </span>
-          <span className="pb-1 text-sm text-muted-foreground">{CYCLE_LABEL[cycle]}</span>
+          <span className="pb-1 text-sm text-muted-foreground">{cycleSuffix[cycle]}</span>
         </div>
         {monthlyEq !== null && (
           <p className="mt-1 text-xs text-muted-foreground/80">
-            Equivale a {fmt(monthlyEq, currency)} / mes
+            {p.equivalent.replace("{amount}", money(monthlyEq))}
           </p>
         )}
 
         <ul className="mt-6 space-y-2.5">
-          {opts.features.map((f) => (
+          {copy.features.map((f) => (
             <li key={f} className="flex items-start gap-2 text-sm">
               <CheckCircle2 className={"mt-0.5 h-4 w-4 shrink-0 " + (opts.accent ? "text-primary" : "text-primary/80")} />
               <span>{f}</span>
@@ -87,12 +88,12 @@ export function PricingSection({
 
         <div className="mt-7 pt-2">
           {opts.accent ? (
-            <Button onClick={() => onContact(PLAN_MESSAGES[plan])} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-              {PLAN_CTA}
+            <Button onClick={() => onContact(copy.message)} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+              {p.choose}
             </Button>
           ) : (
-            <Button onClick={() => onContact(PLAN_MESSAGES[plan])} variant="outline" className="w-full border-primary/40 text-foreground hover:bg-primary/10 hover:text-primary">
-              {PLAN_CTA}
+            <Button onClick={() => onContact(copy.message)} variant="outline" className="w-full border-primary/40 text-foreground hover:bg-primary/10 hover:text-primary">
+              {p.choose}
             </Button>
           )}
         </div>
@@ -106,16 +107,10 @@ export function PricingSection({
       <div className="container">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold sm:text-4xl">
-            {segment === "taller" ? (
-              <>Precios honestos para <span className="text-primary">talleres reales</span>.</>
-            ) : (
-              <>Precios honestos para <span className="text-primary">tu mostrador</span>.</>
-            )}
+            <Rich text={segment === "taller" ? p.titleWorkshop : p.titleShop} />
           </h2>
           <p className="mt-3 text-muted-foreground">
-            {segment === "taller"
-              ? "Elegí tu moneda y tu ciclo. Cambialo cuando quieras."
-              : "Sin órdenes de reparación, sin QR, sin firmas — solo mostrador y caja."}
+            {segment === "taller" ? p.subtitleWorkshop : p.subtitleShop}
           </p>
         </div>
 
@@ -123,8 +118,8 @@ export function PricingSection({
         <div className="mx-auto mt-8 flex justify-center">
           <div className="inline-flex rounded-full border border-border bg-card p-1">
             {([
-              ["taller", "Tengo un Taller"],
-              ["tienda", "Solo tengo Tienda"],
+              ["taller", p.segmentWorkshop],
+              ["tienda", p.segmentShop],
             ] as [Segment, string][]).map(([s, label]) => (
               <button
                 key={s}
@@ -152,16 +147,16 @@ export function PricingSection({
                   (currency === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
-                {c === "gs" ? "Guaraníes (Gs.)" : "USD ($)"}
+                {c === "gs" ? p.currencyGs : p.currencyUsd}
               </button>
             ))}
           </div>
 
           <div className="inline-flex rounded-full border border-border bg-card p-1">
             {([
-              ["mensual", "Mensual"],
-              ["semestral", "Semestral · Ahorrá 10%"],
-              ["anual", "Anual · 2 meses gratis"],
+              ["mensual", p.cycleMonthly],
+              ["semestral", p.cycleSemiannual],
+              ["anual", p.cycleAnnual],
             ] as [Cycle, string][]).map(([c, label]) => (
               <button
                 key={c}
@@ -180,35 +175,13 @@ export function PricingSection({
         {/* Cards */}
         {segment === "taller" ? (
           <div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-3">
-            {renderCard("starter", {
-              title: "Starter",
-              subtitle: "Ideal para dar el primer paso y profesionalizar tu mostrador.",
-              features: PLAN_FEATURES.starter,
-            })}
-            {renderCard("pro", {
-              title: "Pro",
-              subtitle: "Para talleres que quieren escalar y controlar sus ganancias reales.",
-              features: PLAN_FEATURES.pro,
-              accent: true,
-              badgeLabel: "Más Popular",
-            })}
-            {renderCard("business", {
-              title: "Business",
-              subtitle: "Para negocios híbridos que reparan y también venden en mostrador.",
-              features: PLAN_FEATURES.business,
-              accent: true,
-              badgeLabel: "Todo en Uno",
-            })}
+            {renderCard("starter", { title: "Starter" })}
+            {renderCard("pro", { title: "Pro", accent: true, badgeLabel: p.badges.pro })}
+            {renderCard("business", { title: "Business", accent: true, badgeLabel: p.badges.business })}
           </div>
         ) : (
           <div className="mx-auto mt-12 max-w-sm">
-            {renderCard("retail", {
-              title: "Retail",
-              subtitle: "Ideal para locales de accesorios, carcasas y venta de celulares.",
-              features: PLAN_FEATURES.retail,
-              accent: true,
-              badgeLabel: "Solo Ventas",
-            })}
+            {renderCard("retail", { title: "Retail", accent: true, badgeLabel: p.badges.retail })}
           </div>
         )}
 

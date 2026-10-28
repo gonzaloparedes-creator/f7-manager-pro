@@ -9,10 +9,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { PricingSection } from "@/components/PricingSection";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { Rich } from "@/i18n/Rich";
+import { useLanguage } from "@/i18n/useLanguage";
+import { usePageMeta } from "@/i18n/usePageMeta";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
-import { PRICING } from "@/lib/plans";
 import { trackMeta } from "@/lib/metaPixel";
-import { OFFER_GUARANTEE_DAYS } from "@/lib/ofertaOffer";
 import {
   ArrowRight,
   Camera,
@@ -33,241 +35,29 @@ import {
   Wallet,
 } from "lucide-react";
 
-const GUARANTEE = `${OFFER_GUARANTEE_DAYS} días`;
-const CTA_LABEL = `Empezar con garantía de ${GUARANTEE}`;
+// Los textos viven en src/i18n/dictionaries (es, en, pt); acá quedan los íconos y la maqueta.
+const PAIN_CARDS = [
+  { key: "notebook", icon: ClipboardList },
+  { key: "whatsapp", icon: MessageCircle },
+  { key: "money", icon: Wallet },
+] as const;
 
-const PAGE_TITLE = `F7 Manager Pro · Sistema para talleres de reparación · Garantía de ${GUARANTEE}`;
-const PAGE_DESCRIPTION = `Ordená tus órdenes de trabajo, avisale al cliente por WhatsApp y mirá cuánto ganás en cada reparación. Hecho en Paraguay. Si en ${GUARANTEE} no te sirve, te devolvemos todo tu dinero.`;
+const SOLUTION_BLOCKS = [
+  { key: "photos", icon: Camera, plan: "allPlans" },
+  { key: "whatsapp", icon: MessageCircle, plan: "allPlans" },
+  { key: "profit", icon: TrendingUp, plan: "proBusiness" },
+  { key: "warranty", icon: ShieldCheck, plan: "allPlans" },
+  { key: "cash", icon: Wallet, plan: "proBusiness" },
+  { key: "bundle", icon: ShoppingBag, plan: "businessOnly" },
+] as const;
 
-// Mensaje que llega a Gonzalo: la marca "Vi su anuncio" permite distinguir los
-// contactos que vienen de la campaña de los de la landing orgánica.
-const OFERTA_MESSAGE = `¡Hola! Vi el anuncio de F7 Manager Pro y quiero empezar con la garantía de ${GUARANTEE} en mi taller.`;
-const AD_TAG = " (Vi su anuncio)";
+const DEVICE_CARDS = [
+  { key: "phone", icon: Smartphone },
+  { key: "computer", icon: Laptop },
+  { key: "cloud", icon: Cloud },
+] as const;
 
-function contactWhatsApp(origin: string, message?: string) {
-  trackMeta("Contact", { content_name: "oferta", content_category: origin });
-  openUpgradeWhatsApp(message ? message + AD_TAG : OFERTA_MESSAGE);
-}
-
-const starterGs = PRICING.starter.mensual.gs.toLocaleString("es-PY");
-
-const marqueeItems = [
-  "Fotos de entrada y salida",
-  "Aviso por WhatsApp al cliente",
-  "Garantía con reloj",
-  "Ganancia real por orden",
-  "Seguimiento por QR",
-  "Caja y gastos",
-];
-
-const painCards = [
-  {
-    icon: ClipboardList,
-    title: "La libreta que te traiciona",
-    text: "Se moja, se pierde y se lleva el historial. Una orden perdida es plata perdida o un reclamo.",
-    mock: (
-      <div className="space-y-1.5 font-mono text-[11px] text-muted-foreground">
-        <div className="rounded bg-muted/50 p-2">Hoja 47 — "iPhone 8 Juan, no lee"</div>
-        <div className="rounded bg-muted/50 p-2 line-through decoration-destructive/70">Moto G, cambio de pin, 180?</div>
-        <div className="rounded bg-muted/50 p-2 text-secondary">¿Dónde anoté el del Samsung?</div>
-      </div>
-    ),
-  },
-  {
-    icon: MessageCircle,
-    title: "El WhatsApp que no para",
-    text: "Pasás el día contestando «¿ya está mi celular?» en vez de reparar. Cada mensaje te corta el trabajo.",
-    mock: (
-      <div className="space-y-1.5 text-[11px]">
-        <div className="w-fit max-w-[85%] rounded-lg rounded-bl-sm bg-muted/60 px-2.5 py-1.5">¿Ya está mi celular? 🙏</div>
-        <div className="ml-auto w-fit max-w-[85%] rounded-lg rounded-br-sm bg-primary/15 px-2.5 py-1.5 text-primary">Todavía no, te aviso</div>
-        <div className="w-fit max-w-[85%] rounded-lg rounded-bl-sm bg-muted/60 px-2.5 py-1.5">¿Y ahora?</div>
-      </div>
-    ),
-  },
-  {
-    icon: Wallet,
-    title: "La plata que no se ve",
-    text: "Cobraste bien, pero ¿cuánto te quedó después del repuesto? Sin ese número, podés estar trabajando gratis.",
-    mock: (
-      <div className="space-y-1 font-mono text-[11px]">
-        <div className="flex justify-between text-muted-foreground"><span>Cobrado</span><span>Gs. 350.000</span></div>
-        <div className="flex justify-between text-muted-foreground"><span>Repuesto</span><span className="text-destructive">- Gs. 280.000</span></div>
-        <div className="flex justify-between border-t border-border pt-1 text-secondary"><span>¿Te quedó?</span><span>???</span></div>
-      </div>
-    ),
-  },
-];
-
-const solutionBlocks: {
-  pill: string;
-  icon: typeof Camera;
-  title: string;
-  text: string;
-  plan: string;
-  mock: ReactNode;
-}[] = [
-  {
-    pill: "Evidencia fotográfica",
-    icon: Camera,
-    title: "El fin de «yo no lo dejé así»",
-    text: "Foto de cómo entró y foto de cómo sale, con fecha. Si hay una discusión, tenés la prueba en la mano.",
-    plan: "Todos los planes",
-    mock: (
-      <div className="space-y-2">
-        <div className="grid grid-cols-3 gap-1.5">
-          {["Entró", "Entró", "Salió"].map((label, i) => (
-            <div
-              key={i}
-              className="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-border bg-gradient-to-br from-muted to-muted/40"
-            >
-              <Camera className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">{label}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-primary">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Pantalla rota · Cámara ok · Sin golpes en el marco
-        </div>
-      </div>
-    ),
-  },
-  {
-    pill: "Avisos por WhatsApp",
-    icon: MessageCircle,
-    title: "El fin del «¿ya está mi equipo?»",
-    text: "F7 le avisa al cliente por WhatsApp cuando su equipo cambia de estado, y con el QR puede ver el avance sin escribirte.",
-    plan: "Todos los planes",
-    mock: (
-      <div className="space-y-2 text-[11px]">
-        <div className="w-fit max-w-[92%] rounded-lg rounded-bl-sm border border-primary/30 bg-primary/10 px-3 py-2 text-foreground">
-          Hola Juan 👋 Tu <b>iPhone 8</b> ya está <b className="text-primary">listo para retirar</b>.
-        </div>
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-muted-foreground">
-          <QrCode className="h-3.5 w-3.5" /> Seguimiento por QR
-        </div>
-      </div>
-    ),
-  },
-  {
-    pill: "Ganancia real",
-    icon: TrendingUp,
-    title: "El fin del «¿habré ganado en esta reparación?»",
-    text: "Ves cuánto cobraste, cuánto costó el repuesto y cuánto te quedó. Por orden y por mes, en guaraníes.",
-    plan: "Pro y Business",
-    mock: (
-      <div className="space-y-1 font-mono text-[11px]">
-        <div className="flex justify-between text-muted-foreground"><span>Cobrado</span><span>Gs. 350.000</span></div>
-        <div className="flex justify-between text-muted-foreground"><span>Repuesto</span><span className="text-destructive">- Gs. 180.000</span></div>
-        <div className="flex justify-between border-t border-border pt-1 font-semibold text-primary"><span>Te quedó</span><span>Gs. 170.000</span></div>
-      </div>
-    ),
-  },
-  {
-    pill: "Garantía segura",
-    icon: ShieldCheck,
-    title: "El fin de las discusiones por garantía",
-    text: "El reloj de la garantía arranca cuando el cliente retira el equipo. Sin «fue ayer» ni «fue hace 40 días».",
-    plan: "Todos los planes",
-    mock: (
-      <div className="flex flex-col gap-2 text-[11px]">
-        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[hsl(var(--status-listo))]/15 px-3 py-1 font-medium text-[hsl(var(--status-listo))]">
-          Garantía activa: 23 días restantes
-        </span>
-        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-destructive/15 px-3 py-1 font-medium text-destructive">
-          Garantía expirada
-        </span>
-      </div>
-    ),
-  },
-  {
-    pill: "Caja y gastos",
-    icon: Wallet,
-    title: "El fin del «¿cuánto tendría que haber en la caja?»",
-    text: "Abrís la caja, cargás lo que entra y lo que gastás, y al cerrar F7 te dice cuánto efectivo debería haber.",
-    plan: "Pro y Business",
-    mock: (
-      <div className="space-y-1 font-mono text-[11px]">
-        <div className="flex justify-between text-muted-foreground"><span>Apertura</span><span>Gs. 200.000</span></div>
-        <div className="flex justify-between text-muted-foreground"><span>+ Cobros en efectivo</span><span>Gs. 850.000</span></div>
-        <div className="flex justify-between text-muted-foreground"><span>- Gastos</span><span className="text-destructive">Gs. 120.000</span></div>
-        <div className="flex justify-between border-t border-border pt-1 font-semibold text-primary"><span>Efectivo esperado</span><span>Gs. 930.000</span></div>
-      </div>
-    ),
-  },
-  {
-    pill: "Reparación + venta",
-    icon: ShoppingBag,
-    title: "El fin de manejar dos sistemas",
-    text: "Si además vendés accesorios o celulares, cobrás la reparación y la venta en un solo ticket, con inventario y vitrina online.",
-    plan: "Business",
-    mock: (
-      <div className="space-y-1.5 text-[11px]">
-        <div className="flex justify-between rounded bg-muted/50 px-2.5 py-1.5"><span>Cambio de pantalla</span><span className="font-mono">Gs. 350.000</span></div>
-        <div className="flex justify-between rounded bg-muted/50 px-2.5 py-1.5"><span>Funda + vidrio templado</span><span className="font-mono">Gs. 70.000</span></div>
-        <div className="flex justify-between rounded border border-primary/30 bg-primary/10 px-2.5 py-1.5 font-semibold text-primary"><span>Un solo cobro</span><span className="font-mono">Gs. 420.000</span></div>
-      </div>
-    ),
-  },
-];
-
-const guaranteeSteps = [
-  {
-    title: "Nos escribís por WhatsApp",
-    text: "Elegís tu plan y coordinamos el pago. Te entregamos tu recibo.",
-  },
-  {
-    title: `Lo usás ${GUARANTEE} en tu taller`,
-    text: "Con órdenes reales: fotos, avisos a tus clientes y la ganancia de cada reparación.",
-  },
-  {
-    title: "Si no te sirve, te devolvemos todo",
-    text: `Nos avisás por WhatsApp dentro de los ${GUARANTEE} y te reintegramos lo que pagaste.`,
-  },
-];
-
-const faqs = [
-  {
-    q: `¿Cómo funciona la garantía de ${GUARANTEE}?`,
-    a: `Elegís tu plan, coordinamos el pago por WhatsApp y lo usás ${GUARANTEE} en tu taller con órdenes reales. Si no te sirve, nos avisás por WhatsApp dentro de ese plazo y te devolvemos todo lo que pagaste.`,
-  },
-  {
-    q: "¿Qué significa «precio congelado»?",
-    a: "Quienes se suman ahora mantienen el precio de hoy de su plan mientras sigan suscriptos. No sabemos cuándo van a cambiar los precios: por eso conviene entrar lo antes posible.",
-  },
-  {
-    q: "¿Tengo que instalar algo?",
-    a: "No. F7 funciona desde el navegador del celular, la tablet o la computadora. No hay nada que descargar.",
-  },
-  {
-    q: "¿Otros negocios pueden ver mis datos?",
-    a: "No. Cada negocio ve únicamente sus propias órdenes, clientes y números. Nadie de otra empresa puede acceder a lo tuyo.",
-  },
-  {
-    q: "¿Cuánto cuesta?",
-    a: `Desde ${starterGs} Gs. por mes (plan Starter). Pro y Business suman reportes, inventario, caja y venta en mostrador. Pagando por semestre ahorrás 10 % y el plan anual te regala 2 meses. Podés elegir guaraníes o dólares.`,
-  },
-  {
-    q: "¿Cómo se paga?",
-    a: "Coordinamos el pago con vos por WhatsApp y te entregamos tu recibo. Si dentro de la garantía decidís que no es para vos, el reintegro se coordina por el mismo medio.",
-  },
-  {
-    q: "Tengo más de un local o empleados, ¿me sirve?",
-    a: "Sí. El plan Pro incluye sucursales ilimitadas y hasta 5 usuarios con roles; Business, usuarios ilimitados.",
-  },
-  {
-    q: "Solo vendo accesorios, no reparo. ¿Hay plan para mí?",
-    a: "Sí, el plan Retail es para locales de venta: punto de venta, inventario, código de barras y control de caja.",
-  },
-  {
-    q: "¿Y si me trabo o no sé usarlo?",
-    a: "El sistema trae un tutorial paso a paso y te ayudamos por WhatsApp, en español.",
-  },
-  {
-    q: "¿Puedo cambiar de plan más adelante?",
-    a: "Sí. Empezás con el que necesitás hoy y subís cuando tu taller crezca.",
-  },
-];
+const GUARANTEE_STEPS = ["write", "use", "refund"] as const;
 
 function Kicker({ children }: { children: ReactNode }) {
   return (
@@ -280,21 +70,20 @@ export default function Oferta() {
   const finalCtaRef = useRef<HTMLDivElement>(null);
   const [heroCtaVisible, setHeroCtaVisible] = useState(true);
   const [finalCtaVisible, setFinalCtaVisible] = useState(false);
+  const { t, gs } = useLanguage();
+  const o = t.oferta;
+
+  usePageMeta(o.meta.title, o.meta.description);
+
+  // La marca "Vi su anuncio" (traducida) permite distinguir los contactos que vienen de la
+  // campaña de los de la landing orgánica.
+  const contactWhatsApp = (origin: string, message?: string) => {
+    trackMeta("Contact", { content_name: "oferta", content_category: origin });
+    openUpgradeWhatsApp(message ? message + o.whatsapp.adTag : o.whatsapp.message);
+  };
 
   useEffect(() => {
     trackMeta("ViewContent", { content_name: "oferta" });
-  }, []);
-
-  useEffect(() => {
-    const prevTitle = document.title;
-    const descTag = document.querySelector('meta[name="description"]');
-    const prevDesc = descTag?.getAttribute("content") ?? null;
-    document.title = PAGE_TITLE;
-    descTag?.setAttribute("content", PAGE_DESCRIPTION);
-    return () => {
-      document.title = prevTitle;
-      if (prevDesc !== null) descTag?.setAttribute("content", prevDesc);
-    };
   }, []);
 
   useEffect(() => {
@@ -308,10 +97,100 @@ export default function Oferta() {
     };
     watch(heroCtaRef.current, setHeroCtaVisible);
     watch(finalCtaRef.current, setFinalCtaVisible);
-    return () => observers.forEach((o) => o.disconnect());
+    return () => observers.forEach((obs) => obs.disconnect());
   }, []);
 
   const showStickyBar = !heroCtaVisible && !finalCtaVisible;
+
+  const painMocks: Record<(typeof PAIN_CARDS)[number]["key"], ReactNode> = {
+    notebook: (
+      <div className="space-y-1.5 font-mono text-[11px] text-muted-foreground">
+        <div className="rounded bg-muted/50 p-2">{o.problem.cards.notebook.lines[0]}</div>
+        <div className="rounded bg-muted/50 p-2 line-through decoration-destructive/70">{o.problem.cards.notebook.lines[1]}</div>
+        <div className="rounded bg-muted/50 p-2 text-secondary">{o.problem.cards.notebook.lines[2]}</div>
+      </div>
+    ),
+    whatsapp: (
+      <div className="space-y-1.5 text-[11px]">
+        <div className="w-fit max-w-[85%] rounded-lg rounded-bl-sm bg-muted/60 px-2.5 py-1.5">{o.problem.cards.whatsapp.lines[0]}</div>
+        <div className="ml-auto w-fit max-w-[85%] rounded-lg rounded-br-sm bg-primary/15 px-2.5 py-1.5 text-primary">{o.problem.cards.whatsapp.lines[1]}</div>
+        <div className="w-fit max-w-[85%] rounded-lg rounded-bl-sm bg-muted/60 px-2.5 py-1.5">{o.problem.cards.whatsapp.lines[2]}</div>
+      </div>
+    ),
+    money: (
+      <div className="space-y-1 font-mono text-[11px]">
+        <div className="flex justify-between text-muted-foreground"><span>{o.problem.cards.money.collected}</span><span>{gs(350000)}</span></div>
+        <div className="flex justify-between text-muted-foreground"><span>{o.problem.cards.money.part}</span><span className="text-destructive">- {gs(280000)}</span></div>
+        <div className="flex justify-between border-t border-border pt-1 text-secondary"><span>{o.problem.cards.money.left}</span><span>???</span></div>
+      </div>
+    ),
+  };
+
+  const blocks = o.solution.blocks;
+  const solutionMocks: Record<(typeof SOLUTION_BLOCKS)[number]["key"], ReactNode> = {
+    photos: (
+      <div className="space-y-2">
+        <div className="grid grid-cols-3 gap-1.5">
+          {[blocks.photos.came, blocks.photos.came, blocks.photos.left].map((label, i) => (
+            <div
+              key={i}
+              className="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-border bg-gradient-to-br from-muted to-muted/40"
+            >
+              <Camera className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground">{label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 text-[11px] text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5" /> {blocks.photos.note}
+        </div>
+      </div>
+    ),
+    whatsapp: (
+      <div className="space-y-2 text-[11px]">
+        <div className="w-fit max-w-[92%] rounded-lg rounded-bl-sm border border-primary/30 bg-primary/10 px-3 py-2 text-foreground">
+          <Rich text={blocks.whatsapp.message} strongClass="font-bold" accentClass="font-bold text-primary" />
+        </div>
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-muted-foreground">
+          <QrCode className="h-3.5 w-3.5" /> {blocks.whatsapp.tracking}
+        </div>
+      </div>
+    ),
+    profit: (
+      <div className="space-y-1 font-mono text-[11px]">
+        <div className="flex justify-between text-muted-foreground"><span>{blocks.profit.collected}</span><span>{gs(350000)}</span></div>
+        <div className="flex justify-between text-muted-foreground"><span>{blocks.profit.part}</span><span className="text-destructive">- {gs(180000)}</span></div>
+        <div className="flex justify-between border-t border-border pt-1 font-semibold text-primary"><span>{blocks.profit.left}</span><span>{gs(170000)}</span></div>
+      </div>
+    ),
+    warranty: (
+      <div className="flex flex-col gap-2 text-[11px]">
+        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[hsl(var(--status-listo))]/15 px-3 py-1 font-medium text-[hsl(var(--status-listo))]">
+          {t.common.warrantyActive}
+        </span>
+        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-destructive/15 px-3 py-1 font-medium text-destructive">
+          {t.common.warrantyExpired}
+        </span>
+      </div>
+    ),
+    cash: (
+      <div className="space-y-1 font-mono text-[11px]">
+        <div className="flex justify-between text-muted-foreground"><span>{blocks.cash.opening}</span><span>{gs(200000)}</span></div>
+        <div className="flex justify-between text-muted-foreground"><span>{blocks.cash.cashIn}</span><span>{gs(850000)}</span></div>
+        <div className="flex justify-between text-muted-foreground"><span>{blocks.cash.expenses}</span><span className="text-destructive">{gs(120000)}</span></div>
+        <div className="flex justify-between border-t border-border pt-1 font-semibold text-primary"><span>{blocks.cash.expected}</span><span>{gs(930000)}</span></div>
+      </div>
+    ),
+    bundle: (
+      <div className="space-y-1.5 text-[11px]">
+        <div className="flex justify-between rounded bg-muted/50 px-2.5 py-1.5"><span>{blocks.bundle.repair}</span><span className="font-mono">{gs(350000)}</span></div>
+        <div className="flex justify-between rounded bg-muted/50 px-2.5 py-1.5"><span>{blocks.bundle.sale}</span><span className="font-mono">{gs(70000)}</span></div>
+        <div className="flex justify-between rounded border border-primary/30 bg-primary/10 px-2.5 py-1.5 font-semibold text-primary"><span>{blocks.bundle.total}</span><span className="font-mono">{gs(420000)}</span></div>
+      </div>
+    ),
+  };
+
+  const faqs = [...o.faq.items, ...o.faq.extra];
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background pb-24 text-foreground md:pb-0">
@@ -320,9 +199,9 @@ export default function Oferta() {
         <div className="container flex items-start justify-center gap-2 py-2 text-center text-xs sm:items-center sm:text-sm">
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-secondary sm:mt-0" />
           <p>
-            No sabemos cuándo va a subir el precio
+            {o.urgency.bar}
             <span className="mx-1.5 text-muted-foreground">·</span>
-            <span className="font-bold text-secondary">Entrá lo antes posible y aprovechá el de hoy</span>
+            <span className="font-bold text-secondary">{o.urgency.barCta}</span>
           </p>
         </div>
       </div>
@@ -334,18 +213,19 @@ export default function Oferta() {
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary font-bold text-primary-foreground">
               F7
             </div>
-            <span className="font-semibold tracking-tight">Manager Pro</span>
+            <span className="text-sm font-semibold tracking-tight max-[359px]:hidden sm:text-base">Manager Pro</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/login">Ingresar</Link>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <LanguageSwitcher />
+            <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
+              <Link to="/login">{t.common.login}</Link>
             </Button>
             <Button
               size="sm"
               onClick={() => contactWhatsApp("header")}
               className="hidden bg-primary text-primary-foreground hover:bg-primary/90 md:inline-flex"
             >
-              Empezar ahora
+              {t.common.startNow}
             </Button>
           </div>
         </div>
@@ -362,15 +242,12 @@ export default function Oferta() {
         <div className="container relative py-12 md:py-20">
           <div className="mx-auto max-w-3xl animate-fade-in text-center">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              <Sparkles className="h-3 w-3" /> Hecho en Paraguay 🇵🇾 · Para talleres de reparación
+              <Sparkles className="h-3 w-3" /> {o.hero.badge}
             </span>
             <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
-              Dejá la libreta. <span className="text-primary">Sabé cuánto ganás</span> en cada reparación.
+              <Rich text={o.hero.title} />
             </h1>
-            <p className="mt-5 text-base text-muted-foreground md:text-lg">
-              F7 Manager Pro ordena tus órdenes de trabajo, le avisa a tu cliente por WhatsApp y te muestra
-              la ganancia real de cada equipo, en guaraníes.
-            </p>
+            <p className="mt-5 text-base text-muted-foreground md:text-lg">{o.hero.text}</p>
 
             <div ref={heroCtaRef} className="mt-8 flex flex-col items-center gap-3">
               <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -379,7 +256,7 @@ export default function Oferta() {
                   onClick={() => contactWhatsApp("hero")}
                   className="h-12 bg-primary px-7 text-base text-primary-foreground shadow-elevated hover:bg-primary/90"
                 >
-                  {CTA_LABEL} <ArrowRight className="h-4 w-4" />
+                  {t.common.ctaGuarantee} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   asChild
@@ -388,24 +265,22 @@ export default function Oferta() {
                   className="h-12 border-primary/40 px-7 text-base text-primary hover:bg-primary/10 hover:text-primary"
                 >
                   <a href="#solucion">
-                    Ver cómo funciona <ChevronDown className="h-4 w-4" />
+                    {t.common.howItWorks} <ChevronDown className="h-4 w-4" />
                   </a>
                 </Button>
               </div>
               <p className="max-w-md text-sm font-medium">
                 <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-primary" />
-                Si en {GUARANTEE} no te sirve, te devolvemos todo tu dinero.
+                {t.common.guarantee}
               </p>
-              <p className="text-xs text-muted-foreground">
-                Sin instalar nada · Soporte por WhatsApp en español
-              </p>
+              <p className="text-xs text-muted-foreground">{o.hero.smallPrint}</p>
             </div>
 
             <div className="mx-auto mt-6 inline-flex max-w-full items-center gap-2.5 rounded-full border border-border bg-card px-4 py-2 text-left text-xs text-muted-foreground">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-foreground">
                 F7
               </div>
-              <span>Nació en un mostrador de reparaciones, no en una oficina.</span>
+              <span>{o.hero.born}</span>
             </div>
           </div>
 
@@ -413,38 +288,38 @@ export default function Oferta() {
           <div className="mx-auto mt-12 max-w-md">
             <Card className="border-primary/30 bg-card p-4 shadow-[0_0_40px_-12px_hsl(var(--primary)/0.5)] sm:p-5">
               <div className="mb-4 flex items-center justify-between">
-                <span className="text-sm font-semibold">Resumen de hoy</span>
+                <span className="text-sm font-semibold">{o.summary.title}</span>
                 <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Datos de ejemplo
+                  {o.summary.example}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-[11px] text-muted-foreground">Cobrado hoy</p>
-                  <p className="mt-1 whitespace-nowrap font-mono text-sm font-bold sm:text-base">Gs. 1.850.000</p>
+                  <p className="text-[11px] text-muted-foreground">{o.summary.collected}</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-sm font-bold sm:text-base">{gs(1850000)}</p>
                 </div>
                 <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-                  <p className="text-[11px] text-muted-foreground">Ingreso neto</p>
-                  <p className="mt-1 whitespace-nowrap font-mono text-sm font-bold text-primary sm:text-base">Gs. 1.120.000</p>
+                  <p className="text-[11px] text-muted-foreground">{o.summary.net}</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-sm font-bold text-primary sm:text-base">{gs(1120000)}</p>
                 </div>
               </div>
               <div className="mt-3 space-y-2 text-[11px]">
                 <div className="flex items-center justify-between rounded bg-muted/40 p-2">
                   <span className="font-mono">#0142 · iPhone 8 Juan</span>
                   <span className="rounded-full bg-[hsl(var(--status-reparacion))]/20 px-2 py-0.5 text-[10px] text-[hsl(var(--status-reparacion))]">
-                    En reparación
+                    {t.common.statusRepair}
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded bg-muted/40 p-2">
                   <span className="font-mono">#0143 · Moto G</span>
                   <span className="rounded-full bg-[hsl(var(--status-listo))]/20 px-2 py-0.5 text-[10px] text-[hsl(var(--status-listo))]">
-                    Listo
+                    {t.common.statusReady}
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded bg-muted/40 p-2">
                   <span className="font-mono">#0144 · Samsung A52</span>
                   <span className="rounded-full bg-[hsl(var(--status-entregado))]/20 px-2 py-0.5 text-[10px] text-[hsl(var(--status-entregado))]">
-                    Entregado
+                    {t.common.statusDelivered}
                   </span>
                 </div>
               </div>
@@ -454,9 +329,9 @@ export default function Oferta() {
       </section>
 
       {/* CINTA DE BENEFICIOS */}
-      <section aria-label="Beneficios" className="overflow-hidden border-y border-border/60 bg-card/60 py-3.5">
+      <section aria-label={o.marquee.label} className="overflow-hidden border-y border-border/60 bg-card/60 py-3.5">
         <div className="flex w-max animate-marquee motion-reduce:w-auto motion-reduce:animate-none motion-reduce:flex-wrap motion-reduce:justify-center">
-          {marqueeItems.map((item) => (
+          {o.marquee.items.map((item) => (
             <span
               key={item}
               className="mx-5 whitespace-nowrap text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground motion-reduce:mx-3 motion-reduce:my-1"
@@ -465,7 +340,7 @@ export default function Oferta() {
               {item}
             </span>
           ))}
-          {marqueeItems.map((item) => (
+          {o.marquee.items.map((item) => (
             <span
               key={item + "-2"}
               aria-hidden="true"
@@ -482,27 +357,23 @@ export default function Oferta() {
       <section id="problema" className="py-16 md:py-24">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <Kicker>El verdadero problema</Kicker>
+            <Kicker>{o.problem.kicker}</Kicker>
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-              No te falta saber reparar. <span className="text-primary">Te falta tener todo en un solo lugar.</span>
+              <Rich text={o.problem.title} />
             </h2>
-            <p className="mt-5 text-lg font-medium">Reparás bien. Ese nunca fue el problema.</p>
-            <p className="mt-3 text-muted-foreground">
-              El problema es el equipo que jurabas que entró sin ese golpe. El repuesto que compraste y nunca
-              anotaste. El cliente que te escribe a las diez de la noche: «¿ya está?». Y terminar el mes
-              cansado, con la mesa llena, sin saber si quedó plata.
-            </p>
+            <p className="mt-5 text-lg font-medium">{o.problem.lead}</p>
+            <p className="mt-3 text-muted-foreground">{o.problem.text}</p>
           </div>
 
           <div className="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-3">
-            {painCards.map((card) => (
-              <Card key={card.title} className="flex flex-col border-border p-5">
+            {PAIN_CARDS.map((card) => (
+              <Card key={card.key} className="flex flex-col border-border p-5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/15 text-secondary">
                   <card.icon className="h-5 w-5" />
                 </div>
-                <h3 className="mt-4 text-lg font-bold">{card.title}</h3>
-                <p className="mt-1.5 text-sm text-muted-foreground">{card.text}</p>
-                <div className="mt-4 rounded-lg border border-border bg-background/60 p-3">{card.mock}</div>
+                <h3 className="mt-4 text-lg font-bold">{o.problem.cards[card.key].title}</h3>
+                <p className="mt-1.5 text-sm text-muted-foreground">{o.problem.cards[card.key].text}</p>
+                <div className="mt-4 rounded-lg border border-border bg-background/60 p-3">{painMocks[card.key]}</div>
               </Card>
             ))}
           </div>
@@ -513,32 +384,33 @@ export default function Oferta() {
       <section id="solucion" className="scroll-mt-16 border-y border-border/60 bg-card/40 py-16 md:py-24">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <Kicker>La solución</Kicker>
+            <Kicker>{o.solution.kicker}</Kicker>
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-              Cada función de F7 resuelve <span className="text-primary">un dolor</span> de tu mostrador.
+              <Rich text={o.solution.title} />
             </h2>
           </div>
 
           <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {solutionBlocks.map((block) => (
-              <Card key={block.pill} className="flex flex-col border-border bg-card p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                    <block.icon className="h-3.5 w-3.5" /> {block.pill}
-                  </span>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{block.plan}</span>
-                </div>
-                <h3 className="mt-4 text-xl font-bold leading-snug">{block.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{block.text}</p>
-                <div className="mt-auto pt-5">
-                  <div className="rounded-lg border border-border bg-background/60 p-3">{block.mock}</div>
-                </div>
-              </Card>
-            ))}
+            {SOLUTION_BLOCKS.map((block) => {
+              const copy = blocks[block.key];
+              return (
+                <Card key={block.key} className="flex flex-col border-border bg-card p-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                      <block.icon className="h-3.5 w-3.5" /> {copy.pill}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{o.solution[block.plan]}</span>
+                  </div>
+                  <h3 className="mt-4 text-xl font-bold leading-snug">{copy.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{copy.text}</p>
+                  <div className="mt-auto pt-5">
+                    <div className="rounded-lg border border-border bg-background/60 p-3">{solutionMocks[block.key]}</div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Los números y nombres de las maquetas son de ejemplo.
-          </p>
+          <p className="mt-6 text-center text-xs text-muted-foreground">{o.solution.footnote}</p>
         </div>
       </section>
 
@@ -546,60 +418,49 @@ export default function Oferta() {
       <section className="py-16 md:py-24">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <Kicker>Sin complicaciones</Kicker>
+            <Kicker>{o.split.kicker}</Kicker>
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-              Vos reparás. <span className="text-primary">F7 se encarga del resto.</span>
+              <Rich text={o.split.title} />
             </h2>
           </div>
 
           <div className="mx-auto mt-10 grid max-w-4xl gap-4 md:grid-cols-2">
             <Card className="border-border p-6">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Tu parte</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{o.split.yourPart}</p>
               <ul className="mt-4 space-y-3 text-sm">
-                {[
-                  "Cargás la orden: cliente, equipo y falla",
-                  "Sacás las fotos con el mismo celular",
-                  "Reparás y cobrás",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-2.5">
+                {o.split.yourItems.map((item) => (
+                  <li key={item} className="flex items-start gap-2.5">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
-                    <span>{t}</span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
             </Card>
             <Card className="border-primary/50 bg-primary/5 p-6 shadow-[0_0_40px_-14px_hsl(var(--primary)/0.5)]">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">La parte de F7</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{o.split.f7Part}</p>
               <ul className="mt-4 space-y-3 text-sm">
-                {[
-                  "Guarda las fotos, las fechas y la garantía",
-                  "Le avisa al cliente por WhatsApp",
-                  "Calcula lo que te quedó de cada reparación",
-                  "Ordena tus clientes y tu caja",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-2.5">
+                {o.split.f7Items.map((item) => (
+                  <li key={item} className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span>{t}</span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
             </Card>
           </div>
-          <p className="mx-auto mt-5 max-w-xl text-center text-sm text-muted-foreground">
-            Tus clientes se crean solos con cada orden: no tenés que cargar ninguna lista antes de empezar.
-          </p>
+          <p className="mx-auto mt-5 max-w-xl text-center text-sm text-muted-foreground">{o.split.note}</p>
 
           <div className="mx-auto mt-14 max-w-3xl text-center">
             <p className="text-2xl font-bold tracking-tight md:text-3xl">
-              Menos desorden. Menos mensajes. <span className="text-primary">Más ganancia.</span>
+              <Rich text={o.split.tagline} />
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              {["Todo en un solo lugar", "Desde tu celular", "En guaraníes"].map((t) => (
+              {o.split.chips.map((chip) => (
                 <span
-                  key={t}
+                  key={chip}
                   className="rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold text-primary"
                 >
-                  {t}
+                  {chip}
                 </span>
               ))}
             </div>
@@ -611,29 +472,13 @@ export default function Oferta() {
       <section className="border-y border-border/60 bg-card/40 py-14">
         <div className="container">
           <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-3">
-            {[
-              {
-                icon: Smartphone,
-                title: "En tu celular",
-                text: "Cargá órdenes y sacá las fotos desde el mismo teléfono con el que atendés.",
-              },
-              {
-                icon: Laptop,
-                title: "En la computadora",
-                text: "Reportes, caja y clientes en pantalla grande, cuando los necesitás.",
-              },
-              {
-                icon: Cloud,
-                title: "Sin instalar nada",
-                text: "Todo vive en la nube y cada negocio ve únicamente sus propios datos.",
-              },
-            ].map((item) => (
-              <Card key={item.title} className="border-border p-5">
+            {DEVICE_CARDS.map((item) => (
+              <Card key={item.key} className="border-border p-5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <item.icon className="h-5 w-5" />
                 </div>
-                <h3 className="mt-3 font-bold">{item.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{item.text}</p>
+                <h3 className="mt-3 font-bold">{o.devices[item.key].title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{o.devices[item.key].text}</p>
               </Card>
             ))}
           </div>
@@ -648,25 +493,22 @@ export default function Oferta() {
               <ShieldCheck className="h-7 w-7" />
             </div>
             <div className="mt-4">
-              <Kicker>Garantía de {GUARANTEE}</Kicker>
+              <Kicker>{o.guarantee.kicker}</Kicker>
             </div>
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-              Si en {GUARANTEE} no te sirve, <span className="text-primary">te devolvemos todo tu dinero</span>.
+              <Rich text={o.guarantee.title} />
             </h2>
-            <p className="mt-4 text-muted-foreground">
-              El riesgo es nuestro, no tuyo. Lo usás con órdenes reales de tu taller y decidís con datos, no con
-              promesas.
-            </p>
+            <p className="mt-4 text-muted-foreground">{o.guarantee.text}</p>
           </div>
 
           <div className="mx-auto mt-10 grid max-w-4xl gap-4 md:grid-cols-3">
-            {guaranteeSteps.map((step, i) => (
-              <Card key={step.title} className="border-border p-5">
+            {GUARANTEE_STEPS.map((step, i) => (
+              <Card key={step} className="border-border p-5">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                   {i + 1}
                 </span>
-                <h3 className="mt-3 font-bold">{step.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{step.text}</p>
+                <h3 className="mt-3 font-bold">{o.guarantee.steps[step].title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{o.guarantee.steps[step].text}</p>
               </Card>
             ))}
           </div>
@@ -674,29 +516,23 @@ export default function Oferta() {
           <div className="mx-auto mt-6 flex max-w-2xl items-start gap-3 rounded-xl border border-secondary/40 bg-secondary/10 p-4">
             <Lock className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
             <div className="text-sm">
-              <p className="font-semibold">Precio congelado para quienes se suman ahora</p>
+              <p className="font-semibold">{o.freeze.title}</p>
               <p className="mt-0.5 text-muted-foreground">
-                Mantenés el precio de hoy de tu plan mientras sigas suscripto.{" "}
-                <span className="font-semibold text-secondary">
-                  No sabemos cuándo va a subir: entrá lo antes posible.
-                </span>
+                {o.freeze.body}{" "}
+                <span className="font-semibold text-secondary">{o.urgency.short}</span>
               </p>
             </div>
           </div>
 
           <Card className="mx-auto mt-6 max-w-2xl border-primary/40 p-6 shadow-[0_0_40px_-14px_hsl(var(--primary)/0.5)]">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Y además</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{o.guarantee.extrasTitle}</p>
             <ul className="mt-4 space-y-3.5 text-sm">
-              {[
-                ["Soporte por WhatsApp, en español", "Una persona real te contesta."],
-                ["Tutorial paso a paso", "Dentro del sistema, para cada módulo."],
-                ["Precios en guaraníes", "También podés elegir dólares."],
-              ].map(([title, sub]) => (
-                <li key={title} className="flex items-start gap-3">
+              {o.guarantee.extras.map((extra) => (
+                <li key={extra.title} className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                   <span>
-                    <span className="font-semibold">{title}</span>
-                    <span className="block text-muted-foreground">{sub}</span>
+                    <span className="font-semibold">{extra.title}</span>
+                    <span className="block text-muted-foreground">{extra.text}</span>
                   </span>
                 </li>
               ))}
@@ -706,7 +542,7 @@ export default function Oferta() {
               onClick={() => contactWhatsApp("garantia")}
               className="mt-6 h-12 w-full bg-primary text-base text-primary-foreground shadow-elevated hover:bg-primary/90"
             >
-              {CTA_LABEL} <ArrowRight className="h-4 w-4" />
+              {t.common.ctaGuarantee} <ArrowRight className="h-4 w-4" />
             </Button>
           </Card>
         </div>
@@ -719,11 +555,11 @@ export default function Oferta() {
           <>
             <p className="font-medium text-foreground">
               <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-primary" />
-              Todos los planes incluyen la garantía de {GUARANTEE}: si no te sirve, te devolvemos todo tu dinero.
+              {t.pricing.guaranteeNote}
             </p>
             <p className="mt-2">
-              Precio congelado para quienes se suman ahora.{" "}
-              <span className="font-semibold text-secondary">No sabemos cuándo va a subir: entrá lo antes posible.</span>
+              {o.freeze.line}{" "}
+              <span className="font-semibold text-secondary">{o.urgency.short}</span>
             </p>
           </>
         }
@@ -733,8 +569,8 @@ export default function Oferta() {
       <section className="border-t border-border/60 py-16 md:py-24">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <Kicker>Preguntas frecuentes</Kicker>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">Antes de empezar</h2>
+            <Kicker>{o.faq.kicker}</Kicker>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">{o.faq.title}</h2>
           </div>
           <Accordion type="single" collapsible className="mx-auto mt-8 max-w-2xl">
             {faqs.map((item, i) => (
@@ -759,16 +595,15 @@ export default function Oferta() {
             />
             <div className="relative">
               <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
-                Tu próxima reparación, <span className="text-primary">ya ordenada</span>.
+                <Rich text={o.final.title} />
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-                Usalo <span className="font-semibold text-foreground">{GUARANTEE}</span> en tu taller. Si no te
-                sirve, <span className="font-semibold text-foreground">te devolvemos todo tu dinero</span>.
+                <Rich text={o.final.text} />
               </p>
               <p className="mx-auto mt-3 max-w-xl text-sm">
                 <Lock className="mr-1.5 inline h-4 w-4 align-[-3px] text-secondary" />
-                Precio congelado para quienes se suman ahora.{" "}
-                <span className="font-semibold text-secondary">No sabemos cuándo va a subir: entrá lo antes posible.</span>
+                {o.freeze.line}{" "}
+                <span className="font-semibold text-secondary">{o.urgency.short}</span>
               </p>
               <div ref={finalCtaRef} className="mt-8 flex justify-center">
                 <Button
@@ -776,12 +611,10 @@ export default function Oferta() {
                   onClick={() => contactWhatsApp("final")}
                   className="h-12 w-full bg-primary px-7 text-base text-primary-foreground shadow-elevated hover:bg-primary/90 sm:w-auto"
                 >
-                  {CTA_LABEL} <ArrowRight className="h-4 w-4" />
+                  {t.common.ctaGuarantee} <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="mt-5 text-xs text-muted-foreground">
-                🇵🇾 Hecho en Paraguay · Soporte por WhatsApp en español
-              </p>
+              <p className="mt-5 text-xs text-muted-foreground">{o.final.smallPrint}</p>
             </div>
           </div>
         </div>
@@ -794,14 +627,14 @@ export default function Oferta() {
             <div className="flex h-6 w-6 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-foreground">
               F7
             </div>
-            <span>F7 Manager Pro · Hecho en Paraguay</span>
+            <span>{t.common.footerBrand}</span>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/login" className="hover:text-primary">
-              Ingresar
+              {t.common.login}
             </Link>
             <button onClick={() => contactWhatsApp("footer")} className="hover:text-primary">
-              Soporte por WhatsApp
+              {o.footer.support}
             </button>
           </div>
         </div>
@@ -822,7 +655,7 @@ export default function Oferta() {
             tabIndex={showStickyBar ? 0 : -1}
             className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {CTA_LABEL} <ArrowRight className="h-4 w-4" />
+            {t.common.ctaGuarantee} <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
