@@ -730,7 +730,6 @@ export default function Oferta() {
       {/* PLANES */}
       <PricingSection
         onContact={(message) => contactWhatsApp("planes", message)}
-        ctaLabel="Elegir este plan"
         note={
           <>
             <p className="font-medium text-foreground">

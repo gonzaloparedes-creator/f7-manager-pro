@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { openUpgradeWhatsApp, GENERAL_INTEREST_MESSAGE } from "@/lib/upgrade";
+import { OFFER_GUARANTEE_DAYS } from "@/lib/ofertaOffer";
 import { PricingSection } from "@/components/PricingSection";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -22,6 +23,10 @@ import {
   Wallet,
   ArrowRight,
 } from "lucide-react";
+
+// La misma oferta que /oferta: no hay prueba gratis, hay garantía de devolución.
+const GUARANTEE = `${OFFER_GUARANTEE_DAYS} días`;
+const CTA_LABEL = `Empezar con garantía de ${GUARANTEE}`;
 
 const painCards = [
   {
@@ -188,7 +193,7 @@ export default function Presentacion() {
                 onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevated"
               >
-                Empezar 14 días GRATIS <ArrowRight className="h-4 w-4" />
+                {CTA_LABEL} <ArrowRight className="h-4 w-4" />
               </Button>
               <a
                 href="#solucion"
@@ -475,7 +480,15 @@ export default function Presentacion() {
       </section>
 
       {/* SECTION 5.5 — PRICING */}
-      <PricingSection onContact={(message) => openUpgradeWhatsApp(message)} />
+      <PricingSection
+        onContact={(message) => openUpgradeWhatsApp(message)}
+        note={
+          <p className="font-medium text-foreground">
+            <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-primary" />
+            Todos los planes incluyen la garantía de {GUARANTEE}: si no te sirve, te devolvemos todo tu dinero.
+          </p>
+        }
+      />
 
       {/* SECTION 6 — CTA */}
       <section className="border-t border-border/60 py-24">
@@ -493,8 +506,8 @@ export default function Presentacion() {
                 Deja de ser un esclavo de tu <span className="text-primary">mostrador</span>.
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-                Pruébalo gratis por <span className="text-foreground font-semibold">14 días</span>.
-                Sin tarjetas, sin compromiso. El precio de Starter es menor que el de
+                Empezá con la <span className="text-foreground font-semibold">garantía de {GUARANTEE}</span>:
+                si no te sirve, te devolvemos todo tu dinero. El precio de Starter es menor que el de
                 <span className="text-foreground font-semibold"> dos reparaciones genéricas al mes</span>.
                 Únete a la liga profesional de talleres.
               </p>
@@ -504,7 +517,7 @@ export default function Presentacion() {
                   onClick={() => openUpgradeWhatsApp(GENERAL_INTEREST_MESSAGE)}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-elevated text-base h-12 px-7"
                 >
-                  Empezar 14 días GRATIS <ArrowRight className="h-4 w-4" />
+                  {CTA_LABEL} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   size="lg"

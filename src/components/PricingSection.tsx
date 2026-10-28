@@ -21,13 +21,14 @@ function fmt(amount: number, currency: Currency) {
   return `${amount.toLocaleString("es-PY")} Gs.`;
 }
 
+// No hay prueba gratis: el botón de cada plan abre WhatsApp para elegirlo.
+const PLAN_CTA = "Elegir este plan";
+
 export function PricingSection({
   onContact,
-  ctaLabel,
   note,
 }: {
   onContact: (message?: string) => void;
-  ctaLabel?: string;
   note?: ReactNode;
 }) {
   const [segment, setSegment] = useState<Segment>("taller");
@@ -36,7 +37,7 @@ export function PricingSection({
 
   const renderCard = (
     plan: Plan,
-    opts: { title: string; subtitle: string; features: string[]; cta: string; accent?: boolean; badgeLabel?: string },
+    opts: { title: string; subtitle: string; features: string[]; accent?: boolean; badgeLabel?: string },
   ) => {
     const price = PRICING[plan][cycle];
     const value = currency === "usd" ? price.usd : price.gs;
@@ -87,11 +88,11 @@ export function PricingSection({
         <div className="mt-7 pt-2">
           {opts.accent ? (
             <Button onClick={() => onContact(PLAN_MESSAGES[plan])} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-              {ctaLabel ?? opts.cta}
+              {PLAN_CTA}
             </Button>
           ) : (
             <Button onClick={() => onContact(PLAN_MESSAGES[plan])} variant="outline" className="w-full border-primary/40 text-foreground hover:bg-primary/10 hover:text-primary">
-              {ctaLabel ?? opts.cta}
+              {PLAN_CTA}
             </Button>
           )}
         </div>
@@ -183,13 +184,11 @@ export function PricingSection({
               title: "Starter",
               subtitle: "Ideal para dar el primer paso y profesionalizar tu mostrador.",
               features: PLAN_FEATURES.starter,
-              cta: "Comenzar prueba gratis",
             })}
             {renderCard("pro", {
               title: "Pro",
               subtitle: "Para talleres que quieren escalar y controlar sus ganancias reales.",
               features: PLAN_FEATURES.pro,
-              cta: "Empezar 14 días GRATIS",
               accent: true,
               badgeLabel: "Más Popular",
             })}
@@ -197,7 +196,6 @@ export function PricingSection({
               title: "Business",
               subtitle: "Para negocios híbridos que reparan y también venden en mostrador.",
               features: PLAN_FEATURES.business,
-              cta: "Empezar 14 días GRATIS",
               accent: true,
               badgeLabel: "Todo en Uno",
             })}
@@ -208,7 +206,6 @@ export function PricingSection({
               title: "Retail",
               subtitle: "Ideal para locales de accesorios, carcasas y venta de celulares.",
               features: PLAN_FEATURES.retail,
-              cta: "Empezar 14 días GRATIS",
               accent: true,
               badgeLabel: "Solo Ventas",
             })}
