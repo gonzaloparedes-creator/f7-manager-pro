@@ -12,7 +12,7 @@ import { PricingSection } from "@/components/PricingSection";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { PRICING } from "@/lib/plans";
 import { trackMeta } from "@/lib/metaPixel";
-import { OFFER_GUARANTEE_DAYS, offerStatus, type OfferStatus } from "@/lib/ofertaOffer";
+import { OFFER_GUARANTEE_DAYS } from "@/lib/ofertaOffer";
 import {
   ArrowRight,
   Camera,
@@ -226,25 +226,15 @@ const guaranteeSteps = [
   },
 ];
 
-function buildFaqs(offer: OfferStatus) {
-  return [
-    {
-      q: `¿Cómo funciona la garantía de ${GUARANTEE}?`,
-      a: `Elegís tu plan, coordinamos el pago por WhatsApp y lo usás ${GUARANTEE} en tu taller con órdenes reales. Si no te sirve, nos avisás por WhatsApp dentro de ese plazo y te devolvemos todo lo que pagaste.`,
-    },
-    ...(offer.active
-      ? [
-          {
-            q: "¿Qué significa «precio congelado»?",
-            a: `Quienes se suman hasta el ${offer.deadlineLabel} mantienen el precio de hoy de su plan mientras sigan suscriptos. Pasada esa fecha, los precios pueden cambiar.`,
-          },
-        ]
-      : []),
-    ...baseFaqs,
-  ];
-}
-
-const baseFaqs = [
+const faqs = [
+  {
+    q: `¿Cómo funciona la garantía de ${GUARANTEE}?`,
+    a: `Elegís tu plan, coordinamos el pago por WhatsApp y lo usás ${GUARANTEE} en tu taller con órdenes reales. Si no te sirve, nos avisás por WhatsApp dentro de ese plazo y te devolvemos todo lo que pagaste.`,
+  },
+  {
+    q: "¿Qué significa «precio congelado»?",
+    a: "Quienes se suman ahora mantienen el precio de hoy de su plan mientras sigan suscriptos. No sabemos cuándo van a cambiar los precios: por eso conviene entrar lo antes posible.",
+  },
   {
     q: "¿Tengo que instalar algo?",
     a: "No. F7 funciona desde el navegador del celular, la tablet o la computadora. No hay nada que descargar.",
@@ -290,8 +280,6 @@ export default function Oferta() {
   const finalCtaRef = useRef<HTMLDivElement>(null);
   const [heroCtaVisible, setHeroCtaVisible] = useState(true);
   const [finalCtaVisible, setFinalCtaVisible] = useState(false);
-  const [now] = useState(() => new Date());
-  const offer = offerStatus(now);
 
   useEffect(() => {
     trackMeta("ViewContent", { content_name: "oferta" });
@@ -327,20 +315,17 @@ export default function Oferta() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background pb-24 text-foreground md:pb-0">
-      {/* AVISO DE OFERTA (solo mientras la fecha límite real no haya pasado) */}
-      {offer.active && (
-        <div className="border-b border-secondary/40 bg-secondary/10">
-          <div className="container flex items-start justify-center gap-2 py-2 text-center text-xs sm:items-center sm:text-sm">
-            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-secondary sm:mt-0" />
-            <p>
-              Precio congelado para quienes se suman hasta el{" "}
-              <span className="whitespace-nowrap font-semibold">{offer.deadlineLabel}</span>
-              <span className="mx-1.5 text-muted-foreground">·</span>
-              <span className="font-bold text-secondary">{offer.urgencyText}</span>
-            </p>
-          </div>
+      {/* AVISO DE OFERTA: sin fecha, el precio puede subir en cualquier momento */}
+      <div className="border-b border-secondary/40 bg-secondary/10">
+        <div className="container flex items-start justify-center gap-2 py-2 text-center text-xs sm:items-center sm:text-sm">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-secondary sm:mt-0" />
+          <p>
+            No sabemos cuándo va a subir el precio
+            <span className="mx-1.5 text-muted-foreground">·</span>
+            <span className="font-bold text-secondary">Entrá lo antes posible y aprovechá el de hoy</span>
+          </p>
         </div>
-      )}
+      </div>
 
       {/* NAV */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
@@ -686,18 +671,18 @@ export default function Oferta() {
             ))}
           </div>
 
-          {offer.active && (
-            <div className="mx-auto mt-6 flex max-w-2xl items-start gap-3 rounded-xl border border-secondary/40 bg-secondary/10 p-4">
-              <Lock className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
-              <div className="text-sm">
-                <p className="font-semibold">Precio congelado hasta el {offer.deadlineLabel}</p>
-                <p className="mt-0.5 text-muted-foreground">
-                  Si te sumás antes de esa fecha, mantenés el precio de hoy de tu plan mientras sigas suscripto.{" "}
-                  <span className="font-semibold text-secondary">{offer.urgencyText}.</span>
-                </p>
-              </div>
+          <div className="mx-auto mt-6 flex max-w-2xl items-start gap-3 rounded-xl border border-secondary/40 bg-secondary/10 p-4">
+            <Lock className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
+            <div className="text-sm">
+              <p className="font-semibold">Precio congelado para quienes se suman ahora</p>
+              <p className="mt-0.5 text-muted-foreground">
+                Mantenés el precio de hoy de tu plan mientras sigas suscripto.{" "}
+                <span className="font-semibold text-secondary">
+                  No sabemos cuándo va a subir: entrá lo antes posible.
+                </span>
+              </p>
             </div>
-          )}
+          </div>
 
           <Card className="mx-auto mt-6 max-w-2xl border-primary/40 p-6 shadow-[0_0_40px_-14px_hsl(var(--primary)/0.5)]">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Y además</p>
@@ -736,12 +721,10 @@ export default function Oferta() {
               <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-primary" />
               Todos los planes incluyen la garantía de {GUARANTEE}: si no te sirve, te devolvemos todo tu dinero.
             </p>
-            {offer.active && (
-              <p className="mt-2">
-                Precio congelado para quienes se suman hasta el {offer.deadlineLabel}.{" "}
-                <span className="font-semibold text-secondary">{offer.urgencyText}.</span>
-              </p>
-            )}
+            <p className="mt-2">
+              Precio congelado para quienes se suman ahora.{" "}
+              <span className="font-semibold text-secondary">No sabemos cuándo va a subir: entrá lo antes posible.</span>
+            </p>
           </>
         }
       />
@@ -754,7 +737,7 @@ export default function Oferta() {
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">Antes de empezar</h2>
           </div>
           <Accordion type="single" collapsible className="mx-auto mt-8 max-w-2xl">
-            {buildFaqs(offer).map((item, i) => (
+            {faqs.map((item, i) => (
               <AccordionItem key={item.q} value={`faq-${i}`}>
                 <AccordionTrigger className="text-left text-base">{item.q}</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
@@ -782,13 +765,11 @@ export default function Oferta() {
                 Usalo <span className="font-semibold text-foreground">{GUARANTEE}</span> en tu taller. Si no te
                 sirve, <span className="font-semibold text-foreground">te devolvemos todo tu dinero</span>.
               </p>
-              {offer.active && (
-                <p className="mx-auto mt-3 max-w-xl text-sm">
-                  <Lock className="mr-1.5 inline h-4 w-4 align-[-3px] text-secondary" />
-                  Precio congelado para quienes se suman hasta el {offer.deadlineLabel}.{" "}
-                  <span className="font-semibold text-secondary">{offer.urgencyText}.</span>
-                </p>
-              )}
+              <p className="mx-auto mt-3 max-w-xl text-sm">
+                <Lock className="mr-1.5 inline h-4 w-4 align-[-3px] text-secondary" />
+                Precio congelado para quienes se suman ahora.{" "}
+                <span className="font-semibold text-secondary">No sabemos cuándo va a subir: entrá lo antes posible.</span>
+              </p>
               <div ref={finalCtaRef} className="mt-8 flex justify-center">
                 <Button
                   size="lg"
