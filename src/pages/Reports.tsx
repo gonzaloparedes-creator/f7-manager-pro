@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { formatPYG, interruptionReasonLabel } from "@/lib/orders";
+import { interruptionReasonLabel } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -762,7 +763,7 @@ export default function Reports() {
                 />
               </div>
               <div className={`mt-1 text-3xl font-bold ${gananciaNetaTotal >= 0 ? "text-primary" : "text-destructive"}`}>
-                {formatPYG(gananciaNetaTotal)}
+                {formatMoney(gananciaNetaTotal)}
               </div>
             </div>
             <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/15 text-primary">
@@ -923,7 +924,7 @@ export default function Reports() {
                     borderRadius: 8,
                     fontSize: 12,
                   }}
-                  formatter={(v: number) => [formatPYG(Number(v)), chartLabel]}
+                  formatter={(v: number) => [formatMoney(Number(v)), chartLabel]}
                 />
                 <Bar dataKey={chartKey} fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
               </BarChart>
@@ -979,7 +980,7 @@ function SummaryCard({
             {hint && <KpiHint label={label} text={hint} />}
           </div>
           <div className={`text-2xl font-bold ${accent ?? ""}`}>
-            {prefix}{formatPYG(value)}
+            {prefix}{formatMoney(value)}
           </div>
         </div>
         <div className={`hidden h-11 w-11 items-center justify-center rounded-lg sm:flex ${iconBg ?? "bg-accent text-accent-foreground"}`}>
@@ -1044,7 +1045,7 @@ function CostByCategoryCard({ title, rows }: { title: string; rows: Map<string, 
               <AccordionTrigger className="py-2 text-sm hover:no-underline">
                 <div className="flex flex-1 items-center justify-between pr-2">
                   <span className="text-foreground">{label}</span>
-                  <span className="font-medium text-foreground">{formatPYG(v.cost)}</span>
+                  <span className="font-medium text-foreground">{formatMoney(v.cost)}</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pb-2 pt-0">
@@ -1052,7 +1053,7 @@ function CostByCategoryCard({ title, rows }: { title: string; rows: Map<string, 
                   {parts.map(([name, cost]) => (
                     <div key={name} className="flex items-center justify-between pl-3 text-xs">
                       <span className="text-muted-foreground">{name}</span>
-                      <span className="font-medium text-foreground">{formatPYG(cost)}</span>
+                      <span className="font-medium text-foreground">{formatMoney(cost)}</span>
                     </div>
                   ))}
                 </div>
@@ -1084,9 +1085,9 @@ function MarginByCategoryCard({ title, rows, icon = Tags }: { title: string; row
               <tr key={label} className="border-t border-border/50">
                 <td className="py-1.5 text-foreground">{label}</td>
                 <td className="py-1.5 text-right text-muted-foreground">{v.count}</td>
-                <td className="py-1.5 text-right">{formatPYG(v.revenue)}</td>
+                <td className="py-1.5 text-right">{formatMoney(v.revenue)}</td>
                 <td className={cn("py-1.5 text-right font-medium", v.revenue - v.cost >= 0 ? "text-primary" : "text-destructive")}>
-                  {formatPYG(v.revenue - v.cost)}
+                  {formatMoney(v.revenue - v.cost)}
                 </td>
               </tr>
             ))}
@@ -1113,9 +1114,9 @@ function SalesByCategoryCard({ title, rows }: { title: string; rows: Map<string,
                 <div className="flex flex-1 items-center justify-between pr-2">
                   <span className="text-foreground">{label}</span>
                   <span className="flex items-center gap-3 text-sm">
-                    <span className="text-muted-foreground">{formatPYG(v.revenue)}</span>
+                    <span className="text-muted-foreground">{formatMoney(v.revenue)}</span>
                     <span className={cn("font-medium", v.revenue - v.cost >= 0 ? "text-primary" : "text-destructive")}>
-                      {formatPYG(v.revenue - v.cost)}
+                      {formatMoney(v.revenue - v.cost)}
                     </span>
                   </span>
                 </div>
@@ -1126,9 +1127,9 @@ function SalesByCategoryCard({ title, rows }: { title: string; rows: Map<string,
                     <div key={name} className="flex items-center justify-between pl-3 text-xs">
                       <span className="text-muted-foreground">{name}</span>
                       <span className="flex items-center gap-3">
-                        <span className="text-muted-foreground">{formatPYG(pv.revenue)}</span>
+                        <span className="text-muted-foreground">{formatMoney(pv.revenue)}</span>
                         <span className={cn("font-medium", pv.revenue - pv.cost >= 0 ? "text-primary" : "text-destructive")}>
-                          {formatPYG(pv.revenue - pv.cost)}
+                          {formatMoney(pv.revenue - pv.cost)}
                         </span>
                       </span>
                     </div>
@@ -1151,7 +1152,7 @@ function RevenueListCard({ title, icon, rows }: { title: string; icon: any; rows
         {sorted.map((r) => (
           <div key={r.id} className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{r.label}</span>
-            <span className="font-medium text-foreground">{formatPYG(r.revenue)}</span>
+            <span className="font-medium text-foreground">{formatMoney(r.revenue)}</span>
           </div>
         ))}
       </div>
@@ -1209,11 +1210,11 @@ function StaffCommissionCard({
               return (
                 <tr key={r.id} className="border-t border-border/50" data-testid="staff-row">
                   <td className="py-1.5 align-top text-foreground">{r.name}</td>
-                  <td className="py-1.5 text-right align-top">{formatPYG(r.revenue)}</td>
+                  <td className="py-1.5 text-right align-top">{formatMoney(r.revenue)}</td>
                   {commissionEnabled && (
                     <td className="py-1.5 text-right align-top">
                       <div className="font-medium text-primary">
-                        {formatPYG((r.revenue * r.rate) / 100)}
+                        {formatMoney((r.revenue * r.rate) / 100)}
                         <span className="ml-1 text-xs text-muted-foreground">({r.rate}%)</span>
                       </div>
                       {win?.status === "covered" && (
@@ -1250,7 +1251,7 @@ function StaffCommissionCard({
             <tfoot>
               <tr className="border-t border-border font-semibold">
                 <td className="py-1.5" colSpan={2}>Total comisiones</td>
-                <td className="py-1.5 text-right text-primary">{formatPYG(totalCommission)}</td>
+                <td className="py-1.5 text-right text-primary">{formatMoney(totalCommission)}</td>
               </tr>
             </tfoot>
           )}

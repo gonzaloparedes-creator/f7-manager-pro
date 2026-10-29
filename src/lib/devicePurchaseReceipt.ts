@@ -1,4 +1,4 @@
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { summarizeChecklist, type DevicePurchaseRecord } from "@/lib/devicePurchase";
 import { parseBattery } from "@/lib/deviceSpecs";
 
@@ -80,9 +80,9 @@ function copy(record: DevicePurchaseRecord, options: PurchaseReceiptOptions, cop
   <table>
     ${
       canje
-        ? `${row("Valor reconocido", formatPYG(record.purchase_price))}
+        ? `${row("Valor reconocido", formatMoney(record.purchase_price))}
     ${row("Forma de pago", "Descontado del precio de la venta")}`
-        : `${row("Monto pagado", formatPYG(record.purchase_price))}
+        : `${row("Monto pagado", formatMoney(record.purchase_price))}
     ${row("Medio de pago", record.payment_method)}`
     }
   </table>

@@ -2,7 +2,7 @@
 // sacaron a cada equipo, cuánto de lo pagado ya se asignó a esas piezas y la
 // validación al cargar una pieza nueva. Sin React ni Supabase para testearla directo.
 
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { parseGs, type DevicePurchaseRecord } from "@/lib/devicePurchase";
 
 export interface ScrapPart {
@@ -82,7 +82,7 @@ export function validatePart(input: PartInput, remaining: number): string | null
   const cost = parseGs(input.cost);
   if (cost > remaining) {
     return remaining > 0
-      ? `El costo no puede superar lo que queda por asignar (${formatPYG(remaining)})`
+      ? `El costo no puede superar lo que queda por asignar (${formatMoney(remaining)})`
       : "Ya asignaste todo lo que pagaste por este equipo. Cargá la pieza con costo 0.";
   }
   return null;

@@ -6,6 +6,7 @@ import StorefrontShell, { StorefrontUnavailable, useStorefrontTitle } from "@/co
 import StorefrontCard from "@/components/storefront/StorefrontCard";
 import StorefrontGallery from "@/components/storefront/StorefrontGallery";
 import { IncludesList, ProductSeals } from "@/components/storefront/StorefrontSeals";
+import { DEFAULT_CURRENCY, parseCurrency, setActiveCurrency } from "@/lib/currency";
 import {
   buildInterestMessage,
   galleryImages,
@@ -33,16 +34,21 @@ export default function PublicStorefrontItem() {
       return;
     }
     setState({ status: "loading" });
-    (supabase as any)
-      .rpc("get_storefront_item", { _slug: slug, _item_id: itemId })
-      .then(({ data, error }: { data: StorefrontItemData | null; error: unknown }) => {
-        if (!active) return;
-        if (error) setState({ status: "error" });
-        else if (!data) setState({ status: "missing" });
-        else setState({ status: "ready", data });
-      });
+    Promise.all([
+      (supabase as any).rpc("get_storefront_item", { _slug: slug, _item_id: itemId }),
+      supabase.rpc("get_storefront_currency", { _slug: slug }),
+    ]).then(([{ data, error }, { data: currency }]: [{ data: StorefrontItemData | null; error: unknown }, { data: string | null }]) => {
+      if (!active) return;
+      // Los precios se muestran en la moneda del negocio (antes de dibujarlos).
+      setActiveCurrency(parseCurrency(currency));
+      if (error) setState({ status: "error" });
+      else if (!data) setState({ status: "missing" });
+      else setState({ status: "ready", data });
+    });
     return () => { active = false; };
   }, [slug, itemId]);
+
+  useEffect(() => () => setActiveCurrency(DEFAULT_CURRENCY), []);
 
   const ready = state.status === "ready" ? state.data : null;
   useStorefrontTitle(ready?.store.name, ready?.item?.name);

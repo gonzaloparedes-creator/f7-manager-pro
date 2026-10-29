@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompany } from "@/hooks/useCompany";
 import { usePaymentMethodPresets } from "@/hooks/usePaymentMethodPresets";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { logExpensePayment } from "@/lib/expenses";
 import { Wallet, Loader2 } from "lucide-react";
 
@@ -57,7 +57,7 @@ export default function PayExpenseInstallmentDialog({
   const handleConfirm = async () => {
     if (!expense || !user || !companyId) return;
     if (amountNum <= 0 || amountNum > pending) {
-      toast({ title: "Monto inválido", description: `No puede superar lo pendiente (${formatPYG(pending)}).`, variant: "destructive" });
+      toast({ title: "Monto inválido", description: `No puede superar lo pendiente (${formatMoney(pending)}).`, variant: "destructive" });
       return;
     }
     if (!method) {
@@ -82,7 +82,7 @@ export default function PayExpenseInstallmentDialog({
         title: "Cuota registrada",
         description: newAmountPaid >= expense.amount
           ? "El gasto quedó totalmente pagado."
-          : `Pendiente: ${formatPYG(expense.amount - newAmountPaid)}.`,
+          : `Pendiente: ${formatMoney(expense.amount - newAmountPaid)}.`,
       });
       onOpenChange(false);
       onPaid();
@@ -98,12 +98,12 @@ export default function PayExpenseInstallmentDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Abonar cuota{expense ? ` — ${expense.category}` : ""}</DialogTitle>
-          <DialogDescription>Pendiente: {formatPYG(pending)}</DialogDescription>
+          <DialogDescription>Pendiente: {formatMoney(pending)}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="pei-amount">Monto a abonar (Gs.)</Label>
+            <Label htmlFor="pei-amount">Monto a abonar ({currencySymbol()})</Label>
             <Input id="pei-amount" type="number" min={0} max={pending} value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
           <div className="space-y-2">

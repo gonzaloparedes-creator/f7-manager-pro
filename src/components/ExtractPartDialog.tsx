@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { parseGs } from "@/lib/devicePurchase";
 import { buildPartParams, validatePart, type PartInput, type ScrapDevice } from "@/lib/scrapDevice";
 
@@ -67,7 +67,7 @@ export default function ExtractPartDialog({
         <DialogHeader>
           <DialogTitle>Sacar una pieza</DialogTitle>
           <DialogDescription>
-            {device.purchase.device_name} ({device.purchase.receipt_number}), comprado por {formatPYG(device.purchase.purchase_price)}.
+            {device.purchase.device_name} ({device.purchase.receipt_number}), comprado por {formatMoney(device.purchase.purchase_price)}.
             La pieza entra a Inventario como repuesto.
           </DialogDescription>
         </DialogHeader>
@@ -79,17 +79,17 @@ export default function ExtractPartDialog({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="part-cost">Costo de la pieza (Gs.)</Label>
+              <Label htmlFor="part-cost">Costo de la pieza ({currencySymbol()})</Label>
               <Input id="part-cost" inputMode="numeric" placeholder="0" value={formatThousands(form.cost)} onChange={(e) => set({ cost: e.target.value })} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="part-selling">Precio de venta (Gs., opcional)</Label>
+              <Label htmlFor="part-selling">Precio de venta ({currencySymbol()}, opcional)</Label>
               <Input id="part-selling" inputMode="numeric" placeholder="0" value={formatThousands(form.selling)} onChange={(e) => set({ selling: e.target.value })} />
             </div>
           </div>
           <p className="text-xs text-muted-foreground" data-testid="part-remaining">
             {remaining > 0
-              ? `Queda por asignar: ${formatPYG(Math.max(0, remaining - cost))} de ${formatPYG(device.purchase.purchase_price)}. Repartí lo que pagaste entre las piezas que le sacás.`
+              ? `Queda por asignar: ${formatMoney(Math.max(0, remaining - cost))} de ${formatMoney(device.purchase.purchase_price)}. Repartí lo que pagaste entre las piezas que le sacás.`
               : "Ya asignaste todo lo que pagaste por este equipo. Las piezas que sigas cargando entran a costo 0."}
           </p>
         </div>

@@ -3,7 +3,7 @@ import {
   buildBatchCreatedMessage,
   buildOrderMessageVars,
   equipmentLabel,
-  PREVIEW_VARS,
+  getPreviewVars,
   renderMessage,
   resolveStatusBody,
   type OrderMessageSource,
@@ -105,6 +105,6 @@ describe("mensaje de lote", () => {
 
 describe("vista previa de variables", () => {
   it("el ejemplo de {{equipo}} muestra que incluye el modelo", () => {
-    expect(PREVIEW_VARS.equipo).toBe("Celular Samsung Galaxy S23");
+    expect(getPreviewVars().equipo).toBe("Celular Samsung Galaxy S23");
   });
 });

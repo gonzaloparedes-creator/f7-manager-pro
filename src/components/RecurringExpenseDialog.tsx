@@ -25,6 +25,7 @@ import { Loader2, FolderPlus, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { currencySymbol } from "@/lib/currency";
 
 const CREATE_CATEGORY = "__create_category__";
 const GENERAL_BRANCH = "__general__";
@@ -233,7 +234,7 @@ export default function RecurringExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="recurring-amount">Monto (Gs.)</Label>
+            <Label htmlFor="recurring-amount">Monto ({currencySymbol()})</Label>
             <Input
               id="recurring-amount"
               type="number"

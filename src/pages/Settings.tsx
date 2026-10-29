@@ -36,7 +36,7 @@ import MarcaPresetsTab from "@/components/MarcaPresetsTab";
 import ServiceTermsTab from "@/components/ServiceTermsTab";
 import OrderStatusPresetsTab from "@/components/OrderStatusPresetsTab";
 import WhatsAppSettingsTab from "@/components/WhatsAppSettingsTab";
-import { COUNTRIES, PY_DEPARTMENTS } from "@/lib/locations";
+import LocationCurrencyCard from "@/components/LocationCurrencyCard";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface Profile {
@@ -189,7 +189,7 @@ export default function Settings() {
 
           <TicketWidthCard />
 
-          <LocationCard />
+          <LocationCurrencyCard />
         </TabsContent>
 
         <TabsContent value="whatsapp">
@@ -418,81 +418,6 @@ function TicketWidthCard() {
             {saving ? "Guardando..." : "Guardar"}
           </Button>
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ---------- Ubicación del taller ---------- */
-function LocationCard() {
-  const { toast } = useToast();
-  const { companyId } = useCompany();
-  const [country, setCountry] = useState("PY");
-  const [department, setDepartment] = useState("");
-  const [city, setCity] = useState("");
-  const [saving, setSaving] = useState(false);
-  const isParaguay = country === "PY";
-
-  useEffect(() => {
-    if (!companyId) return;
-    supabase.from("companies").select("country, department, city").eq("id", companyId).maybeSingle()
-      .then(({ data }) => {
-        if (!data) return;
-        setCountry(data.country ?? "PY");
-        setDepartment(data.department ?? "");
-        setCity(data.city ?? "");
-      });
-  }, [companyId]);
-
-  const save = async () => {
-    if (!companyId) return;
-    setSaving(true);
-    const { error } = await supabase.from("companies").update({
-      country,
-      department: isParaguay ? (department || null) : null,
-      city: isParaguay ? (city || null) : null,
-    }).eq("id", companyId);
-    setSaving(false);
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else toast({ title: "Ubicación actualizada" });
-  };
-
-  return (
-    <Card>
-      <CardContent className="space-y-4 p-6">
-        <div>
-          <div className="font-semibold">Ubicación del taller</div>
-          <div className="text-xs text-muted-foreground">Nos ayuda a entender dónde estamos creciendo.</div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>País</Label>
-            <Select value={country} onValueChange={(v) => { setCountry(v); setDepartment(""); setCity(""); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COUNTRIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          {isParaguay && (
-            <div className="space-y-2">
-              <Label>Departamento</Label>
-              <Select value={department} onValueChange={setDepartment}>
-                <SelectTrigger><SelectValue placeholder="Elegí uno" /></SelectTrigger>
-                <SelectContent>
-                  {PY_DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {isParaguay && (
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Ciudad</Label>
-              <Input value={city} onChange={(e) => setCity(e.target.value)} />
-            </div>
-          )}
-        </div>
-        <Button onClick={save} disabled={saving || !companyId}>{saving ? "Guardando..." : "Guardar cambios"}</Button>
       </CardContent>
     </Card>
   );

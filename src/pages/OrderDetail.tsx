@@ -14,10 +14,11 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/StatusBadge";
 import { WarrantyBadge } from "@/components/WarrantyBadge";
 import {
-  formatPYG, renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse,
+  renderServiceTerms, resolveStatusLabel, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type QuoteResponse,
   ORDER_PRIORITIES, PRIORITY_LABELS, normalizePriority, priorityBadgeClasses,
   INTERRUPTION_REASONS, interruptionReasonLabel, type InterruptionReason,
 } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import RegisterPaymentDialog from "@/components/RegisterPaymentDialog";
 import { useServiceTerms } from "@/hooks/useServiceTerms";
 import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
@@ -1168,7 +1169,7 @@ export default function OrderDetail() {
                 {editingFinance ? (
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-quote" className="text-xs text-muted-foreground">Precio del presupuesto (Gs.)</Label>
+                      <Label htmlFor="edit-quote" className="text-xs text-muted-foreground">Precio del presupuesto ({currencySymbol()})</Label>
                       <Input
                         id="edit-quote"
                         type="number"
@@ -1182,7 +1183,7 @@ export default function OrderDetail() {
                       </p>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="edit-deposit" className="text-xs text-muted-foreground">Seña / Pagado (Gs.)</Label>
+                      <Label htmlFor="edit-deposit" className="text-xs text-muted-foreground">Seña / Pagado ({currencySymbol()})</Label>
                       <Input
                         id="edit-deposit"
                         type="number"
@@ -1201,11 +1202,11 @@ export default function OrderDetail() {
                         <div className="space-y-1 rounded-md border border-dashed border-border p-2 text-sm">
                           <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Total ajustado</span>
-                            <span className="font-semibold">{formatPYG(tAdj)}</span>
+                            <span className="font-semibold">{formatMoney(tAdj)}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Saldo</span>
-                            <span className={cn("font-bold", sal > 0 ? "text-secondary" : "text-foreground")}>{formatPYG(sal)}</span>
+                            <span className={cn("font-bold", sal > 0 ? "text-secondary" : "text-foreground")}>{formatMoney(sal)}</span>
                           </div>
                         </div>
                       );
@@ -1235,14 +1236,14 @@ export default function OrderDetail() {
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Presupuesto inicial</span>
-                        <span className="font-medium">{formatPYG(presupuestoInicial)}</span>
+                        <span className="font-medium">{formatMoney(presupuestoInicial)}</span>
                       </div>
 
                       {ajustePrecio !== 0 && (
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">Ajuste de precio</span>
                           <span className={cn("font-medium", ajustePrecio < 0 ? "text-destructive" : "text-foreground")}>
-                            {ajustePrecio < 0 ? "- " : "+ "}{formatPYG(Math.abs(ajustePrecio))}
+                            {ajustePrecio < 0 ? "- " : "+ "}{formatMoney(Math.abs(ajustePrecio))}
                           </span>
                         </div>
                       )}
@@ -1254,7 +1255,7 @@ export default function OrderDetail() {
                             <div key={i} className="flex items-center justify-between gap-2 text-sm">
                               <span className="truncate">{c.motivo}</span>
                               <div className="flex items-center gap-2">
-                                <span className="font-medium">{formatPYG(c.monto)}</span>
+                                <span className="font-medium">{formatMoney(c.monto)}</span>
                                 <button
                                   type="button"
                                   onClick={() => setPendingRemoveChargeIdx(i)}
@@ -1272,15 +1273,15 @@ export default function OrderDetail() {
 
                       <div className="flex items-center justify-between border-t border-border pt-2">
                         <span className="text-muted-foreground">Total ajustado</span>
-                        <span className="font-semibold">{formatPYG(totalAjustado)}</span>
+                        <span className="font-semibold">{formatMoney(totalAjustado)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Seña / Pagado</span>
-                        <span className="font-medium">- {formatPYG(order.deposit_amount)}</span>
+                        <span className="font-medium">- {formatMoney(order.deposit_amount)}</span>
                       </div>
                       <div className="flex items-center justify-between border-t border-border pt-2">
                         <span className="text-sm font-semibold">Saldo</span>
-                        <span className={cn("text-base font-bold", saldo > 0 ? "text-secondary" : "text-foreground")}>{formatPYG(saldo)}</span>
+                        <span className={cn("text-base font-bold", saldo > 0 ? "text-secondary" : "text-foreground")}>{formatMoney(saldo)}</span>
                       </div>
                     </div>
 
@@ -1459,7 +1460,7 @@ export default function OrderDetail() {
                         <Input
                           type="number"
                           inputMode="numeric"
-                          placeholder="Monto Adicional Gs."
+                          placeholder={`Monto Adicional ${currencySymbol()}`}
                           value={chargeMonto}
                           onChange={(e) => setChargeMonto(e.target.value)}
                         />
@@ -1722,7 +1723,7 @@ export default function OrderDetail() {
         title="¿Eliminar cargo adicional?"
         description={
           pendingRemoveChargeIdx !== null && order.cargos_adicionales?.[pendingRemoveChargeIdx]
-            ? `Se eliminará "${order.cargos_adicionales[pendingRemoveChargeIdx].motivo}" (${formatPYG(order.cargos_adicionales[pendingRemoveChargeIdx].monto)}).`
+            ? `Se eliminará "${order.cargos_adicionales[pendingRemoveChargeIdx].motivo}" (${formatMoney(order.cargos_adicionales[pendingRemoveChargeIdx].monto)}).`
             : ""
         }
         loading={pendingRemoveChargeIdx !== null && removingChargeIdx === pendingRemoveChargeIdx}

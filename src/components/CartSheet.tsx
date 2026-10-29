@@ -10,7 +10,8 @@ import { useCompany } from "@/hooks/useCompany";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
 import { Loader2, ShoppingCart, CheckCircle2, Printer, Trash2, MessageCircle, ArrowLeftRight, ShieldCheck } from "lucide-react";
-import { formatPYG, isCashLabel } from "@/lib/orders";
+import { isCashLabel } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import QuantityStepper from "@/components/QuantityStepper";
 import BuyDeviceDialog from "@/components/BuyDeviceDialog";
@@ -289,7 +290,7 @@ export default function CartSheet({
         inserted = (data as InsertedRow[]) ?? [];
       }
 
-      toast.success(`Venta registrada: ${formatPYG(total)}`);
+      toast.success(`Venta registrada: ${formatMoney(total)}`);
       const buyerRow = inserted.find((r) => r.customer_name || r.customer_phone);
       setCompletedSale({
         id: saleGroupId,
@@ -330,19 +331,19 @@ export default function CartSheet({
               </SheetTitle>
               <SheetDescription>
                 {completedSale.items.length} producto{completedSale.items.length !== 1 ? "s" : ""} ·{" "}
-                {formatPYG(completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0))}
+                {formatMoney(completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0))}
               </SheetDescription>
             </SheetHeader>
             {completedSale.trade_in && (
               <div className="rounded-md border border-border bg-muted/30 p-3 text-sm" data-testid="trade-in-done">
                 <div className="font-medium text-foreground">Equipo recibido en canje</div>
                 <div className="text-muted-foreground">
-                  {completedSale.trade_in.device_name} · {formatPYG(completedSale.trade_in.value)}
+                  {completedSale.trade_in.device_name} · {formatMoney(completedSale.trade_in.value)}
                   {completedSale.trade_in.record ? ` · ${completedSale.trade_in.record.receipt_number}` : ""}
                 </div>
                 {!completedSale.deposit && (
                   <div className="text-muted-foreground">
-                    Cobrado: {formatPYG(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - completedSale.trade_in.value))}
+                    Cobrado: {formatMoney(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - completedSale.trade_in.value))}
                   </div>
                 )}
                 {completedSale.trade_in.record && onPrintTradeIn && (
@@ -360,9 +361,9 @@ export default function CartSheet({
             {!!completedSale.deposit && (
               <div className="rounded-md border border-border bg-muted/30 p-3 text-sm" data-testid="deposit-done">
                 <div className="font-medium text-foreground">Venta desde una reserva</div>
-                <div className="text-muted-foreground">Seña ya abonada: -{formatPYG(completedSale.deposit)}</div>
+                <div className="text-muted-foreground">Seña ya abonada: -{formatMoney(completedSale.deposit)}</div>
                 <div className="text-muted-foreground">
-                  Cobrado ahora: {formatPYG(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - (completedSale.trade_in?.value ?? 0) - completedSale.deposit))}
+                  Cobrado ahora: {formatMoney(Math.max(0, completedSale.items.reduce((s, i) => s + i.quantity * i.unit_price, 0) - (completedSale.trade_in?.value ?? 0) - completedSale.deposit))}
                 </div>
               </div>
             )}
@@ -427,14 +428,14 @@ export default function CartSheet({
                       {(() => {
                         const r = reservationOf(l);
                         return r
-                          ? `Reserva ${r.receipt_number} · ${r.customer_name} · ${depositOf(r) > 0 ? `seña ${formatPYG(depositOf(r))}` : "sin seña"}`
+                          ? `Reserva ${r.receipt_number} · ${r.customer_name} · ${depositOf(r) > 0 ? `seña ${formatMoney(depositOf(r))}` : "sin seña"}`
                           : "Esta reserva ya no está activa";
                       })()}
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">Gs.</span>
+                      <span className="text-xs text-muted-foreground">{currencySymbol()}</span>
                       <Input
                         type="number"
                         min={0}
@@ -450,7 +451,7 @@ export default function CartSheet({
                     </div>
                     <QuantityStepper value={l.quantity} max={l.product.stock} onChange={(q) => setQty(l.id, q)} size="sm" />
                     <div className="w-20 shrink-0 text-right text-sm font-semibold">
-                      {formatPYG(l.quantity * l.unitPrice)}
+                      {formatMoney(l.quantity * l.unitPrice)}
                     </div>
                   </div>
                 </div>
@@ -543,7 +544,7 @@ export default function CartSheet({
                               discountUnit === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
                             )}
                           >
-                            Gs.
+                            {currencySymbol()}
                           </button>
                         </div>
                       </div>
@@ -554,11 +555,11 @@ export default function CartSheet({
                     <>
                       <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span>Subtotal</span>
-                        <span>{formatPYG(subtotal)}</span>
+                        <span>{formatMoney(subtotal)}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm text-secondary">
                         <span>Descuento</span>
-                        <span>-{formatPYG(discountAmount)}</span>
+                        <span>-{formatMoney(discountAmount)}</span>
                       </div>
                     </>
                   )}
@@ -569,7 +570,7 @@ export default function CartSheet({
                         <span className="flex items-center gap-1.5 font-medium text-foreground">
                           <ArrowLeftRight className="h-4 w-4 text-primary" /> Equipo recibido
                         </span>
-                        <span className="font-semibold text-secondary">-{formatPYG(tradeInValue)}</span>
+                        <span className="font-semibold text-secondary">-{formatMoney(tradeInValue)}</span>
                       </div>
                       <div className="truncate text-muted-foreground">
                         {tradeIn.params.device_name} · IMEI {tradeIn.params.imei}
@@ -588,12 +589,12 @@ export default function CartSheet({
 
                   <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-4 py-3">
                     <span className="text-sm text-muted-foreground">Total</span>
-                    <span className="text-xl font-bold text-primary">{formatPYG(total)}</span>
+                    <span className="text-xl font-bold text-primary">{formatMoney(total)}</span>
                   </div>
                   {deposits > 0 && (
                     <div className="flex items-center justify-between text-sm text-secondary" data-testid="deposit-line">
                       <span>Seña ya abonada (reserva)</span>
-                      <span>-{formatPYG(deposits)}</span>
+                      <span>-{formatMoney(deposits)}</span>
                     </div>
                   )}
                   {reservationProblem && <p className="text-xs text-destructive" data-testid="reservation-problem">{reservationProblem}</p>}
@@ -602,13 +603,13 @@ export default function CartSheet({
                       <span className="text-sm text-muted-foreground">
                         A cobrar (total{tradeIn ? " − equipo recibido" : ""}{deposits > 0 ? " − seña" : ""})
                       </span>
-                      <span className="text-xl font-bold text-primary" data-testid="to-collect">{formatPYG(toCollect)}</span>
+                      <span className="text-xl font-bold text-primary" data-testid="to-collect">{formatMoney(toCollect)}</span>
                     </div>
                   )}
 
                   {isCashLabel(paymentMethod) && toCollect > 0 && (
                     <div className="space-y-2">
-                      <Label htmlFor="cart-received">¿Con cuánto te paga? (Gs.)</Label>
+                      <Label htmlFor="cart-received">¿Con cuánto te paga? ({currencySymbol()})</Label>
                       <Input
                         id="cart-received"
                         type="number"
@@ -624,7 +625,7 @@ export default function CartSheet({
                           vuelto >= 0 ? "border-secondary/40 bg-secondary/10 text-secondary" : "border-destructive/40 bg-destructive/10 text-destructive"
                         )}>
                           <span>{vuelto >= 0 ? "Vuelto" : "Falta"}</span>
-                          <span className="text-lg">{formatPYG(Math.abs(vuelto))}</span>
+                          <span className="text-lg">{formatMoney(Math.abs(vuelto))}</span>
                         </div>
                       )}
                     </div>

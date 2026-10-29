@@ -1,7 +1,7 @@
 import { Fragment, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MESSAGE_VARIABLES, PREVIEW_VARS, renderMessage, type MessageVars } from "@/lib/customerMessages";
+import { MESSAGE_VARIABLES, getPreviewVars, renderMessage, type MessageVars } from "@/lib/customerMessages";
 
 // Mismo tope que el CHECK de whatsapp_templates.body.
 export const MAX_TEMPLATE_LENGTH = 1500;
@@ -59,7 +59,7 @@ export default function MessageTemplateEditor({
 
   const available = MESSAGE_VARIABLES.filter((v) => (variables ? variables.includes(v.key) : !v.postSaleOnly));
   const unknown = unavailableVariables(value, new Set<string>(available.map((v) => v.key)));
-  const preview = renderMessage(value, { ...PREVIEW_VARS, ...previewVars });
+  const preview = renderMessage(value, { ...getPreviewVars(), ...previewVars });
 
   return (
     <div className="space-y-4">

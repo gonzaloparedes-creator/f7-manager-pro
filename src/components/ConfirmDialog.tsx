@@ -17,6 +17,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   confirmingLabel?: string;
   loading?: boolean;
+  /** Botón rojo (por defecto). false para acciones reversibles que solo necesitan un aviso. */
+  destructive?: boolean;
   onConfirm: () => void;
 }
 
@@ -28,6 +30,7 @@ export function ConfirmDialog({
   confirmLabel = "Eliminar",
   confirmingLabel = "Eliminando...",
   loading = false,
+  destructive = true,
   onConfirm,
 }: ConfirmDialogProps) {
   return (
@@ -42,7 +45,7 @@ export function ConfirmDialog({
           <AlertDialogAction
             onClick={onConfirm}
             disabled={loading}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className={destructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
           >
             {loading ? confirmingLabel : confirmLabel}
           </AlertDialogAction>

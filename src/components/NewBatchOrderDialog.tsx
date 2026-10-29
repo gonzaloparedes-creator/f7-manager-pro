@@ -26,6 +26,7 @@ import "react-phone-input-2/lib/style.css";
 import { SignaturePad } from "@/components/SignaturePad";
 import DeviceIntakeFields, { type DeviceIntakeValue } from "@/components/DeviceIntakeFields";
 import type { PhotoEntry } from "@/lib/photos";
+import { formatMoney } from "@/lib/currency";
 
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
 type DeviceRow = DeviceIntakeValue & { key: string; files: PhotoEntry[] };
@@ -63,7 +64,7 @@ function summarizeRow(row: DeviceRow): string {
   const parts = [row.device_type, [row.marca, row.modelo].filter(Boolean).join(" ")].filter(Boolean);
   const amount = parseAmount(row.quote_amount);
   const base = parts.join(" · ");
-  return amount > 0 ? `${base} · Gs. ${amount.toLocaleString("es-PY")}` : base;
+  return amount > 0 ? `${base} · ${formatMoney(amount)}` : base;
 }
 
 function toggleInSet<T>(set: Set<T>, item: T, active: boolean): Set<T> {

@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { warrantyDocumentLine } from "@/lib/deviceWarranty";
 
 interface TicketLineItem {
@@ -150,22 +150,22 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
       addWrapped(warrantyLine, fontSmall);
       if (Number(item.warranty_days) > 0) hasWarranty = true;
     }
-    addRow(`${item.quantity} x ${formatPYG(item.unit_price)}`, formatPYG(item.quantity * Number(item.unit_price || 0)), fontBody);
+    addRow(`${item.quantity} x ${formatMoney(item.unit_price)}`, formatMoney(item.quantity * Number(item.unit_price || 0)), fontBody);
     addGap(0.8);
   }
   addDashed();
   const tradeInValue = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in.value : 0;
   const depositValue = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
   if (tradeInValue > 0 || depositValue > 0) {
-    addRow("Subtotal", formatPYG(total), fontBody);
+    addRow("Subtotal", formatMoney(total), fontBody);
     if (tradeInValue > 0 && sale.trade_in) {
       addWrapped(`Equipo recibido: ${sale.trade_in.device_name}`, fontSmall);
-      addRow("Canje", `-${formatPYG(tradeInValue)}`, fontBody);
+      addRow("Canje", `-${formatMoney(tradeInValue)}`, fontBody);
     }
-    if (depositValue > 0) addRow("Seña abonada", `-${formatPYG(depositValue)}`, fontBody);
-    addRow("A PAGAR", formatPYG(Math.max(0, total - tradeInValue - depositValue)), fontTotal);
+    if (depositValue > 0) addRow("Seña abonada", `-${formatMoney(depositValue)}`, fontBody);
+    addRow("A PAGAR", formatMoney(Math.max(0, total - tradeInValue - depositValue)), fontTotal);
   } else {
-    addRow("TOTAL", formatPYG(total), fontTotal);
+    addRow("TOTAL", formatMoney(total), fontTotal);
   }
   addRow("Pago", sale.payment_method || "—", fontSmall);
   addDashed();

@@ -7,10 +7,11 @@ import { WarrantyBadge } from "@/components/WarrantyBadge";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import MoveOrderMenu from "@/components/MoveOrderMenu";
 import {
-  PRIORITY_LABELS, QUOTE_RESPONSE_LABELS, STALE_AFTER_DAYS, elapsedSince, formatElapsedShort, formatPYG,
+  PRIORITY_LABELS, QUOTE_RESPONSE_LABELS, STALE_AFTER_DAYS, elapsedSince, formatElapsedShort,
   isClosedOrderStatus, normalizePriority, orderMoney, quoteResponseBadgeClasses, resolveStatusLabel,
   type QuoteResponse,
 } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 export interface CargoAdicional { motivo: string; monto: number }
@@ -101,7 +102,7 @@ function Money({
 }: { order: OrderListItem; compact?: boolean; onPay?: (order: OrderListItem) => void }) {
   const { total, deposit, saldo, isFullyPaid } = orderMoney(order);
   if (order.status === "presupuesto") {
-    return total > 0 ? <span className="whitespace-nowrap font-medium text-foreground">{formatPYG(total)}</span> : null;
+    return total > 0 ? <span className="whitespace-nowrap font-medium text-foreground">{formatMoney(total)}</span> : null;
   }
   if (saldo > 0) {
     return (
@@ -109,11 +110,11 @@ function Money({
         <div className="flex flex-col items-end leading-tight">
           {!compact && deposit > 0 && (
             <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-              Pagado: <span className="font-medium text-foreground">{formatPYG(deposit)}</span>
+              Pagado: <span className="font-medium text-foreground">{formatMoney(deposit)}</span>
             </span>
           )}
           <span className={cn("whitespace-nowrap font-semibold text-secondary", compact ? "text-[11px]" : "text-sm font-bold")}>
-            Saldo: {formatPYG(saldo)}
+            Saldo: {formatMoney(saldo)}
           </span>
         </div>
         {onPay && (
@@ -137,7 +138,7 @@ function Money({
     return (
       <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-success">
         <Check className="h-3 w-3" />
-        Pagado{!compact && ` ${formatPYG(total)}`}
+        Pagado{!compact && ` ${formatMoney(total)}`}
       </span>
     );
   }

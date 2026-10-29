@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import WarrantySelector from "@/components/WarrantySelector";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -358,13 +358,13 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
               <h3 className="text-sm font-semibold text-foreground">Información financiera</h3>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="e_quote">Presupuesto (Gs.)</Label>
+                  <Label htmlFor="e_quote">Presupuesto ({currencySymbol()})</Label>
                   <Input id="e_quote" inputMode="numeric" placeholder="0"
                     value={formatThousands(form.quote_amount)}
                     onChange={(e) => setForm({ ...form, quote_amount: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="e_deposit">Seña / Pagado (Gs.)</Label>
+                  <Label htmlFor="e_deposit">Seña / Pagado ({currencySymbol()})</Label>
                   <Input id="e_deposit" inputMode="numeric" placeholder="0"
                     value={formatThousands(form.deposit_amount)}
                     onChange={(e) => setForm({ ...form, deposit_amount: e.target.value })} />
@@ -375,13 +375,13 @@ export default function EditOrderDialog({ open, onOpenChange, orderId, onUpdated
                     "flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-semibold",
                     balance > 0 ? "text-foreground" : "text-muted-foreground"
                   )}>
-                    {formatPYG(balance)}
+                    {formatMoney(balance)}
                   </div>
                 </div>
               </div>
               {cargosTotal > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Cargos adicionales: <span className="font-semibold text-foreground">{formatPYG(cargosTotal)}</span> · Total: <span className="font-semibold text-foreground">{formatPYG(total)}</span>
+                  Cargos adicionales: <span className="font-semibold text-foreground">{formatMoney(cargosTotal)}</span> · Total: <span className="font-semibold text-foreground">{formatMoney(total)}</span>
                 </p>
               )}
 

@@ -301,6 +301,7 @@ export type Database = {
           commission_enabled: boolean
           country: string
           created_at: string
+          currency: string
           department: string | null
           founder_cohort: boolean
           founder_cohort_at: string | null
@@ -342,6 +343,7 @@ export type Database = {
           commission_enabled?: boolean
           country?: string
           created_at?: string
+          currency?: string
           department?: string | null
           founder_cohort?: boolean
           founder_cohort_at?: string | null
@@ -383,6 +385,7 @@ export type Database = {
           commission_enabled?: boolean
           country?: string
           created_at?: string
+          currency?: string
           department?: string | null
           founder_cohort?: boolean
           founder_cohort_at?: string | null
@@ -1773,6 +1776,9 @@ export type Database = {
       }
       generate_order_number: { Args: { _company_id: string }; Returns: string }
       generate_recurring_expenses: { Args: never; Returns: number }
+      get_company_currency_by_code: { Args: { _code: string }; Returns: string }
+      get_company_currency_by_tracking: { Args: { _token: string }; Returns: string }
+      get_storefront_currency: { Args: { _slug: string }; Returns: string }
       get_history_by_code: {
         Args: { _code: string }
         Returns: {

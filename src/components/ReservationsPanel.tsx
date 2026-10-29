@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarClock, CalendarPlus, MessageCircle, ShoppingCart, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import {
   balanceDue,
   depositOf,
@@ -71,9 +71,9 @@ export default function ReservationsPanel({
                       </Badge>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                      <span>Precio: <span className="font-medium text-foreground">{formatPYG(Number(r.agreed_price))}</span></span>
-                      <span>Seña: <span className="font-medium text-foreground">{deposit > 0 ? formatPYG(deposit) : "sin seña"}</span></span>
-                      {deposit > 0 && <span>Saldo: <span className="font-medium text-foreground">{formatPYG(balanceDue(r))}</span></span>}
+                      <span>Precio: <span className="font-medium text-foreground">{formatMoney(Number(r.agreed_price))}</span></span>
+                      <span>Seña: <span className="font-medium text-foreground">{deposit > 0 ? formatMoney(deposit) : "sin seña"}</span></span>
+                      {deposit > 0 && <span>Saldo: <span className="font-medium text-foreground">{formatMoney(balanceDue(r))}</span></span>}
                     </div>
                     {r.notes && <div className="text-xs text-muted-foreground">{r.notes}</div>}
                     <div className="flex flex-wrap gap-2 pt-1">
@@ -117,9 +117,9 @@ export default function ReservationsPanel({
                       <div className="truncate text-xs text-muted-foreground">
                         {r.customer_name}
                         {r.status === "cancelada" && deposit > 0
-                          ? ` · devuelto ${formatPYG(Number(r.refunded_amount))} · retenido ${formatPYG(Number(r.retained_amount))}`
+                          ? ` · devuelto ${formatMoney(Number(r.refunded_amount))} · retenido ${formatMoney(Number(r.retained_amount))}`
                           : r.status === "vendida" && deposit > 0
-                            ? ` · seña aplicada ${formatPYG(deposit)}`
+                            ? ` · seña aplicada ${formatMoney(deposit)}`
                             : ""}
                         {r.cancel_reason ? ` · ${r.cancel_reason}` : ""}
                       </div>

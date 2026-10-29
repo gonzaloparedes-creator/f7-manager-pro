@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { RecurringRule } from "@/components/RecurringExpenseDialog";
 import { describeSchedule, formatDueDate, nextDueDate } from "@/lib/recurringExpenses";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { Repeat, Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function RecurringExpensesPanel({
@@ -110,7 +110,7 @@ export default function RecurringExpensesPanel({
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{describeSchedule(r)}</TableCell>
                       {hasMultipleBranches && <TableCell className="whitespace-nowrap text-muted-foreground">{branchName(r.branch_id)}</TableCell>}
-                      <TableCell className="text-right font-medium">{formatPYG(r.amount)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatMoney(r.amount)}</TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         {r.payment_method ? `Pagado · ${r.payment_method}` : "A pagar"}
                       </TableCell>
@@ -148,7 +148,7 @@ export default function RecurringExpensesPanel({
         title="¿Eliminar regla?"
         description={
           pendingDelete
-            ? `Se dejará de cargar el gasto recurrente de "${pendingDelete.category}" (${formatPYG(pendingDelete.amount)}). Los gastos que ya se generaron se conservan.`
+            ? `Se dejará de cargar el gasto recurrente de "${pendingDelete.category}" (${formatMoney(pendingDelete.amount)}). Los gastos que ya se generaron se conservan.`
             : ""
         }
         loading={deleting}

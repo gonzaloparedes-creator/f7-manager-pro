@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { ArrowDown, Search, SlidersHorizontal, Store, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import {
   EMPTY_QUERY,
   SORT_LABELS,
@@ -152,21 +152,21 @@ export default function StorefrontView({ store, items, preview = false }: Props)
         {showFilterPanel && filtersOpen && bounds && (
           <div className="mb-4 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
             <label className="grid gap-1 text-xs font-medium text-muted-foreground">
-              Precio desde (Gs.)
+              Precio desde ({currencySymbol()})
               <Input
                 inputMode="numeric"
                 value={query.minPrice !== null ? String(query.minPrice) : ""}
-                placeholder={formatPYG(bounds.min)}
+                placeholder={formatMoney(bounds.min)}
                 onChange={(e) => patch({ minPrice: parsePriceInput(e.target.value) })}
                 className="h-10 text-sm"
               />
             </label>
             <label className="grid gap-1 text-xs font-medium text-muted-foreground">
-              Precio hasta (Gs.)
+              Precio hasta ({currencySymbol()})
               <Input
                 inputMode="numeric"
                 value={query.maxPrice !== null ? String(query.maxPrice) : ""}
-                placeholder={formatPYG(bounds.max)}
+                placeholder={formatMoney(bounds.max)}
                 onChange={(e) => patch({ maxPrice: parsePriceInput(e.target.value) })}
                 className="h-10 text-sm"
               />

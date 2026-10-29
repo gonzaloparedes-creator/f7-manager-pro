@@ -200,11 +200,6 @@ export function formatElapsedShort(iso: string | null | undefined, now = Date.no
   return `${e.days} d`;
 }
 
-export function formatPYG(value: number | null | undefined) {
-  const n = Number(value ?? 0);
-  return `Gs. ${n.toLocaleString("es-PY")}`;
-}
-
 // Usado para saber cuándo tiene sentido calcular vuelto (solo en efectivo)
 // y para el desglose de Cierre de Caja (transferencia/tarjeta ya quedan
 // verificadas por el banco, no hay "vuelto" físico que dar).

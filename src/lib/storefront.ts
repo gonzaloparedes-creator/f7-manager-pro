@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { toWhatsAppPhone } from "@/lib/whatsapp";
 
 export interface StorefrontSeal {
@@ -279,7 +279,7 @@ export function parsePriceInput(raw: string): number | null {
 }
 
 export function priceLabel(item: Pick<StorefrontItem, "price">): string {
-  return item.price !== null && item.price > 0 ? formatPYG(item.price) : "Consultar precio";
+  return item.price !== null && item.price > 0 ? formatMoney(item.price) : "Consultar precio";
 }
 
 export function whatsappLink(phone: string, message?: string): string {
@@ -292,7 +292,7 @@ export function mapsUrl(address: string): string {
 }
 
 export function buildInterestMessage(item: Pick<StorefrontItem, "name" | "price">, storeName: string, link?: string): string {
-  const price = item.price !== null && item.price > 0 ? ` (${formatPYG(item.price)})` : "";
+  const price = item.price !== null && item.price > 0 ? ` (${formatMoney(item.price)})` : "";
   const lines = [`Hola ${storeName}! Me interesa este producto: "${item.name}"${price}. ¿Lo tienen disponible?`];
   if (link) lines.push(link);
   return lines.join("\n");

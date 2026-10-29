@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InsightCard, InsightEmpty as Empty, InsightLoading as Loading } from "@/components/InsightCard";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import {
   RFM_AT_RISK_DAYS,
   RFM_RECENT_DAYS,
@@ -221,12 +221,12 @@ export default function ReportsBusiness({
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <div className="text-xs text-muted-foreground">Costos fijos por mes</div>
-                <div className="text-2xl font-bold" data-testid="fixed-total">{formatPYG(Math.round(equilibrium.fixedMonthly))}</div>
+                <div className="text-2xl font-bold" data-testid="fixed-total">{formatMoney(Math.round(equilibrium.fixedMonthly))}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Tenés que cobrar por mes</div>
                 {equilibrium.breakEvenRevenue !== null ? (
-                  <div className="text-2xl font-bold" data-testid="break-even-revenue">{formatPYG(Math.round(equilibrium.breakEvenRevenue))}</div>
+                  <div className="text-2xl font-bold" data-testid="break-even-revenue">{formatMoney(Math.round(equilibrium.breakEvenRevenue))}</div>
                 ) : (
                   <div className="text-sm text-muted-foreground">
                     Todavía no hay un margen positivo para calcularlo.
@@ -244,7 +244,7 @@ export default function ReportsBusiness({
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="font-medium">Este mes</span>
                 <span className="text-muted-foreground" data-testid="coverage-pct">
-                  {formatPYG(Math.round(equilibrium.monthProfit))} de ganancia · {pct(Math.max(0, equilibrium.coveragePct))} de los costos fijos
+                  {formatMoney(Math.round(equilibrium.monthProfit))} de ganancia · {pct(Math.max(0, equilibrium.coveragePct))} de los costos fijos
                 </span>
               </div>
               <div className="h-2 w-full rounded-full bg-muted">
@@ -256,10 +256,10 @@ export default function ReportsBusiness({
               <p className="text-sm text-muted-foreground">
                 {equilibrium.remaining === 0
                   ? "Ya cubriste los costos fijos de este mes."
-                  : `Te faltan ${formatPYG(Math.round(equilibrium.remaining))} de ganancia para cubrirlos.`}
+                  : `Te faltan ${formatMoney(Math.round(equilibrium.remaining))} de ganancia para cubrirlos.`}
                 {equilibrium.projectedProfit !== null && equilibrium.remaining > 0 && (
                   <>
-                    {" "}Al ritmo de hoy cerrarías el mes con {formatPYG(Math.round(Math.max(0, equilibrium.projectedProfit)))} de ganancia.
+                    {" "}Al ritmo de hoy cerrarías el mes con {formatMoney(Math.round(Math.max(0, equilibrium.projectedProfit)))} de ganancia.
                   </>
                 )}
                 {equilibrium.projectedProfit === null && equilibrium.remaining > 0 && " Es muy pronto en el mes para proyectar cómo cerrás."}
@@ -272,7 +272,7 @@ export default function ReportsBusiness({
                 {visibleFixed.map((r, i) => (
                   <li key={`${r.label}-${i}`} className="flex items-center justify-between gap-2 py-1.5">
                     <span className="min-w-0 truncate">{r.label}</span>
-                    <span className="shrink-0 text-muted-foreground">{formatPYG(Math.round(r.monthly))}</span>
+                    <span className="shrink-0 text-muted-foreground">{formatMoney(Math.round(r.monthly))}</span>
                   </li>
                 ))}
               </ul>
@@ -322,8 +322,8 @@ export default function ReportsBusiness({
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="font-medium">{formatPYG(Math.round(r.revenue))}</div>
-                        <div className="text-xs text-muted-foreground">gan. {formatPYG(Math.round(r.profit))}</div>
+                        <div className="font-medium">{formatMoney(Math.round(r.revenue))}</div>
+                        <div className="text-xs text-muted-foreground">gan. {formatMoney(Math.round(r.profit))}</div>
                       </div>
                     </li>
                   ))}
@@ -373,7 +373,7 @@ export default function ReportsBusiness({
                             <span className="block text-sm font-semibold" data-testid="rfm-count">
                               {g.count} <span className="text-xs font-normal text-muted-foreground">({pct(g.pct)})</span>
                             </span>
-                            <span className="block text-xs text-muted-foreground">{formatPYG(Math.round(g.value))}</span>
+                            <span className="block text-xs text-muted-foreground">{formatMoney(Math.round(g.value))}</span>
                           </span>
                         </button>
                         {isOpen && (
@@ -386,7 +386,7 @@ export default function ReportsBusiness({
                                     {plural(c.visits, "visita", "visitas")} · hace {c.daysSince} {c.daysSince === 1 ? "día" : "días"}
                                   </div>
                                 </div>
-                                <span className="shrink-0 text-muted-foreground">{formatPYG(Math.round(c.value))}</span>
+                                <span className="shrink-0 text-muted-foreground">{formatMoney(Math.round(c.value))}</span>
                               </li>
                             ))}
                             {g.count > 5 && <li className="py-1 text-xs text-muted-foreground">y {g.count - 5} más</li>}
@@ -412,7 +412,7 @@ export default function ReportsBusiness({
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <div className="text-3xl font-bold" data-testid="ltv-avg">{formatPYG(Math.round(ltv.avgValue))}</div>
+                    <div className="text-3xl font-bold" data-testid="ltv-avg">{formatMoney(Math.round(ltv.avgValue))}</div>
                     <div className="text-xs text-muted-foreground">
                       en promedio por cliente, entre {plural(ltv.clients, "cliente", "clientes")} que ya pagaron.
                     </div>
@@ -438,7 +438,7 @@ export default function ReportsBusiness({
                           <div className="truncate font-medium">{c.name}</div>
                           <div className="text-xs text-muted-foreground">{plural(c.delivered, "orden entregada", "órdenes entregadas")}</div>
                         </div>
-                        <span className="shrink-0 font-medium">{formatPYG(Math.round(c.value))}</span>
+                        <span className="shrink-0 font-medium">{formatMoney(Math.round(c.value))}</span>
                       </li>
                     ))}
                   </ul>

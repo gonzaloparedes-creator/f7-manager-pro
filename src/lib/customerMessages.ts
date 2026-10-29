@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { normalizedRealPhone } from "@/lib/clients";
-import { formatPYG, getDefaultStatusMessage } from "@/lib/orders";
+import { getDefaultStatusMessage } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import type { PostSaleEventKey } from "@/lib/postSale";
 
 export interface MessageVars {
@@ -31,17 +32,16 @@ export const MESSAGE_VARIABLES: {
   { key: "estado", label: "Estado", example: "Listo para retirar" },
   { key: "link", label: "Link de seguimiento", example: "https://f7manager.com/tracking/ORD-0001" },
   { key: "taller", label: "Nombre del taller", example: "Tu Taller" },
-  { key: "monto", label: "Monto del presupuesto", example: "Gs. 350.000" },
-  { key: "saldo", label: "Saldo pendiente", example: "Gs. 200.000" },
+  { key: "monto", label: "Monto del presupuesto", get example() { return formatMoney(350000); } },
+  { key: "saldo", label: "Saldo pendiente", get example() { return formatMoney(200000); } },
   { key: "garantia", label: "Garantía", example: "30 días" },
   { key: "resena", label: "Link de reseña", example: "https://g.page/r/tu-taller/review", postSaleOnly: true },
   { key: "vencimiento", label: "Vence la garantía", example: "28/10/2026", postSaleOnly: true },
 ];
 
-export const PREVIEW_VARS: MessageVars = MESSAGE_VARIABLES.reduce(
-  (acc, v) => ({ ...acc, [v.key]: v.example }),
-  {} as MessageVars
-);
+// Función (no constante): los montos de ejemplo siguen la moneda de la empresa.
+export const getPreviewVars = (): MessageVars =>
+  MESSAGE_VARIABLES.reduce((acc, v) => ({ ...acc, [v.key]: v.example }), {} as MessageVars);
 
 const KNOWN_VARS = new Set<string>(MESSAGE_VARIABLES.map((v) => v.key));
 
@@ -195,8 +195,8 @@ export function buildOrderMessageVars(
     estado: ctx.estado ?? "",
     link: trackingUrl(order.tracking_token),
     taller: ctx.taller,
-    monto: formatPYG(order.quote_amount),
-    saldo: formatPYG(saldo),
+    monto: formatMoney(order.quote_amount),
+    saldo: formatMoney(saldo),
     garantia: days > 0 ? `${days} ${days === 1 ? "día" : "días"}` : "sin garantía",
   };
 }

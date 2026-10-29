@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingBag, ShoppingCart, AlertTriangle, CalendarClock, Eye, EyeOff, FileText, Pencil, Tag, Trash2, X } from "lucide-react";
 import QuantityStepper from "@/components/QuantityStepper";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { balanceDue, depositOf, displayDate, expiryText, type DeviceReservation } from "@/lib/reservations";
 import { isLowBattery, originLabel } from "@/lib/deviceSpecs";
 import { toMinPrice } from "@/lib/devicePricing";
@@ -88,7 +88,7 @@ export default function ProductPreviewDialog({
             <DialogTitle className="text-xl leading-snug">{product.name}</DialogTitle>
             <DialogDescription className="sr-only">Detalle del producto</DialogDescription>
           </DialogHeader>
-          <div className="text-2xl font-bold text-primary">{formatPYG(product.selling_price)}</div>
+          <div className="text-2xl font-bold text-primary">{formatMoney(product.selling_price)}</div>
           {product.barcode && (
             <div className="text-sm" data-testid="preview-barcode">
               <span className="text-muted-foreground">Código: </span>
@@ -122,7 +122,7 @@ export default function ProductPreviewDialog({
                 <div className="flex items-center gap-1.5" data-testid="preview-min-price">
                   <span className="text-muted-foreground">Mínimo de negociación: </span>
                   <span className="font-medium" data-testid="preview-min-price-value">
-                    {showMinPrice ? formatPYG(minPrice) : "Gs. ••••••"}
+                    {showMinPrice ? formatMoney(minPrice) : `${currencySymbol()} ••••••`}
                   </span>
                   <button
                     type="button"
@@ -172,9 +172,9 @@ export default function ProductPreviewDialog({
                 {" · "}{expiryText(reservation.expires_on)} ({displayDate(reservation.expires_on)})
               </div>
               <div className="text-muted-foreground">
-                Precio {formatPYG(Number(reservation.agreed_price))}
+                Precio {formatMoney(Number(reservation.agreed_price))}
                 {depositOf(reservation) > 0
-                  ? ` · seña ${formatPYG(depositOf(reservation))} · saldo ${formatPYG(balanceDue(reservation))}`
+                  ? ` · seña ${formatMoney(depositOf(reservation))} · saldo ${formatMoney(balanceDue(reservation))}`
                   : " · sin seña"}
               </div>
             </div>
@@ -184,7 +184,7 @@ export default function ProductPreviewDialog({
             <div className="flex items-center justify-between gap-2">
               <QuantityStepper value={cartLine.quantity} max={product.stock} onChange={onUpdateQty} />
               <span className="text-base font-semibold text-foreground">
-                {formatPYG(cartLine.quantity * cartLine.unitPrice)}
+                {formatMoney(cartLine.quantity * cartLine.unitPrice)}
               </span>
             </div>
           ) : reservation ? (

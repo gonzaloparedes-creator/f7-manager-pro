@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Wrench, CheckCircle2, Clock, Stethoscope, PackageCheck, Truck, CalendarDays, Smartphone, Wallet, XCircle, MessageSquareText, Loader2, Hash, FileText } from "lucide-react";
-import { STATUS_LABELS, formatPYG, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
+import { STATUS_LABELS, QUOTE_RESPONSE_LABELS, quoteResponseBadgeClasses, type OrderStatus, type QuoteResponse } from "@/lib/orders";
+import { DEFAULT_CURRENCY, formatMoney, parseCurrency, setActiveCurrency } from "@/lib/currency";
 import f7Logo from "@/assets/f7-logo.png";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -95,6 +96,8 @@ export default function PublicTrackingByCode() {
     }
   };
 
+  useEffect(() => () => setActiveCurrency(DEFAULT_CURRENCY), []);
+
   useEffect(() => {
     document.title = "Seguimiento de reparación | F7 Manager Pro";
 
@@ -108,17 +111,21 @@ export default function PublicTrackingByCode() {
       // correlativo ORD-XXXX (ya impresos/entregados antes de este cambio)
       // se siguen resolviendo, pero sin exponer la bitácora técnica interna.
       const isToken = UUID_RE.test(orderCode);
-      const [{ data: o }, { data: h }, { data: tn }] = isToken
+      const [{ data: o }, { data: h }, { data: tn }, { data: currency }] = isToken
         ? await Promise.all([
             supabase.rpc("get_order_by_tracking", { _token: orderCode }),
             supabase.rpc("get_order_history_by_tracking", { _token: orderCode }),
             supabase.rpc("get_technical_notes_by_tracking", { _token: orderCode }),
+            supabase.rpc("get_company_currency_by_tracking", { _token: orderCode }),
           ])
         : await Promise.all([
             supabase.rpc("get_order_by_code", { _code: orderCode }),
             supabase.rpc("get_history_by_code", { _code: orderCode }),
             Promise.resolve({ data: [] as PublicTechNote[] }),
+            supabase.rpc("get_company_currency_by_code", { _code: orderCode }),
           ]);
+      // Los montos se muestran en la moneda del negocio (antes de dibujarlos).
+      setActiveCurrency(parseCurrency(currency));
       const found: any = Array.isArray(o) ? o[0] : null;
       if (found?.company_name) document.title = `Seguimiento ${found.order_number} | ${found.company_name}`;
       setOrder(found ? {
@@ -331,13 +338,13 @@ export default function PublicTrackingByCode() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Presupuesto inicial</span>
-                      <span className="font-medium">{formatPYG(presupuestoInicial)}</span>
+                      <span className="font-medium">{formatMoney(presupuestoInicial)}</span>
                     </div>
                     {ajustePrecio !== 0 && (
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Ajuste de precio</span>
                         <span className="font-medium">
-                          {ajustePrecio < 0 ? "- " : "+ "}{formatPYG(Math.abs(ajustePrecio))}
+                          {ajustePrecio < 0 ? "- " : "+ "}{formatMoney(Math.abs(ajustePrecio))}
                         </span>
                       </div>
                     )}
@@ -347,22 +354,22 @@ export default function PublicTrackingByCode() {
                         {cargos.map((c, i) => (
                           <div key={i} className="flex items-center justify-between gap-2 text-sm">
                             <span className="truncate">{c.motivo}</span>
-                            <span className="font-medium">{formatPYG(c.monto)}</span>
+                            <span className="font-medium">{formatMoney(c.monto)}</span>
                           </div>
                         ))}
                       </div>
                     )}
                     <div className="flex items-center justify-between border-t border-border pt-2">
                       <span className="text-muted-foreground">Total ajustado</span>
-                      <span className="font-semibold">{formatPYG(totalAjustado)}</span>
+                      <span className="font-semibold">{formatMoney(totalAjustado)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Seña / Pagado</span>
-                      <span className="font-medium">- {formatPYG(deposit)}</span>
+                      <span className="font-medium">- {formatMoney(deposit)}</span>
                     </div>
                     <div className="flex items-center justify-between border-t border-border pt-2">
                       <span className="text-sm font-semibold">Saldo</span>
-                      <span className="text-base font-bold text-primary">{formatPYG(saldo)}</span>
+                      <span className="text-base font-bold text-primary">{formatMoney(saldo)}</span>
                     </div>
                   </div>
                 )}

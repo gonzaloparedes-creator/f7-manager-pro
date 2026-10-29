@@ -20,7 +20,7 @@ import PayExpenseInstallmentDialog, { type ExpenseForInstallment } from "@/compo
 import RecurringExpenseDialog, { type RecurringRule } from "@/components/RecurringExpenseDialog";
 import RecurringExpensesPanel from "@/components/RecurringExpensesPanel";
 import { generateRecurringExpenses } from "@/hooks/useGenerateRecurringExpenses";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { Receipt, Plus, Pencil, Trash2, Wallet, ShieldAlert, ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -200,15 +200,15 @@ export default function Gastos() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Gastos del mes</div>
-          <div className="mt-1 text-2xl font-bold">{formatPYG(totalMonth)}</div>
+          <div className="mt-1 text-2xl font-bold">{formatMoney(totalMonth)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Gastos de hoy</div>
-          <div className="mt-1 text-2xl font-bold">{formatPYG(totalToday)}</div>
+          <div className="mt-1 text-2xl font-bold">{formatMoney(totalToday)}</div>
         </Card>
         <Card className="col-span-2 p-4 lg:col-span-1">
           <div className="text-xs text-muted-foreground">Pendiente por pagar</div>
-          <div className={cn("mt-1 text-2xl font-bold", totalPending > 0 && "text-secondary")}>{formatPYG(totalPending)}</div>
+          <div className={cn("mt-1 text-2xl font-bold", totalPending > 0 && "text-secondary")}>{formatMoney(totalPending)}</div>
         </Card>
       </div>
 
@@ -286,7 +286,7 @@ export default function Gastos() {
                         </TableCell>
                         {hasMultipleBranches && <TableCell className="whitespace-nowrap text-muted-foreground">{branchName(e.branch_id)}</TableCell>}
                         <TableCell className="max-w-[220px] truncate text-muted-foreground">{e.description ?? "—"}</TableCell>
-                        <TableCell className="text-right font-medium">{formatPYG(e.amount)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatMoney(e.amount)}</TableCell>
                         <TableCell>
                           {e.payment_type === "contado" ? (
                             <Badge variant="secondary">Contado</Badge>
@@ -298,7 +298,7 @@ export default function Gastos() {
                                   : `Crédito${e.installments_total ? ` · ${e.installments_paid}/${e.installments_total}` : ""}`}
                               </Badge>
                               {pending > 0 && (
-                                <span className="text-xs text-muted-foreground">Pendiente: {formatPYG(pending)}</span>
+                                <span className="text-xs text-muted-foreground">Pendiente: {formatMoney(pending)}</span>
                               )}
                             </div>
                           )}
@@ -362,7 +362,7 @@ export default function Gastos() {
         open={!!pendingDelete}
         onOpenChange={(o) => !o && setPendingDelete(null)}
         title="¿Eliminar gasto?"
-        description={pendingDelete ? `Se eliminará el gasto de "${pendingDelete.category}" (${formatPYG(pendingDelete.amount)}).` : ""}
+        description={pendingDelete ? `Se eliminará el gasto de "${pendingDelete.category}" (${formatMoney(pendingDelete.amount)}).` : ""}
         loading={deleting}
         onConfirm={() => pendingDelete && removeExpense(pendingDelete)}
       />

@@ -10,7 +10,7 @@ import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice"
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { depositOf, parseCancelDraft, type CancelDraft, type DeviceReservation } from "@/lib/reservations";
 
 const digitsOnly = (s: string) => s.replace(/\D/g, "");
@@ -91,17 +91,17 @@ export default function CancelReservationDialog({
           {deposit > 0 ? (
             <>
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                Seña recibida: <span className="font-semibold">{formatPYG(deposit)}</span>
+                Seña recibida: <span className="font-semibold">{formatMoney(deposit)}</span>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="cancel-refund">Cuánto le devolvés (Gs.)</Label>
+                <Label htmlFor="cancel-refund">Cuánto le devolvés ({currencySymbol()})</Label>
                 <Input id="cancel-refund" inputMode="numeric" placeholder="0" value={thousands(draft.refund)} onChange={(e) => set({ refund: digitsOnly(e.target.value) })} />
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => set({ refund: String(deposit) })}>Devolver todo</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => set({ refund: "" })}>Retener todo</Button>
                 </div>
                 <p className="text-xs text-muted-foreground" data-testid="cancel-summary">
-                  Se devuelve {formatPYG(Math.min(refund, deposit))} · Te quedás con {formatPYG(retained)} (queda como ingreso retenido de la seña).
+                  Se devuelve {formatMoney(Math.min(refund, deposit))} · Te quedás con {formatMoney(retained)} (queda como ingreso retenido de la seña).
                 </p>
               </div>
               {refund > 0 && (

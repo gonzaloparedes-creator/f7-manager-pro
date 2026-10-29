@@ -19,7 +19,7 @@ import { Loader2, FolderPlus, Camera, Upload, X, Smartphone } from "lucide-react
 import { CameraCapture } from "@/components/CameraCapture";
 import { cn, sanitizeFilenameForStorage } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { DEVICE_ORIGINS, DEVICE_ORIGIN_LABELS, isDeviceOrigin, parseBattery, type DeviceOrigin } from "@/lib/deviceSpecs";
 import { parseMinPrice } from "@/lib/devicePricing";
 import { GALLERY_MAX } from "@/lib/storefront";
@@ -520,12 +520,12 @@ export default function NewProductDialog({
               {canViewCosts && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-2">
-                    <Label htmlFor="product-purchase-cost">Costo de compra (Gs.)</Label>
-                    <Input id="product-purchase-cost" type="number" min={0} step="1" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} placeholder="Gs. 0" />
+                    <Label htmlFor="product-purchase-cost">Costo de compra ({currencySymbol()})</Label>
+                    <Input id="product-purchase-cost" type="number" min={0} step="1" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} placeholder={`${currencySymbol()} 0`} />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="product-repair-cost">Repuestos (Gs.)</Label>
-                    <Input id="product-repair-cost" type="number" min={0} step="1" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} placeholder="Gs. 0" />
+                    <Label htmlFor="product-repair-cost">Repuestos ({currencySymbol()})</Label>
+                    <Input id="product-repair-cost" type="number" min={0} step="1" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} placeholder={`${currencySymbol()} 0`} />
                   </div>
                 </div>
               )}
@@ -534,12 +534,12 @@ export default function NewProductDialog({
                 <Input id="product-repair-details" value={repairDetails} onChange={(e) => setRepairDetails(e.target.value)} placeholder="Ej: Pantalla original + batería" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="product-price">Precio venta (Gs.)</Label>
-                <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
+                <Label htmlFor="product-price">Precio venta ({currencySymbol()})</Label>
+                <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={`${currencySymbol()} 0`} />
               </div>
               {canGiveDiscounts && (
                 <div className="grid gap-2">
-                  <Label htmlFor="product-min-price">Mínimo de negociación (Gs., opcional)</Label>
+                  <Label htmlFor="product-min-price">Mínimo de negociación ({currencySymbol()}, opcional)</Label>
                   <Input
                     id="product-min-price"
                     type="number"
@@ -562,19 +562,19 @@ export default function NewProductDialog({
                 <div className="grid gap-1 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Costo total (compra + repuestos)</span>
-                    <span className="font-medium">{formatPYG(deviceTotalCost)}</span>
+                    <span className="font-medium">{formatMoney(deviceTotalCost)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Ganancia estimada</span>
                     <span id="device-profit" className={deviceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
-                      {formatPYG(deviceProfit)}
+                      {formatMoney(deviceProfit)}
                     </span>
                   </div>
                   {minPriceProfit !== null && (
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Ganancia si vendés al mínimo</span>
                       <span id="device-min-profit" className={minPriceProfit < 0 ? "font-semibold text-destructive" : "font-semibold text-success"}>
-                        {formatPYG(minPriceProfit)}
+                        {formatMoney(minPriceProfit)}
                       </span>
                     </div>
                   )}
@@ -594,14 +594,14 @@ export default function NewProductDialog({
                 </div>
                 {canViewCosts && (
                   <div className="grid gap-2">
-                    <Label htmlFor="product-cost">Costo (Gs.)</Label>
-                    <Input id="product-cost" type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
+                    <Label htmlFor="product-cost">Costo ({currencySymbol()})</Label>
+                    <Input id="product-cost" type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder={`${currencySymbol()} 0`} />
                   </div>
                 )}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="product-price">Precio venta (Gs.)</Label>
-                <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
+                <Label htmlFor="product-price">Precio venta ({currencySymbol()})</Label>
+                <Input id="product-price" type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={`${currencySymbol()} 0`} />
               </div>
             </>
           )}

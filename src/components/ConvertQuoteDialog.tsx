@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useWhatsAppOffer } from "@/hooks/useWhatsAppOffer";
-import { formatPYG, renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
+import { renderServiceTerms, STATUS_LABELS, logOrderPayment } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { Type, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PatternLock } from "@/components/PatternLock";
@@ -291,13 +292,13 @@ export default function ConvertQuoteDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Presupuesto (Gs.)</Label>
+              <Label>Presupuesto ({currencySymbol()})</Label>
               <div className="flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-semibold">
-                {formatPYG(order.quote_amount)}
+                {formatMoney(order.quote_amount)}
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="convert_deposit">Seña (Gs.)</Label>
+              <Label htmlFor="convert_deposit">Seña ({currencySymbol()})</Label>
               <Input
                 id="convert_deposit"
                 inputMode="numeric"

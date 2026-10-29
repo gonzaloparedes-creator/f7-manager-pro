@@ -15,7 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { formatPYG, isCashLabel } from "@/lib/orders";
+import { isCashLabel } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarDays, Wallet, CheckCircle2, AlertTriangle, Loader2, History, RotateCcw, DoorOpen, Landmark, Store } from "lucide-react";
@@ -86,7 +87,7 @@ function MethodLine({ label, amount, negative, virtualEnabled }: { label: string
         ) : cash ? " (a contar)" : ""}
       </span>
       <span className={cn("shrink-0", negative && "text-destructive", cash && "font-semibold", cash && !negative && "text-foreground")}>
-        {negative ? "-" : ""}{formatPYG(amount)}
+        {negative ? "-" : ""}{formatMoney(amount)}
       </span>
     </div>
   );
@@ -101,7 +102,7 @@ function DiffBanner({ diff, exactText }: { diff: number; exactText: string }) {
           : "border-destructive/40 bg-destructive/10 text-destructive"
     )}>
       {diff === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-      {diff === 0 ? exactText : diff > 0 ? `Sobrante de ${formatPYG(diff)}` : `Faltante de ${formatPYG(Math.abs(diff))}`}
+      {diff === 0 ? exactText : diff > 0 ? `Sobrante de ${formatMoney(diff)}` : `Faltante de ${formatMoney(Math.abs(diff))}`}
     </div>
   );
 }
@@ -128,13 +129,13 @@ function BoxReconcile({ title, icon, lines, expectedLabel, expected, inputId, in
         {lines.map((l) => (
           <div key={l.label} className="flex items-center justify-between text-muted-foreground">
             <span>{l.label}</span>
-            <span>{formatPYG(l.amount)}</span>
+            <span>{formatMoney(l.amount)}</span>
           </div>
         ))}
       </div>
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold text-foreground">{expectedLabel}</div>
-        <div className="text-lg font-bold text-foreground">{formatPYG(expected)}</div>
+        <div className="text-lg font-bold text-foreground">{formatMoney(expected)}</div>
       </div>
       <div className="space-y-2">
         <Label htmlFor={inputId}>{inputLabel}</Label>
@@ -156,7 +157,7 @@ function BoxReconcile({ title, icon, lines, expectedLabel, expected, inputId, in
 
 function diffText(d: number | null) {
   if (d === null || d === 0) return "—";
-  return (d > 0 ? "+" : "") + formatPYG(d);
+  return (d > 0 ? "+" : "") + formatMoney(d);
 }
 function diffClass(d: number | null) {
   return d === null || d === 0 ? "text-primary" : d > 0 ? "text-secondary" : "text-destructive";
@@ -442,8 +443,8 @@ export default function CashClosing() {
     toast({
       title: "Caja abierta",
       description: virtualEnabled
-        ? `Efectivo inicial: ${formatPYG(openingCash)} · Saldo virtual: ${formatPYG(openingVirtual)}.`
-        : `Efectivo inicial: ${formatPYG(openingCash)}.`,
+        ? `Efectivo inicial: ${formatMoney(openingCash)} · Saldo virtual: ${formatMoney(openingVirtual)}.`
+        : `Efectivo inicial: ${formatMoney(openingCash)}.`,
     });
     setOpeningCashInput(""); setOpeningVirtualInput(""); setOpeningNotes(""); setRedoingOpening(false);
     const fresh: OpeningRow = {
@@ -494,13 +495,13 @@ export default function CashClosing() {
     const cashMsg = difference === 0
       ? "El efectivo contado coincide con lo esperado."
       : difference > 0
-        ? `Sobrante de ${formatPYG(difference)} en efectivo.`
-        : `Faltante de ${formatPYG(Math.abs(difference))} en efectivo.`;
+        ? `Sobrante de ${formatMoney(difference)} en efectivo.`
+        : `Faltante de ${formatMoney(Math.abs(difference))} en efectivo.`;
     const virtualMsg = !virtualEnabled || differenceVirtual === null
       ? ""
       : differenceVirtual === 0
         ? " La caja virtual también cuadra."
-        : ` Caja virtual: ${differenceVirtual > 0 ? "sobrante" : "faltante"} de ${formatPYG(Math.abs(differenceVirtual))}.`;
+        : ` Caja virtual: ${differenceVirtual > 0 ? "sobrante" : "faltante"} de ${formatMoney(Math.abs(differenceVirtual))}.`;
     toast({ title: "Caja cerrada", description: cashMsg + virtualMsg });
     setCountedCash(""); setCountedVirtual(""); setNotes(""); setRedoing(false);
     // Recarga liviana: sólo lo que cambió (el cierre del día + el historial).
@@ -594,7 +595,7 @@ export default function CashClosing() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="opening-cash">
-                        {virtualEnabled ? "Efectivo en la caja física (Gs.)" : "Efectivo de apertura (Gs.)"}
+                        {virtualEnabled ? `Efectivo en la caja física (${currencySymbol()})` : `Efectivo de apertura (${currencySymbol()})`}
                       </Label>
                       <Input
                         id="opening-cash"
@@ -608,7 +609,7 @@ export default function CashClosing() {
                     </div>
                     {virtualEnabled && (
                       <div className="space-y-2">
-                        <Label htmlFor="opening-virtual">Saldo en la caja virtual / banco (Gs.)</Label>
+                        <Label htmlFor="opening-virtual">Saldo en la caja virtual / banco ({currencySymbol()})</Label>
                         <Input
                           id="opening-virtual"
                           type="number"
@@ -649,15 +650,15 @@ export default function CashClosing() {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Wallet className="h-3.5 w-3.5" /> Caja física</div>
-                            <div className="text-xl font-bold text-foreground">{formatPYG(existingOpening.opening_cash)}</div>
+                            <div className="text-xl font-bold text-foreground">{formatMoney(existingOpening.opening_cash)}</div>
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Landmark className="h-3.5 w-3.5" /> Caja virtual</div>
-                            <div className="text-xl font-bold text-foreground">{formatPYG(existingOpening.opening_virtual)}</div>
+                            <div className="text-xl font-bold text-foreground">{formatMoney(existingOpening.opening_virtual)}</div>
                           </div>
                         </div>
                       ) : (
-                        <div className="text-2xl font-bold text-foreground">{formatPYG(existingOpening.opening_cash)}</div>
+                        <div className="text-2xl font-bold text-foreground">{formatMoney(existingOpening.opening_cash)}</div>
                       )}
                       {existingOpening.notes && (
                         <p className="text-sm text-muted-foreground">"{existingOpening.notes}"</p>
@@ -701,8 +702,8 @@ export default function CashClosing() {
                                 {format(new Date(h.opening_date + "T00:00:00"), "d MMM yyyy", { locale: es })}
                               </button>
                             </td>
-                            <td className="py-1.5 text-right text-muted-foreground">{formatPYG(h.opening_cash)}</td>
-                            {virtualEnabled && <td className="py-1.5 text-right text-muted-foreground">{formatPYG(h.opening_virtual ?? 0)}</td>}
+                            <td className="py-1.5 text-right text-muted-foreground">{formatMoney(h.opening_cash)}</td>
+                            {virtualEnabled && <td className="py-1.5 text-right text-muted-foreground">{formatMoney(h.opening_virtual ?? 0)}</td>}
                           </tr>
                         ))}
                       </tbody>
@@ -734,7 +735,7 @@ export default function CashClosing() {
                               ))}
                               <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                                 <span>Subtotal reparaciones</span>
-                                <span>{formatPYG(breakdownByOrdenes.reduce((s, [, a]) => s + a, 0))}</span>
+                                <span>{formatMoney(breakdownByOrdenes.reduce((s, [, a]) => s + a, 0))}</span>
                               </div>
                             </>
                           )}
@@ -751,7 +752,7 @@ export default function CashClosing() {
                               ))}
                               <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                                 <span>Subtotal ventas</span>
-                                <span>{formatPYG(breakdownByVentas.reduce((s, [, a]) => s + a, 0))}</span>
+                                <span>{formatMoney(breakdownByVentas.reduce((s, [, a]) => s + a, 0))}</span>
                               </div>
                             </>
                           )}
@@ -765,7 +766,7 @@ export default function CashClosing() {
                             ))}
                             <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                               <span>Subtotal señas</span>
-                              <span>{formatPYG(breakdownBySenas.reduce((s, [, a]) => s + a, 0))}</span>
+                              <span>{formatMoney(breakdownBySenas.reduce((s, [, a]) => s + a, 0))}</span>
                             </div>
                           </div>
                         )}
@@ -781,7 +782,7 @@ export default function CashClosing() {
                               ))}
                               <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                                 <span>Subtotal gastos</span>
-                                <span className="text-destructive">-{formatPYG(totalExpenses)}</span>
+                                <span className="text-destructive">-{formatMoney(totalExpenses)}</span>
                               </div>
                             </>
                           )}
@@ -795,7 +796,7 @@ export default function CashClosing() {
                             ))}
                             <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                               <span>Subtotal compras</span>
-                              <span className="text-destructive">-{formatPYG(totalPurchases)}</span>
+                              <span className="text-destructive">-{formatMoney(totalPurchases)}</span>
                             </div>
                           </div>
                         )}
@@ -808,7 +809,7 @@ export default function CashClosing() {
                             ))}
                             <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                               <span>Subtotal devoluciones</span>
-                              <span className="text-destructive">-{formatPYG(totalRefunds)}</span>
+                              <span className="text-destructive">-{formatMoney(totalRefunds)}</span>
                             </div>
                           </div>
                         )}
@@ -816,17 +817,17 @@ export default function CashClosing() {
                         <div className="space-y-1.5 border-t border-border pt-2">
                           <div className="flex items-center justify-between text-sm font-semibold">
                             <span>{outflowLabel}</span>
-                            <span>{formatPYG(totalIncome - totalOutflow)}</span>
+                            <span>{formatMoney(totalIncome - totalOutflow)}</span>
                           </div>
                           {virtualEnabled && (
                             <>
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Neto por caja física</span>
-                                <span>{formatPYG(cashIncome - cashOutflow)}</span>
+                                <span>{formatMoney(cashIncome - cashOutflow)}</span>
                               </div>
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" /> Neto por caja virtual</span>
-                                <span>{formatPYG(virtualIncome - virtualExpenses - virtualPurchases - virtualRefunds)}</span>
+                                <span>{formatMoney(virtualIncome - virtualExpenses - virtualPurchases - virtualRefunds)}</span>
                               </div>
                             </>
                           )}
@@ -861,7 +862,7 @@ export default function CashClosing() {
                             expectedLabel="Efectivo esperado"
                             expected={expectedCash}
                             inputId="counted-cash"
-                            inputLabel="Efectivo contado (Gs.)"
+                            inputLabel={`Efectivo contado (${currencySymbol()})`}
                             value={countedCash}
                             onChange={setCountedCash}
                             diff={countedCash.trim() ? difference : null}
@@ -882,7 +883,7 @@ export default function CashClosing() {
                               expectedLabel="Saldo virtual esperado"
                               expected={expectedVirtual}
                               inputId="counted-virtual"
-                              inputLabel="Saldo real en el banco (Gs.) — opcional"
+                              inputLabel={`Saldo real en el banco (${currencySymbol()}) — opcional`}
                               hint="Si lo cargás, se compara con lo esperado. Si lo dejás vacío, no se compara. El saldo del banco puede incluir movimientos que no pasaron por F7."
                               value={countedVirtual}
                               onChange={setCountedVirtual}
@@ -891,7 +892,7 @@ export default function CashClosing() {
                           </div>
                           <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
                             <span className="font-semibold text-foreground">Total esperado del día (ambas cajas)</span>
-                            <span className="font-bold text-foreground">{formatPYG(expectedCash + expectedVirtual)}</span>
+                            <span className="font-bold text-foreground">{formatMoney(expectedCash + expectedVirtual)}</span>
                           </div>
                         </>
                       ) : (
@@ -906,7 +907,7 @@ export default function CashClosing() {
                           expectedLabel="Efectivo esperado"
                           expected={expectedCash}
                           inputId="counted-cash"
-                          inputLabel="Efectivo contado (Gs.)"
+                          inputLabel={`Efectivo contado (${currencySymbol()})`}
                           value={countedCash}
                           onChange={setCountedCash}
                           diff={countedCash.trim() ? difference : null}
@@ -914,7 +915,7 @@ export default function CashClosing() {
                       )}
                       <div className="space-y-2">
                         <Label htmlFor="closing-notes">Notas (opcional)</Label>
-                        <Textarea id="closing-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej: faltaron Gs. 5.000, posible vuelto mal dado" />
+                        <Textarea id="closing-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={`Ej: faltaron ${formatMoney(5000)}, posible vuelto mal dado`} />
                       </div>
                       <div className="flex gap-2">
                         {redoing && (
@@ -946,11 +947,11 @@ export default function CashClosing() {
                               <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
                                   <div className="text-xs text-muted-foreground">Esperado</div>
-                                  <div className="font-semibold">{formatPYG(existingClosing.expected_cash)}</div>
+                                  <div className="font-semibold">{formatMoney(existingClosing.expected_cash)}</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground">Contado</div>
-                                  <div className="font-semibold">{formatPYG(existingClosing.counted_cash)}</div>
+                                  <div className="font-semibold">{formatMoney(existingClosing.counted_cash)}</div>
                                 </div>
                               </div>
                               <DiffBanner diff={existingClosing.difference} exactText="Cuadró exacto" />
@@ -962,12 +963,12 @@ export default function CashClosing() {
                               <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
                                   <div className="text-xs text-muted-foreground">Esperado</div>
-                                  <div className="font-semibold">{formatPYG(existingClosing.expected_virtual)}</div>
+                                  <div className="font-semibold">{formatMoney(existingClosing.expected_virtual)}</div>
                                 </div>
                                 <div>
                                   <div className="text-xs text-muted-foreground">Saldo real</div>
                                   <div className="font-semibold">
-                                    {existingClosing.counted_virtual != null ? formatPYG(existingClosing.counted_virtual) : "No se cargó"}
+                                    {existingClosing.counted_virtual != null ? formatMoney(existingClosing.counted_virtual) : "No se cargó"}
                                   </div>
                                 </div>
                               </div>
@@ -978,12 +979,12 @@ export default function CashClosing() {
                             <div className="space-y-1 border-t border-border/60 pt-3 text-sm">
                               <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">Total esperado (ambas cajas)</span>
-                                <span className="font-semibold">{formatPYG(existingClosing.expected_cash + existingClosing.expected_virtual)}</span>
+                                <span className="font-semibold">{formatMoney(existingClosing.expected_cash + existingClosing.expected_virtual)}</span>
                               </div>
                               {existingClosing.counted_virtual != null && (
                                 <div className="flex items-center justify-between">
                                   <span className="text-muted-foreground">Total real (ambas cajas)</span>
-                                  <span className="font-semibold">{formatPYG(existingClosing.counted_cash + existingClosing.counted_virtual)}</span>
+                                  <span className="font-semibold">{formatMoney(existingClosing.counted_cash + existingClosing.counted_virtual)}</span>
                                 </div>
                               )}
                             </div>
@@ -993,11 +994,11 @@ export default function CashClosing() {
                             <div className="grid grid-cols-2 gap-3 text-sm">
                               <div>
                                 <div className="text-xs text-muted-foreground">Esperado</div>
-                                <div className="font-semibold">{formatPYG(existingClosing.expected_cash)}</div>
+                                <div className="font-semibold">{formatMoney(existingClosing.expected_cash)}</div>
                               </div>
                               <div>
                                 <div className="text-xs text-muted-foreground">Contado</div>
-                                <div className="font-semibold">{formatPYG(existingClosing.counted_cash)}</div>
+                                <div className="font-semibold">{formatMoney(existingClosing.counted_cash)}</div>
                               </div>
                             </div>
                             <DiffBanner diff={existingClosing.difference} exactText="Cuadró exacto" />
@@ -1053,18 +1054,18 @@ export default function CashClosing() {
                                   {format(new Date(h.closing_date + "T00:00:00"), "d MMM yyyy", { locale: es })}
                                 </button>
                               </td>
-                              <td className="py-1.5 text-right text-muted-foreground">{formatPYG(h.expected_cash)}</td>
-                              <td className="py-1.5 text-right text-muted-foreground">{formatPYG(h.counted_cash)}</td>
+                              <td className="py-1.5 text-right text-muted-foreground">{formatMoney(h.expected_cash)}</td>
+                              <td className="py-1.5 text-right text-muted-foreground">{formatMoney(h.counted_cash)}</td>
                               <td className={cn("py-1.5 text-right font-medium", diffClass(h.difference))}>
                                 {diffText(h.difference)}
                               </td>
                               {virtualEnabled && (
                                 <>
                                   <td className="py-1.5 pl-3 text-right text-muted-foreground">
-                                    {h.expected_virtual != null ? formatPYG(h.expected_virtual) : "—"}
+                                    {h.expected_virtual != null ? formatMoney(h.expected_virtual) : "—"}
                                   </td>
                                   <td className="py-1.5 text-right text-muted-foreground">
-                                    {h.counted_virtual != null ? formatPYG(h.counted_virtual) : "—"}
+                                    {h.counted_virtual != null ? formatMoney(h.counted_virtual) : "—"}
                                   </td>
                                   <td className={cn("py-1.5 text-right font-medium", diffClass(h.difference_virtual))}>
                                     {diffText(h.difference_virtual)}

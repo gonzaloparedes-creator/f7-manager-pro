@@ -21,7 +21,7 @@ import { useBranches } from "@/hooks/useBranches";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Item = {
@@ -161,7 +161,7 @@ export default function Inventory() {
           <Card className="col-span-2 p-3 sm:col-span-1 sm:p-4">
             <div className="text-xs text-muted-foreground">Valor inventario (costo)</div>
             <div className="mt-1 text-2xl font-bold">
-              {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
+              {formatMoney(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
             </div>
           </Card>
         )}
@@ -283,8 +283,8 @@ export default function Inventory() {
                         </span>
                       )}
                       <span className="text-muted-foreground">
-                        {canViewCosts && <>{formatPYG(i.cost_price)} → </>}
-                        <span className="font-medium text-foreground">{formatPYG(i.selling_price)}</span>
+                        {canViewCosts && <>{formatMoney(i.cost_price)} → </>}
+                        <span className="font-medium text-foreground">{formatMoney(i.selling_price)}</span>
                       </span>
                     </div>
                   </div>
@@ -355,8 +355,8 @@ export default function Inventory() {
                           )}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">{canViewStock ? i.min_stock_alert : "—"}</TableCell>
-                        {canViewCosts && <TableCell className="text-right">{formatPYG(i.cost_price)}</TableCell>}
-                        <TableCell className="text-right">{formatPYG(i.selling_price)}</TableCell>
+                        {canViewCosts && <TableCell className="text-right">{formatMoney(i.cost_price)}</TableCell>}
+                        <TableCell className="text-right">{formatMoney(i.selling_price)}</TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end">
                             <Button size="icon" variant="ghost" onClick={() => setLabelItem(i)} aria-label={`Etiqueta de ${i.name}`}>

@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { revenueByStaffId, type StaffOrderFields, type StaffSaleFields } from "@/lib/staffRevenue";
 import { commissionAmount, formatPeriod, type CommissionSettlement } from "@/lib/commissionSettlements";
 import { Loader2 } from "lucide-react";
@@ -128,7 +128,7 @@ export function SettleDialog({
       toast({ title: "No se pudo registrar la liquidación", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Liquidación registrada", description: `${person.name}: ${formatPYG(amount)} (${formatPeriod(periodFrom, periodTo)})` });
+    toast({ title: "Liquidación registrada", description: `${person.name}: ${formatMoney(amount)} (${formatPeriod(periodFrom, periodTo)})` });
     onOpenChange(false);
     onSaved();
   };
@@ -148,7 +148,7 @@ export function SettleDialog({
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Lo atribuido en el período</span>
               <span data-testid="settle-base" className="font-medium">
-                {base == null ? (loadError ? "—" : <Loader2 className="h-4 w-4 animate-spin" />) : formatPYG(base)}
+                {base == null ? (loadError ? "—" : <Loader2 className="h-4 w-4 animate-spin" />) : formatMoney(base)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
@@ -158,7 +158,7 @@ export function SettleDialog({
             <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
               <span className="font-semibold">A pagar</span>
               <span data-testid="settle-amount" className="text-lg font-bold text-primary">
-                {base == null ? "—" : formatPYG(amount)}
+                {base == null ? "—" : formatMoney(amount)}
               </span>
             </div>
           </div>
@@ -263,8 +263,8 @@ export function SettlementHistoryDialog({
                     <div className="text-xs text-muted-foreground">{formatPeriod(s.period_from, s.period_to)}</div>
                   </div>
                   <div className="text-right">
-                    <div className={`font-semibold ${s.voided_at ? "line-through" : "text-primary"}`}>{formatPYG(s.amount)}</div>
-                    <div className="text-xs text-muted-foreground">{formatPYG(s.base_amount)} × {s.rate}%</div>
+                    <div className={`font-semibold ${s.voided_at ? "line-through" : "text-primary"}`}>{formatMoney(s.amount)}</div>
+                    <div className="text-xs text-muted-foreground">{formatMoney(s.base_amount)} × {s.rate}%</div>
                   </div>
                 </div>
                 {s.notes && <p className="mt-1 text-xs text-muted-foreground">{s.notes}</p>}

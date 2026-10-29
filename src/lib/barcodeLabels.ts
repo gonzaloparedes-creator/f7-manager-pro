@@ -3,7 +3,7 @@
 // Nunca lleva costos: una etiqueta se pega en el producto y la ve el cliente.
 
 import { escapeHtml } from "@/lib/devicePurchaseReceipt";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 
 export const LABEL_WIDTH_MM = 60;
 export const LABEL_HEIGHT_MM = 40;
@@ -29,7 +29,7 @@ export function clampCopies(raw: string | number): number {
 /** El precio sale solo si se pidió y es mayor a cero (un repuesto sin precio de venta no lleva "Gs. 0"). */
 export function labelPriceText(price: number | null | undefined, show: boolean): string | null {
   const n = Number(price ?? 0);
-  return show && Number.isFinite(n) && n > 0 ? formatPYG(n) : null;
+  return show && Number.isFinite(n) && n > 0 ? formatMoney(n) : null;
 }
 
 export function moduleWidthMm(modules: number): number {

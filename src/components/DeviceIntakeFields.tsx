@@ -18,7 +18,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, ORDER_PRIORITIES, PRIORITY_LABELS, normalizePriority, type OrderPriority } from "@/lib/orders";
+import { ORDER_PRIORITIES, PRIORITY_LABELS, normalizePriority, type OrderPriority } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { compressPhoto, type PhotoEntry } from "@/lib/photos";
 import WarrantySelector from "@/components/WarrantySelector";
 import { Upload, CalendarIcon, Camera, Type, Grid3x3, X } from "lucide-react";
@@ -567,13 +568,13 @@ export default function DeviceIntakeFields({
         <h4 className="text-sm font-semibold text-foreground">Información financiera</h4>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor={id("quote_amount")}>Presupuesto (Gs.)</Label>
+            <Label htmlFor={id("quote_amount")}>Presupuesto ({currencySymbol()})</Label>
             <Input id={id("quote_amount")} inputMode="numeric" placeholder="0"
               value={formatThousands(value.quote_amount)}
               onChange={(e) => onChange({ quote_amount: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor={id("deposit_amount")}>Seña (Gs.)</Label>
+            <Label htmlFor={id("deposit_amount")}>Seña ({currencySymbol()})</Label>
             <Input id={id("deposit_amount")} inputMode="numeric" placeholder="0"
               value={formatThousands(value.deposit_amount)}
               onChange={(e) => onChange({ deposit_amount: e.target.value })} />
@@ -584,7 +585,7 @@ export default function DeviceIntakeFields({
               "flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-semibold",
               balance > 0 ? "text-foreground" : "text-muted-foreground"
             )}>
-              {formatPYG(balance)}
+              {formatMoney(balance)}
             </div>
           </div>
         </div>

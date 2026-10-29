@@ -57,7 +57,7 @@ import { useBranches } from "@/hooks/useBranches";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export type Product = {
@@ -570,7 +570,7 @@ export default function Products() {
               )}
               <div>
                 <div className="font-semibold text-foreground">{i.name}</div>
-                <div className="text-sm font-medium text-primary">{formatPYG(i.selling_price)}</div>
+                <div className="text-sm font-medium text-primary">{formatMoney(i.selling_price)}</div>
                 {i.is_device && i.imei && (
                   <div className="text-[11px] text-muted-foreground">IMEI {i.imei}</div>
                 )}
@@ -665,7 +665,7 @@ export default function Products() {
                   onChange={(q) => updateCartQty(i, q)}
                 />
                 <span className="text-sm font-semibold text-foreground">
-                  {formatPYG(cart[i.id].quantity * cart[i.id].unitPrice)}
+                  {formatMoney(cart[i.id].quantity * cart[i.id].unitPrice)}
                 </span>
               </div>
             ) : reservation ? (
@@ -781,7 +781,7 @@ export default function Products() {
             </div>
             {staleSummary.count > 0 ? (
               <div className="mt-1 text-[11px] font-medium text-secondary">
-                {canViewCosts && `${formatPYG(staleSummary.immobilizedCost)} inmovilizado · `}{stockFilter === "stale" ? "Mostrando estos ↓" : "Ver cuáles →"}
+                {canViewCosts && `${formatMoney(staleSummary.immobilizedCost)} inmovilizado · `}{stockFilter === "stale" ? "Mostrando estos ↓" : "Ver cuáles →"}
               </div>
             ) : (
               <div className="mt-1 text-[11px] text-muted-foreground">Ninguno sin moverse</div>
@@ -790,14 +790,14 @@ export default function Products() {
         )}
         <Card className="p-3 sm:p-4">
           <div className="text-xs text-muted-foreground">Ventas de hoy</div>
-          <div className="mt-1 text-xl font-bold text-success sm:text-2xl">{formatPYG(totalToday)}</div>
+          <div className="mt-1 text-xl font-bold text-success sm:text-2xl">{formatMoney(totalToday)}</div>
           <div className="text-[11px] text-muted-foreground">{salesToday.length} venta{salesToday.length !== 1 ? "s" : ""}</div>
         </Card>
         {canViewCosts && (
           <Card className="p-3 sm:p-4">
             <div className="text-xs text-muted-foreground">Valor catálogo (costo)</div>
             <div className="mt-1 text-xl font-bold sm:text-2xl">
-              {formatPYG(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
+              {formatMoney(items.reduce((s, i) => s + i.stock * Number(i.cost_price || 0), 0))}
             </div>
           </Card>
         )}
@@ -941,18 +941,18 @@ export default function Products() {
                         </div>
                         {g.tradeInValue > 0 && (
                           <div className="truncate text-xs text-primary">
-                            Con canje: {tradeInDeviceName(g.key)} (-{formatPYG(g.tradeInValue)}) · cobrado {formatPYG(g.total - g.tradeInValue - g.depositValue)}
+                            Con canje: {tradeInDeviceName(g.key)} (-{formatMoney(g.tradeInValue)}) · cobrado {formatMoney(g.total - g.tradeInValue - g.depositValue)}
                           </div>
                         )}
                         {g.depositValue > 0 && (
                           <div className="truncate text-xs text-primary" data-testid="sale-deposit">
-                            Con seña de reserva: -{formatPYG(g.depositValue)}
-                            {g.tradeInValue > 0 ? "" : ` · cobrado ${formatPYG(g.total - g.depositValue)}`}
+                            Con seña de reserva: -{formatMoney(g.depositValue)}
+                            {g.tradeInValue > 0 ? "" : ` · cobrado ${formatMoney(g.total - g.depositValue)}`}
                           </div>
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className="font-semibold text-foreground">{formatPYG(g.total)}</span>
+                        <span className="font-semibold text-foreground">{formatMoney(g.total)}</span>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -1017,7 +1017,7 @@ export default function Products() {
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        {canViewCosts && <span className="font-semibold text-foreground">{formatPYG(p.purchase_price)}</span>}
+                        {canViewCosts && <span className="font-semibold text-foreground">{formatMoney(p.purchase_price)}</span>}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -1077,7 +1077,7 @@ export default function Products() {
             <ShoppingCart className="h-5 w-5" />
             {cartCount} {cartCount === 1 ? "producto" : "productos"}
           </span>
-          <span className="font-bold">{formatPYG(cartTotal)}</span>
+          <span className="font-bold">{formatMoney(cartTotal)}</span>
         </button>
       )}
 

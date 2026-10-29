@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/SignaturePad";
-import { formatPYG, normalizePriority, PRIORITY_LABELS, renderServiceTerms } from "@/lib/orders";
+import { normalizePriority, PRIORITY_LABELS, renderServiceTerms } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { parseAmount, type OrderFormState } from "./state";
 
 interface Props {
@@ -82,11 +83,11 @@ export default function StepReview({ form, patch, photoCount, goTo }: Props) {
       </Block>
 
       <Block title="Presupuesto y entrega" step={3} goTo={goTo}>
-        <Row label="Presupuesto">{quote > 0 ? formatPYG(quote) : "Sin presupuesto"}</Row>
-        <Row label="Seña">{deposit > 0 ? `${formatPYG(deposit)} (${form.deposit_payment_method})` : "Sin seña"}</Row>
+        <Row label="Presupuesto">{quote > 0 ? formatMoney(quote) : "Sin presupuesto"}</Row>
+        <Row label="Seña">{deposit > 0 ? `${formatMoney(deposit)} (${form.deposit_payment_method})` : "Sin seña"}</Row>
         {quote - deposit > 0 && (
           <Row label="Saldo">
-            <span className="text-secondary">{formatPYG(quote - deposit)}</span>
+            <span className="text-secondary">{formatMoney(quote - deposit)}</span>
           </Row>
         )}
         <Row label="Entrega estimada">

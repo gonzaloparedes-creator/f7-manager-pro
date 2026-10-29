@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle2, HandCoins, ShoppingCart, Smartphone, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompany";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import type { DeviceReservation } from "@/lib/reservations";
 import {
@@ -86,19 +86,19 @@ export default function DevicesHub({
           <div className="text-xs text-muted-foreground">En stock</div>
           <div className="mt-1 text-2xl font-bold" data-testid="hub-in-stock">{kpis.inStock.count}</div>
           <div className="text-[11px] text-muted-foreground">
-            {canViewStock && canViewCosts ? `${formatPYG(kpis.inStock.cost)} de costo parado` : "equipos disponibles"}
+            {canViewStock && canViewCosts ? `${formatMoney(kpis.inStock.cost)} de costo parado` : "equipos disponibles"}
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">A la venta</div>
           <div className="mt-1 text-2xl font-bold" data-testid="hub-for-sale">{kpis.forSale.count}</div>
-          <div className="text-[11px] text-muted-foreground">{formatPYG(kpis.forSale.potential)} de venta potencial</div>
+          <div className="text-[11px] text-muted-foreground">{formatMoney(kpis.forSale.potential)} de venta potencial</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">Reservados</div>
           <div className="mt-1 text-2xl font-bold" data-testid="hub-reserved">{kpis.reserved.count}</div>
           <div className="text-[11px] text-muted-foreground">
-            {kpis.reserved.count > 0 ? `${formatPYG(kpis.reserved.deposits)} en señas` : "sin señas pendientes"}
+            {kpis.reserved.count > 0 ? `${formatMoney(kpis.reserved.deposits)} en señas` : "sin señas pendientes"}
           </div>
         </Card>
         <Card className="p-4">
@@ -110,8 +110,8 @@ export default function DevicesHub({
             {monthSales === null
               ? "Cargando..."
               : isAdmin
-                ? `${formatPYG(kpis.soldMonth.profit)} de ganancia${kpis.soldMonth.profitComplete ? "" : " (parcial)"}`
-                : `${formatPYG(kpis.soldMonth.revenue)} vendidos`}
+                ? `${formatMoney(kpis.soldMonth.profit)} de ganancia${kpis.soldMonth.profitComplete ? "" : " (parcial)"}`
+                : `${formatMoney(kpis.soldMonth.revenue)} vendidos`}
           </div>
         </Card>
       </div>

@@ -734,6 +734,16 @@ export const tutorialCategories: TutorialCategory[] = [
         images: [{ file: "configuracion-perfil-01.png", alt: "Tab de Perfil en Configuración" }],
       },
       {
+        id: "moneda",
+        title: "Moneda",
+        body: [
+          "En Configuración → Perfil → \"Ubicación y moneda\" elegís la moneda en la que trabaja tu negocio: hoy guaraníes (Gs.) o dólares (US$). Todos los montos (órdenes, cobros, caja, gastos, reportes, comprobantes y mensajes de WhatsApp) se ven en esa moneda, y también lo que ve tu cliente en el link de seguimiento y en la vitrina.",
+          "Al elegir el país se preselecciona su moneda, y la podés cambiar a mano. Si la moneda de tu país todavía no está disponible, usá dólares y tocá \"Pedir mi moneda\": la vamos sumando a medida que se necesita.",
+          "Ojo: cambiar la moneda NO convierte los montos que ya cargaste. Por ejemplo, un presupuesto de 350.000 pasaría de verse \"Gs. 350.000\" a \"US$ 350.000\". Por eso, si tu negocio ya tiene órdenes, cobros o productos cargados, F7 te avisa antes de confirmar. Si te equivocás, volvé a la moneda anterior y todo se ve como antes.",
+          "Por ahora los dólares se cargan sin centavos (montos enteros).",
+        ],
+      },
+      {
         id: "whatsapp",
         title: "WhatsApp",
         body: [

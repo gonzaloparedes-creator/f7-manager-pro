@@ -10,7 +10,7 @@ import MessageTemplateEditor from "@/components/MessageTemplateEditor";
 import {
   MESSAGE_EVENTS,
   renderMessage,
-  PREVIEW_VARS,
+  getPreviewVars,
   type MessageEventKey,
   type MessageVars,
 } from "@/lib/customerMessages";
@@ -119,7 +119,7 @@ export default function WhatsAppTemplatesCard({
         </div>
         <div className="text-xs text-muted-foreground">{EVENT_HELP[key]}</div>
         <div className="line-clamp-2 text-xs text-muted-foreground/80">
-          {renderMessage(bodyOf(key), PREVIEW_VARS)}
+          {renderMessage(bodyOf(key), getPreviewVars())}
         </div>
       </div>
       <Button variant="ghost" size="icon" onClick={() => openEditor(key)} aria-label={`Editar mensaje: ${MESSAGE_EVENTS[key].label}`}>

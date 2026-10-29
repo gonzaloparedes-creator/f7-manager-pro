@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import StorefrontView from "@/components/storefront/StorefrontView";
 import { StorefrontUnavailable } from "@/components/storefront/StorefrontShell";
+import { DEFAULT_CURRENCY, parseCurrency, setActiveCurrency } from "@/lib/currency";
 import type { StorefrontData } from "@/lib/storefront";
 
 type State = { status: "loading" } | { status: "missing" } | { status: "error" } | { status: "ready"; data: StorefrontData };
@@ -19,16 +20,21 @@ export default function PublicStorefront() {
       return;
     }
     setState({ status: "loading" });
-    (supabase as any)
-      .rpc("get_storefront", { _slug: slug })
-      .then(({ data, error }: { data: StorefrontData | null; error: unknown }) => {
-        if (!active) return;
-        if (error) setState({ status: "error" });
-        else if (!data) setState({ status: "missing" });
-        else setState({ status: "ready", data });
-      });
+    Promise.all([
+      (supabase as any).rpc("get_storefront", { _slug: slug }),
+      supabase.rpc("get_storefront_currency", { _slug: slug }),
+    ]).then(([{ data, error }, { data: currency }]: [{ data: StorefrontData | null; error: unknown }, { data: string | null }]) => {
+      if (!active) return;
+      // Los precios se muestran en la moneda del negocio (antes de dibujarlos).
+      setActiveCurrency(parseCurrency(currency));
+      if (error) setState({ status: "error" });
+      else if (!data) setState({ status: "missing" });
+      else setState({ status: "ready", data });
+    });
     return () => { active = false; };
   }, [slug]);
+
+  useEffect(() => () => setActiveCurrency(DEFAULT_CURRENCY), []);
 
   if (state.status === "loading") {
     return (

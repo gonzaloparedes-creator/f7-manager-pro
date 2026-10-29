@@ -1,3 +1,5 @@
+import { currencySymbol } from "@/lib/currency";
+
 // Precio mínimo de negociación de un equipo (B1 seminuevos). Lógica pura, sin React ni Supabase.
 
 export interface ParsedMinPrice {
@@ -10,7 +12,7 @@ export interface ParsedMinPrice {
 export function parseMinPrice(input: string | number | null | undefined, sellingPrice: number): ParsedMinPrice {
   const text = String(input ?? "").trim();
   if (text === "") return { value: null, error: null };
-  if (!/^\d+$/.test(text)) return { value: null, error: "El precio mínimo tiene que ser un monto en Gs., sin decimales" };
+  if (!/^\d+$/.test(text)) return { value: null, error: `El precio mínimo tiene que ser un monto en ${currencySymbol()}, sin decimales` };
   const value = Number(text);
   if (value === 0) return { value: null, error: null };
   if (value > (Number.isFinite(sellingPrice) ? sellingPrice : 0)) {

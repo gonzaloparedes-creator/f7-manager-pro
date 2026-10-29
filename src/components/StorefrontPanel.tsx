@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import StorefrontView from "@/components/storefront/StorefrontView";
 import StorefrontCustomizer from "@/components/storefront/StorefrontCustomizer";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import {
   ACCENT_PRESETS,
@@ -711,7 +711,7 @@ export default function StorefrontPanel({ items, reservedIds, categoryName, onPu
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {Number(item.selling_price) > 0 ? formatPYG(Number(item.selling_price)) : "Sin precio"}
+                      {Number(item.selling_price) > 0 ? formatMoney(Number(item.selling_price)) : "Sin precio"}
                       {" · "}
                       {item.is_device ? "Equipo" : `Stock ${item.stock}`}
                     </p>

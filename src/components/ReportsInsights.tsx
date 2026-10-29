@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InsightCard, InsightEmpty as Empty, InsightLoading as Loading } from "@/components/InsightCard";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import { formatPYG, resolveStatusLabel } from "@/lib/orders";
+import { resolveStatusLabel } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { normalizedRealPhone } from "@/lib/clients";
 import { openWhatsApp, toWhatsAppPhone } from "@/lib/whatsapp";
 import {
@@ -350,7 +351,7 @@ export default function ReportsInsights({
                       <tr key={s.name} className="border-t border-border/50">
                         <td className="py-1.5">{s.name}</td>
                         <td className="py-1.5 text-right font-medium">{s.count}</td>
-                        <td className="py-1.5 text-right text-muted-foreground">{s.avgTicket > 0 ? formatPYG(s.avgTicket) : "—"}</td>
+                        <td className="py-1.5 text-right text-muted-foreground">{s.avgTicket > 0 ? formatMoney(s.avgTicket) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -456,7 +457,7 @@ export default function ReportsInsights({
             ) : (
               <div className="space-y-2">
                 <div>
-                  <div className="text-3xl font-bold" data-testid="idle-total">{formatPYG(idle.totalValue)}</div>
+                  <div className="text-3xl font-bold" data-testid="idle-total">{formatMoney(idle.totalValue)}</div>
                   <div className="text-xs text-muted-foreground">
                     en {idleRows.length} {idleRows.length === 1 ? "artículo" : "artículos"} sin movimiento hace {idleDays} días o más.
                   </div>
@@ -471,7 +472,7 @@ export default function ReportsInsights({
                           {hasMultipleBranches && branchName(r.branch_id) ? ` · ${branchName(r.branch_id)}` : ""}
                         </div>
                       </div>
-                      <span className="shrink-0 font-medium">{formatPYG(r.value)}</span>
+                      <span className="shrink-0 font-medium">{formatMoney(r.value)}</span>
                     </li>
                   ))}
                 </ul>

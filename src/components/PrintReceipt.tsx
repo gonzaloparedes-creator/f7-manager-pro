@@ -1,7 +1,8 @@
 import { QRCodeCanvas } from "qrcode.react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { DEFAULT_SERVICE_TERMS, formatPYG, STATUS_LABELS, type OrderStatus } from "@/lib/orders";
+import { DEFAULT_SERVICE_TERMS, STATUS_LABELS, type OrderStatus } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { receiptWarranty } from "@/lib/receiptWarranty";
 
 interface PrintOrder {
@@ -190,15 +191,15 @@ function InfoGrid({ order, statusLabel }: { order: PrintOrder; statusLabel?: str
         <div className="grid grid-cols-3 gap-2">
           <div>
             <div className="text-black/60">Presupuesto</div>
-            <div className="font-semibold">{formatPYG(order.quote_amount)}</div>
+            <div className="font-semibold">{formatMoney(order.quote_amount)}</div>
           </div>
           <div>
             <div className="text-black/60">Seña / Pagado</div>
-            <div className="font-semibold">{formatPYG(order.deposit_amount)}</div>
+            <div className="font-semibold">{formatMoney(order.deposit_amount)}</div>
           </div>
           <div>
             <div className="text-black/60">Saldo</div>
-            <div className="font-bold">{formatPYG(balance)}</div>
+            <div className="font-bold">{formatMoney(balance)}</div>
           </div>
         </div>
         <WarrantyInfo order={order} />

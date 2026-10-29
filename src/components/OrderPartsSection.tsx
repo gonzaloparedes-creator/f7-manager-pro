@@ -12,7 +12,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Wrench, Plus, Trash2, Search, Loader2, PackagePlus, Package, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -203,7 +203,7 @@ export default function OrderPartsSection({
         created_by: user.id,
       });
       if (error) throw error;
-      toast({ title: "Repuesto externo agregado", description: `${supplierName.trim()} · ${formatPYG(cost)}` });
+      toast({ title: "Repuesto externo agregado", description: `${supplierName.trim()} · ${formatMoney(cost)}` });
       setSupplierName(""); setPartDetails(""); setExtCost("");
       try { localStorage.removeItem(PARTS_DRAFT_KEY); } catch {}
       await loadParts();
@@ -342,7 +342,7 @@ export default function OrderPartsSection({
                           <div className="min-w-0">
                             <div className="truncate font-medium text-foreground">{it.name}</div>
                             <div className="text-xs text-muted-foreground">
-                              {formatPYG(it.selling_price)}
+                              {formatMoney(it.selling_price)}
                             </div>
                           </div>
                           <span
@@ -393,7 +393,7 @@ export default function OrderPartsSection({
               />
             </div>
             <div className="grid gap-2">
-              <Label className="text-xs">Precio de Costo (Gs.)</Label>
+              <Label className="text-xs">Precio de Costo ({currencySymbol()})</Label>
               <Input
                 type="number"
                 min={0}
@@ -445,7 +445,7 @@ export default function OrderPartsSection({
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {isExternal && p.part_details ? `${p.part_details} · ` : ""}
-                      Cant: {p.quantity} · {formatPYG(lineTotal)}
+                      Cant: {p.quantity} · {formatMoney(lineTotal)}
                     </div>
                   </div>
                   <Button
@@ -476,11 +476,11 @@ export default function OrderPartsSection({
           >
             <div className="flex items-center justify-between gap-2 text-muted-foreground">
               <span>Precio al cliente</span>
-              <span data-testid="order-profit-price">{formatPYG(orderTotal)}</span>
+              <span data-testid="order-profit-price">{formatMoney(orderTotal)}</span>
             </div>
             <div className="flex items-center justify-between gap-2 text-muted-foreground">
               <span>Costo de repuestos</span>
-              <span data-testid="order-profit-cost">− {formatPYG(partsCost)}</span>
+              <span data-testid="order-profit-cost">− {formatMoney(partsCost)}</span>
             </div>
             <div className="flex items-center justify-between gap-2 border-t border-border pt-1.5 font-semibold">
               <span>Ganancia de esta orden</span>
@@ -488,7 +488,7 @@ export default function OrderPartsSection({
                 data-testid="order-profit-net"
                 className={profit >= 0 ? "text-primary" : "text-destructive"}
               >
-                {formatPYG(profit)}
+                {formatMoney(profit)}
                 {marginPct !== null && (
                   <span className="ml-1.5 text-xs font-medium text-muted-foreground">({marginPct}%)</span>
                 )}
@@ -527,11 +527,11 @@ export default function OrderPartsSection({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
-                <Label>Costo (Gs.)</Label>
+                <Label>Costo ({currencySymbol()})</Label>
                 <Input type="number" min={0} step="1" value={newCost} onChange={(e) => setNewCost(e.target.value)} />
               </div>
               <div className="grid gap-2">
-                <Label>Precio venta (Gs.)</Label>
+                <Label>Precio venta ({currencySymbol()})</Label>
                 <Input type="number" min={0} step="1" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
               </div>
             </div>

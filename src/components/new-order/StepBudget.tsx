@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import WarrantySelector from "@/components/WarrantySelector";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { formatThousands, parseAmount, type OrderFormState } from "./state";
 
@@ -45,7 +45,7 @@ export default function StepBudget({ form, patch }: Props) {
       <div className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="order_quote_amount">Presupuesto (Gs.)</Label>
+            <Label htmlFor="order_quote_amount">Presupuesto ({currencySymbol()})</Label>
             <Input
               id="order_quote_amount"
               className="h-11 text-base"
@@ -56,7 +56,7 @@ export default function StepBudget({ form, patch }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="order_deposit_amount">Seña (Gs.)</Label>
+            <Label htmlFor="order_deposit_amount">Seña ({currencySymbol()})</Label>
             <Input
               id="order_deposit_amount"
               className={cn("h-11 text-base", depositTooHigh && "border-destructive focus-visible:ring-destructive")}
@@ -101,7 +101,7 @@ export default function StepBudget({ form, patch }: Props) {
           ) : (
             <>
               <span>Saldo a cobrar al retirar</span>
-              <span className={cn("text-base font-semibold", balance > 0 && "text-secondary")}>{formatPYG(balance)}</span>
+              <span className={cn("text-base font-semibold", balance > 0 && "text-secondary")}>{formatMoney(balance)}</span>
             </>
           )}
         </div>

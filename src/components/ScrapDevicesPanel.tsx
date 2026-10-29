@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { HandCoins, Printer, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { partAvailability, type PartAvailability, type ScrapDevice, type ScrapTotals } from "@/lib/scrapDevice";
 import type { DevicePurchaseRecord } from "@/lib/devicePurchase";
 
@@ -65,15 +65,15 @@ export default function ScrapDevicesPanel({
           <>
             <Card className="p-4">
               <div className="text-xs text-muted-foreground">Invertido</div>
-              <div className="mt-1 text-2xl font-bold">{formatPYG(totals.invested)}</div>
+              <div className="mt-1 text-2xl font-bold">{formatMoney(totals.invested)}</div>
             </Card>
             <Card className="p-4">
               <div className="text-xs text-muted-foreground">Asignado a piezas</div>
-              <div className="mt-1 text-2xl font-bold text-success">{formatPYG(totals.allocated)}</div>
+              <div className="mt-1 text-2xl font-bold text-success">{formatMoney(totals.allocated)}</div>
             </Card>
             <Card className="p-4">
               <div className="text-xs text-muted-foreground">Sin asignar</div>
-              <div className={cn("mt-1 text-2xl font-bold", totals.unassigned > 0 && "text-secondary")}>{formatPYG(totals.unassigned)}</div>
+              <div className={cn("mt-1 text-2xl font-bold", totals.unassigned > 0 && "text-secondary")}>{formatMoney(totals.unassigned)}</div>
               <div className="text-[11px] text-muted-foreground">Plata de equipos sin desarmar del todo</div>
             </Card>
           </>
@@ -109,9 +109,9 @@ export default function ScrapDevicesPanel({
                   <div className="flex items-center gap-2">
                     {canViewCosts && (
                       <div className="text-right">
-                        <div className="font-semibold text-foreground">{formatPYG(p.purchase_price)}</div>
+                        <div className="font-semibold text-foreground">{formatMoney(p.purchase_price)}</div>
                         <div className={cn("text-[11px]", d.unassigned > 0 ? "text-secondary" : "text-muted-foreground")}>
-                          {d.unassigned > 0 ? `${formatPYG(d.unassigned)} sin asignar` : "Todo asignado"}
+                          {d.unassigned > 0 ? `${formatMoney(d.unassigned)} sin asignar` : "Todo asignado"}
                         </div>
                       </div>
                     )}
@@ -132,7 +132,7 @@ export default function ScrapDevicesPanel({
                           <span className="min-w-0 truncate">{part.part_name}</span>
                           <span className="flex shrink-0 items-center gap-2">
                             <Badge variant="outline" className={cn("text-[10px]", av.className)}>{av.label}</Badge>
-                            {canViewCosts && <span className="text-muted-foreground">{formatPYG(part.allocated_cost)}</span>}
+                            {canViewCosts && <span className="text-muted-foreground">{formatMoney(part.allocated_cost)}</span>}
                           </span>
                         </li>
                       );

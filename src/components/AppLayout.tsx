@@ -18,6 +18,7 @@ import UpgradeProDialog from "@/components/UpgradeProDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import QuickActionsFab from "@/components/QuickActionsFab";
 import WhatsAppOfferProvider from "@/components/WhatsAppOfferProvider";
+import { CurrencyProvider } from "@/components/CurrencyProvider";
 import PendingMessagesProvider from "@/components/PendingMessagesProvider";
 import PlanExpiryReminder from "@/components/PlanExpiryReminder";
 import { usePendingMessages } from "@/hooks/usePendingMessages";
@@ -315,8 +316,10 @@ function AppLayoutContent() {
 
 export default function AppLayout() {
   return (
-    <PendingMessagesProvider>
-      <AppLayoutContent />
-    </PendingMessagesProvider>
+    <CurrencyProvider>
+      <PendingMessagesProvider>
+        <AppLayoutContent />
+      </PendingMessagesProvider>
+    </CurrencyProvider>
   );
 }

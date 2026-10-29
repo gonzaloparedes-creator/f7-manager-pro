@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { warrantyDocumentLine } from "@/lib/deviceWarranty";
 import type { TicketSale } from "@/components/SaleTicket";
 
@@ -19,12 +19,12 @@ function totalLines(sale: TicketSale): string[] {
   const total = saleTotal(sale);
   const tradeIn = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in : null;
   const deposit = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
-  if (!tradeIn && !deposit) return [`*Total: ${formatPYG(total)}*`];
+  if (!tradeIn && !deposit) return [`*Total: ${formatMoney(total)}*`];
   return [
-    `Subtotal: ${formatPYG(total)}`,
-    ...(tradeIn ? [`Equipo recibido (${tradeIn.device_name}): -${formatPYG(tradeIn.value)}`] : []),
-    ...(deposit ? [`Seña ya abonada: -${formatPYG(deposit)}`] : []),
-    `*A pagar: ${formatPYG(saleToPay(sale))}*`,
+    `Subtotal: ${formatMoney(total)}`,
+    ...(tradeIn ? [`Equipo recibido (${tradeIn.device_name}): -${formatMoney(tradeIn.value)}`] : []),
+    ...(deposit ? [`Seña ya abonada: -${formatMoney(deposit)}`] : []),
+    `*A pagar: ${formatMoney(saleToPay(sale))}*`,
   ];
 }
 
@@ -39,7 +39,7 @@ export function buildSaleReceiptMessage(
   const lines = sale.items.flatMap((i) => {
     const warranty = warrantyDocumentLine(sale.created_at, i.warranty_days);
     return [
-      `• ${i.quantity} x ${i.product_name} — ${formatPYG(i.quantity * Number(i.unit_price || 0))}`,
+      `• ${i.quantity} x ${i.product_name} — ${formatMoney(i.quantity * Number(i.unit_price || 0))}`,
       ...(i.imei ? [`   IMEI: ${i.imei}`] : []),
       ...(warranty ? [`   ${warranty}`] : []),
     ];

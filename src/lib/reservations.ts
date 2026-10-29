@@ -6,7 +6,7 @@
 // cancele.
 
 import { addDays, differenceInCalendarDays, format, parse } from "date-fns";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 
 export type ReservationStatus = "activa" | "vendida" | "cancelada";
 
@@ -152,10 +152,10 @@ export function parseReservationDraft(
 
   const price = parseAmount(draft.agreedPrice);
   if (price === null || price <= 0) {
-    return { error: "El precio acordado tiene que ser un monto en Gs. mayor a cero, sin decimales" };
+    return { error: `El precio acordado tiene que ser un monto en ${currencySymbol()} mayor a cero, sin decimales` };
   }
   const deposit = parseAmount(draft.deposit);
-  if (deposit === null) return { error: "La seña tiene que ser un monto en Gs., sin decimales" };
+  if (deposit === null) return { error: `La seña tiene que ser un monto en ${currencySymbol()}, sin decimales` };
   if (deposit > price) return { error: "La seña no puede superar el precio acordado" };
   const method = draft.paymentMethod.trim();
   if (deposit > 0 && !method) return { error: "Elegí con qué medio de pago dejó la seña" };
@@ -200,8 +200,8 @@ export type ParsedCancel =
 
 export function parseCancelDraft(draft: CancelDraft, reservationId: string, deposit: number): ParsedCancel {
   const refund = parseAmount(draft.refund);
-  if (refund === null) return { error: "El monto a devolver tiene que ser un monto en Gs., sin decimales" };
-  if (refund > deposit) return { error: `No podés devolver más que la seña (${formatPYG(deposit)})` };
+  if (refund === null) return { error: `El monto a devolver tiene que ser un monto en ${currencySymbol()}, sin decimales` };
+  if (refund > deposit) return { error: `No podés devolver más que la seña (${formatMoney(deposit)})` };
   const method = draft.method.trim();
   if (refund > 0 && !method) return { error: "Elegí con qué medio de pago se devuelve la seña" };
   const reason = draft.reason.trim();
@@ -235,7 +235,7 @@ export function totalDeposit(lines: { deposit?: number }[]): number {
 export function depositProblem(lines: ReservedSaleLine[]): string | null {
   for (const l of lines) {
     if (l.deposit > l.quantity * l.unitPrice) {
-      return `La seña de «${l.name}» (${formatPYG(l.deposit)}) es mayor que su precio de venta. Subí el precio o bajá el descuento.`;
+      return `La seña de «${l.name}» (${formatMoney(l.deposit)}) es mayor que su precio de venta. Subí el precio o bajá el descuento.`;
     }
   }
   return null;
@@ -253,9 +253,9 @@ export function buildReservationMessage(
     `Reserva ${r.receipt_number}`,
     "",
     `Equipo: ${r.device_name}`,
-    `Precio acordado: ${formatPYG(Number(r.agreed_price))}`,
+    `Precio acordado: ${formatMoney(Number(r.agreed_price))}`,
     ...(deposit > 0
-      ? [`Seña recibida: ${formatPYG(deposit)}`, `Saldo a pagar al retirarlo: ${formatPYG(balanceDue(r))}`]
+      ? [`Seña recibida: ${formatMoney(deposit)}`, `Saldo a pagar al retirarlo: ${formatMoney(balanceDue(r))}`]
       : ["Sin seña"]),
     `Te lo guardamos hasta el ${displayDate(r.expires_on)}.`,
     "",

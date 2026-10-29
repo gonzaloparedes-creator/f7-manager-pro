@@ -11,7 +11,7 @@ import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice"
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { openWhatsApp, toWhatsAppPhone } from "@/lib/whatsapp";
 import {
   balanceDue,
@@ -108,7 +108,7 @@ export default function ReserveDeviceDialog({
               <DialogDescription>
                 Reserva <span className="font-semibold text-foreground">{done.receipt_number}</span> — {done.device_name} para {done.customer_name}, hasta el {displayDate(done.expires_on)}.
                 {Number(done.deposit_amount) > 0
-                  ? ` Seña: ${formatPYG(Number(done.deposit_amount))}. Saldo al retirarlo: ${formatPYG(balanceDue(done))}.`
+                  ? ` Seña: ${formatMoney(Number(done.deposit_amount))}. Saldo al retirarlo: ${formatMoney(balanceDue(done))}.`
                   : " Sin seña."}
               </DialogDescription>
             </DialogHeader>
@@ -144,11 +144,11 @@ export default function ReserveDeviceDialog({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-2">
-                  <Label htmlFor="res-price">Precio acordado (Gs.)</Label>
+                  <Label htmlFor="res-price">Precio acordado ({currencySymbol()})</Label>
                   <Input id="res-price" inputMode="numeric" placeholder="0" value={thousands(draft.agreedPrice)} onChange={(e) => set({ agreedPrice: digitsOnly(e.target.value) })} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="res-deposit">Seña que deja (Gs., opcional)</Label>
+                  <Label htmlFor="res-deposit">Seña que deja ({currencySymbol()}, opcional)</Label>
                   <Input id="res-deposit" inputMode="numeric" placeholder="0" value={thousands(draft.deposit)} onChange={(e) => set({ deposit: digitsOnly(e.target.value) })} />
                 </div>
               </div>
@@ -165,7 +165,7 @@ export default function ReserveDeviceDialog({
                   </div>
                   {priceAmount >= depositAmount && priceAmount > 0 && (
                     <p className="text-xs text-muted-foreground" data-testid="reserve-balance">
-                      Saldo al retirarlo: {formatPYG(priceAmount - depositAmount)}. La seña entra a la caja de hoy.
+                      Saldo al retirarlo: {formatMoney(priceAmount - depositAmount)}. La seña entra a la caja de hoy.
                     </p>
                   )}
                 </div>

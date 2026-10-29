@@ -5,7 +5,7 @@
 // costos, origen, notas ni historial) e "interno" (costos, ganancia, estado e historial).
 // En ninguna va el mínimo de negociación: es un dato que se destapa a propósito en pantalla.
 
-import { formatPYG } from "@/lib/orders";
+import { formatMoney } from "@/lib/currency";
 import { escapeHtml } from "@/lib/devicePurchaseReceipt";
 import { daysInStock, daysInStockLabel } from "@/lib/deviceStock";
 import { originLabel, parseBattery } from "@/lib/deviceSpecs";
@@ -106,8 +106,8 @@ export function buildDossierEvents(device: DossierDevice, history: DossierHistor
   for (const p of history.purchases) {
     events.push(
       p.kind === "canje"
-        ? { at: p.created_at, title: `Recibido en canje · ${p.receipt_number}`, detail: `Valor reconocido ${formatPYG(num(p.purchase_price))}` }
-        : { at: p.created_at, title: `Comprado a un cliente · ${p.receipt_number}`, detail: `Pagado ${formatPYG(num(p.purchase_price))}` },
+        ? { at: p.created_at, title: `Recibido en canje · ${p.receipt_number}`, detail: `Valor reconocido ${formatMoney(num(p.purchase_price))}` }
+        : { at: p.created_at, title: `Comprado a un cliente · ${p.receipt_number}`, detail: `Pagado ${formatMoney(num(p.purchase_price))}` },
     );
   }
 
@@ -116,13 +116,13 @@ export function buildDossierEvents(device: DossierDevice, history: DossierHistor
     events.push({
       at: r.created_at,
       title: `Reservado · ${r.receipt_number}`,
-      detail: `Para ${r.customer_name} · precio acordado ${formatPYG(num(r.agreed_price))} · ${deposit > 0 ? `seña ${formatPYG(deposit)}` : "sin seña"}`,
+      detail: `Para ${r.customer_name} · precio acordado ${formatMoney(num(r.agreed_price))} · ${deposit > 0 ? `seña ${formatMoney(deposit)}` : "sin seña"}`,
     });
     if (r.status === "cancelada" && r.resolved_at) {
       events.push({
         at: r.resolved_at,
         title: `Reserva cancelada · ${r.receipt_number}`,
-        detail: `Devuelto ${formatPYG(num(r.refunded_amount))} · retenido ${formatPYG(num(r.retained_amount))}`,
+        detail: `Devuelto ${formatMoney(num(r.refunded_amount))} · retenido ${formatMoney(num(r.retained_amount))}`,
       });
     }
   }
@@ -130,10 +130,10 @@ export function buildDossierEvents(device: DossierDevice, history: DossierHistor
   for (const s of history.sales) {
     const deposit = num(s.reservation_deposit);
     const parts = [
-      `${formatPYG(num(s.unit_price))}${s.payment_method ? ` (${s.payment_method})` : ""}`,
+      `${formatMoney(num(s.unit_price))}${s.payment_method ? ` (${s.payment_method})` : ""}`,
       s.customer_name ? `a ${s.customer_name}` : null,
       warrantyText(s.warranty_days),
-      deposit > 0 ? `seña ya abonada ${formatPYG(deposit)}` : null,
+      deposit > 0 ? `seña ya abonada ${formatMoney(deposit)}` : null,
     ].filter(Boolean);
     events.push({ at: s.created_at, title: "Vendido", detail: parts.join(" · ") });
   }
@@ -212,7 +212,7 @@ function customerBody(device: DossierDevice): string {
     ${row("IMEI", device.imei)}
     ${row("Batería", battery === null ? null : `${battery}%`)}
   </table>
-  <div class="price-box"><span>Precio</span><strong>${escapeHtml(formatPYG(num(device.selling_price)))}</strong></div>`;
+  <div class="price-box"><span>Precio</span><strong>${escapeHtml(formatMoney(num(device.selling_price)))}</strong></div>`;
 }
 
 function internalBody(device: DossierDevice, history: DossierHistory, options: DossierOptions): string {
@@ -223,15 +223,15 @@ function internalBody(device: DossierDevice, history: DossierHistory, options: D
   const margin = (pct: number | null) => (pct === null ? "" : ` (${pct}%)`);
 
   const costRows = [
-    finance.purchaseCost > 0 ? row("Costo de compra", formatPYG(finance.purchaseCost)) : "",
-    finance.repairCost > 0 ? row("Reparaciones", formatPYG(finance.repairCost)) : "",
-    row("Costo total", formatPYG(finance.totalCost)),
-    row("Precio de venta (lista)", formatPYG(finance.listPrice)),
-    row("Ganancia estimada a precio de lista", `${formatPYG(finance.estimatedProfit)}${margin(finance.estimatedMarginPct)}`),
+    finance.purchaseCost > 0 ? row("Costo de compra", formatMoney(finance.purchaseCost)) : "",
+    finance.repairCost > 0 ? row("Reparaciones", formatMoney(finance.repairCost)) : "",
+    row("Costo total", formatMoney(finance.totalCost)),
+    row("Precio de venta (lista)", formatMoney(finance.listPrice)),
+    row("Ganancia estimada a precio de lista", `${formatMoney(finance.estimatedProfit)}${margin(finance.estimatedMarginPct)}`),
   ].join("");
 
   const soldRows = finance.sold
-    ? `${row("Vendido por", formatPYG(finance.sold.price))}${row("Ganancia real", `${formatPYG(finance.sold.profit)}${margin(finance.sold.marginPct)}`)}`
+    ? `${row("Vendido por", formatMoney(finance.sold.price))}${row("Ganancia real", `${formatMoney(finance.sold.profit)}${margin(finance.sold.marginPct)}`)}`
     : "";
 
   const timeline = events.length

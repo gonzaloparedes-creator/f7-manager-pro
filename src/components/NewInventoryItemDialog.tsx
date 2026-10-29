@@ -18,6 +18,7 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { isDuplicateBarcodeError } from "@/lib/barcode";
 import { checkBarcodeForSave } from "@/lib/barcodeRemote";
 import BarcodeField from "@/components/BarcodeField";
+import { currencySymbol } from "@/lib/currency";
 
 const CREATE_CATEGORY = "__create_category__";
 const CREATE_SUBCATEGORY = "__create_subcategory__";
@@ -325,13 +326,13 @@ export default function NewInventoryItemDialog({
             </div>
             {canViewCosts && (
               <div className="grid gap-2">
-                <Label>Costo (Gs.)</Label>
-                <Input type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Gs. 0" />
+                <Label>Costo ({currencySymbol()})</Label>
+                <Input type="number" min={0} step="1" value={cost} onChange={(e) => setCost(e.target.value)} placeholder={`${currencySymbol()} 0`} />
               </div>
             )}
             <div className="grid gap-2">
-              <Label>Precio venta (Gs.)</Label>
-              <Input type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Gs. 0" />
+              <Label>Precio venta ({currencySymbol()})</Label>
+              <Input type="number" min={0} step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={`${currencySymbol()} 0`} />
             </div>
           </div>
 

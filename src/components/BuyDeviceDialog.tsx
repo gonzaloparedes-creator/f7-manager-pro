@@ -19,7 +19,7 @@ import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice"
 import { toast } from "sonner";
 import { Loader2, Printer, CheckCircle2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatPYG } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import {
   buildDevicePurchaseParams,
   emptyDevicePurchaseForm,
@@ -209,7 +209,7 @@ export default function BuyDeviceDialog({
               </DialogTitle>
               <DialogDescription>
                 Comprobante <span className="font-semibold text-foreground">{done.receipt_number}</span> — {done.device_name} por{" "}
-                {formatPYG(done.purchase_price)}.{" "}
+                {formatMoney(done.purchase_price)}.{" "}
                 {done.kind === "piezas"
                   ? "El equipo quedó en la Chatarra de Productos > Equipos: desde ahí cargás las piezas que le saques."
                   : "El equipo ya está en el catálogo de Productos."}
@@ -401,27 +401,27 @@ export default function BuyDeviceDialog({
                 <h4 className="text-sm font-semibold text-foreground">{canje ? "Valor del canje" : "Pago"}</h4>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="buy-price">{canje ? "Valor que le reconocés (Gs.)" : "Precio de compra (Gs.)"}</Label>
+                    <Label htmlFor="buy-price">{canje ? `Valor que le reconocés (${currencySymbol()})` : `Precio de compra (${currencySymbol()})`}</Label>
                     <Input id="buy-price" inputMode="numeric" placeholder="0" value={formatThousands(form.purchase_price)} onChange={(e) => set({ purchase_price: e.target.value })} />
                   </div>
                   {!piezas && (
                     <div className="grid gap-2">
-                      <Label htmlFor="buy-selling">Precio de venta (Gs., opcional)</Label>
+                      <Label htmlFor="buy-selling">Precio de venta ({currencySymbol()}, opcional)</Label>
                       <Input id="buy-selling" inputMode="numeric" placeholder="0" value={formatThousands(form.selling_price)} onChange={(e) => set({ selling_price: e.target.value })} />
                     </div>
                   )}
                 </div>
                 {!piezas && purchasePrice > 0 && sellingPrice > 0 && (
                   <p className={cn("text-xs", sellingPrice - purchasePrice < 0 ? "text-destructive" : "text-muted-foreground")}>
-                    Ganancia estimada antes de repuestos: {formatPYG(sellingPrice - purchasePrice)}
+                    Ganancia estimada antes de repuestos: {formatMoney(sellingPrice - purchasePrice)}
                   </p>
                 )}
                 {canje ? (
                   <p className="text-xs text-muted-foreground">
                     No sale plata de la caja: este valor se descuenta de lo que paga el cliente por la venta, y es el costo del equipo cuando lo revendas.
                     {maxValue !== undefined && (deposit > 0
-                      ? ` Máximo: ${formatPYG(Math.max(0, maxValue - deposit))} (el total de la venta menos la seña ya abonada).`
-                      : ` Máximo: ${formatPYG(maxValue)} (el total de la venta).`)}
+                      ? ` Máximo: ${formatMoney(Math.max(0, maxValue - deposit))} (el total de la venta menos la seña ya abonada).`
+                      : ` Máximo: ${formatMoney(maxValue)} (el total de la venta).`)}
                   </p>
                 ) : (
                   <div className="grid gap-2">

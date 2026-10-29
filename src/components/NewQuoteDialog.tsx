@@ -21,6 +21,7 @@ import { resolveClientId } from "@/lib/clients";
 import { Search, UserPlus, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PhoneInput from "react-phone-input-2";
+import { currencySymbol } from "@/lib/currency";
 import "react-phone-input-2/lib/style.css";
 
 type ClientLite = { id: string; name: string; phone: string | null; cedula: string | null };
@@ -533,7 +534,7 @@ export default function NewQuoteDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quote_amount">Presupuesto (Gs.)</Label>
+            <Label htmlFor="quote_amount">Presupuesto ({currencySymbol()})</Label>
             <Input
               id="quote_amount"
               inputMode="numeric"

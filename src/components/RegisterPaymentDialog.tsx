@@ -13,7 +13,8 @@ import { useOrderStatusPresets } from "@/hooks/useOrderStatusPresets";
 import { useCashRegisterGate } from "@/hooks/useCashRegisterGate";
 import CashRegisterRequiredNotice from "@/components/CashRegisterRequiredNotice";
 import { useToast } from "@/hooks/use-toast";
-import { formatPYG, isCashLabel, logOrderPayment, resolveStatusLabel } from "@/lib/orders";
+import { isCashLabel, logOrderPayment, resolveStatusLabel } from "@/lib/orders";
+import { currencySymbol, formatMoney } from "@/lib/currency";
 import { Wallet, Loader2, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -136,7 +137,7 @@ export default function RegisterPaymentDialog({
       return;
     }
     if (totalPay < 0 || totalPay > saldoConDescuento) {
-      toast({ title: "Monto inválido", description: `No puede superar el saldo (${formatPYG(saldoConDescuento)}).`, variant: "destructive" });
+      toast({ title: "Monto inválido", description: `No puede superar el saldo (${formatMoney(saldoConDescuento)}).`, variant: "destructive" });
       return;
     }
     if (activeLines.some((l) => !l.method)) {
@@ -168,12 +169,12 @@ export default function RegisterPaymentDialog({
 
       const noteParts: string[] = [];
       if (activeLines.length > 0) {
-        const paidList = activeLines.map((l) => `${formatPYG(l.amountNum)} (${l.method})`).join(", ");
+        const paidList = activeLines.map((l) => `${formatMoney(l.amountNum)} (${l.method})`).join(", ");
         noteParts.push(`Pago registrado: ${paidList}`);
       }
       if (discountAmount > 0) {
         const pctNote = discountUnit === "percent" ? ` (${discountInput}%)` : "";
-        noteParts.push(`Descuento aplicado: ${formatPYG(discountAmount)}${pctNote}`);
+        noteParts.push(`Descuento aplicado: ${formatMoney(discountAmount)}${pctNote}`);
       }
       try {
         await supabase.from("order_status_history").insert({
@@ -199,7 +200,7 @@ export default function RegisterPaymentDialog({
         title: discountAmount > 0 ? "Pago registrado con descuento" : "Pago registrado",
         description: saldoConDescuento - totalPay <= 0
           ? `${order.order_number} quedó totalmente pagada.`
-          : `Saldo restante: ${formatPYG(saldoConDescuento - totalPay)}.`,
+          : `Saldo restante: ${formatMoney(saldoConDescuento - totalPay)}.`,
       });
       onOpenChange(false);
       onRegistered();
@@ -215,7 +216,7 @@ export default function RegisterPaymentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar pago{order ? ` — ${order.order_number}` : ""}</DialogTitle>
-          <DialogDescription>Saldo pendiente: {formatPYG(saldo)}</DialogDescription>
+          <DialogDescription>Saldo pendiente: {formatMoney(saldo)}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -253,13 +254,13 @@ export default function RegisterPaymentDialog({
                       discountUnit === "amount" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    Gs.
+                    {currencySymbol()}
                   </button>
                 </div>
               </div>
               {discountAmount > 0 && (
                 <p className="text-xs text-secondary">
-                  -{formatPYG(discountAmount)} · saldo con descuento: {formatPYG(saldoConDescuento)}
+                  -{formatMoney(discountAmount)} · saldo con descuento: {formatMoney(saldoConDescuento)}
                 </p>
               )}
             </div>
@@ -322,7 +323,7 @@ export default function RegisterPaymentDialog({
                             "text-xs font-semibold",
                             vuelto >= 0 ? "text-secondary" : "text-destructive"
                           )}>
-                            {vuelto >= 0 ? `Vuelto: ${formatPYG(vuelto)}` : `Falta: ${formatPYG(-vuelto)}`}
+                            {vuelto >= 0 ? `Vuelto: ${formatMoney(vuelto)}` : `Falta: ${formatMoney(-vuelto)}`}
                           </span>
                         )}
                       </div>
@@ -339,7 +340,7 @@ export default function RegisterPaymentDialog({
               "text-xs font-medium",
               totalPay > saldoConDescuento ? "text-destructive" : "text-muted-foreground"
             )}>
-              Total a registrar: {formatPYG(totalPay)} / Saldo: {formatPYG(saldoConDescuento)}
+              Total a registrar: {formatMoney(totalPay)} / Saldo: {formatMoney(saldoConDescuento)}
             </p>
           </div>
 
