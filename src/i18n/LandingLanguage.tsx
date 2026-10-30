@@ -10,10 +10,15 @@ import {
 } from "@/i18n/language";
 import { LandingLanguageContext, type LandingLanguage } from "@/i18n/useLanguage";
 
-export function LandingLanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => resolveInitialLang(window.location.search, readStoredLang()).lang);
+// fixedLang: para una landing de un solo idioma (/py, Paraguay). No lee ni guarda la elección
+// de las otras landings, ignora ?lang= y no se puede cambiar.
+export function LandingLanguageProvider({ children, fixedLang }: { children: ReactNode; fixedLang?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(
+    () => fixedLang ?? resolveInitialLang(window.location.search, readStoredLang()).lang
+  );
 
   useEffect(() => {
+    if (fixedLang) return;
     // Un link con ?lang= se recuerda: los links entre / y /oferta no llevan el parámetro.
     if (resolveInitialLang(window.location.search, null).fromUrl) storeLang(lang);
     // Solo al entrar: después manda lo que elija la persona.
@@ -30,10 +35,14 @@ export function LandingLanguageProvider({ children }: { children: ReactNode }) {
     };
   }, [lang]);
 
-  const setLang = useCallback((next: Lang) => {
-    setLangState(next);
-    storeLang(next);
-  }, []);
+  const setLang = useCallback(
+    (next: Lang) => {
+      if (fixedLang) return;
+      setLangState(next);
+      storeLang(next);
+    },
+    [fixedLang]
+  );
 
   const value = useMemo<LandingLanguage>(
     () => ({

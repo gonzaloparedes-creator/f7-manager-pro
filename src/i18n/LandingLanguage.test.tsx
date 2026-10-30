@@ -107,6 +107,21 @@ describe("LandingLanguageProvider", () => {
     expect(screen.getByTestId("login")).toHaveTextContent("Log in");
   });
 
+  it("con idioma fijo (/py) ignora lo guardado y ?lang=, no guarda nada y no deja cambiar", () => {
+    window.localStorage.setItem(LANG_STORAGE_KEY, "pt");
+    window.history.pushState({}, "", "/py?lang=en");
+    render(
+      <LandingLanguageProvider fixedLang="es">
+        <Probe />
+      </LandingLanguageProvider>
+    );
+    expect(screen.getByTestId("lang")).toHaveTextContent("es");
+    expect(screen.getByTestId("money")).toHaveTextContent("Gs. 1.850.000");
+    act(() => screen.getByText("a-ingles").click());
+    expect(screen.getByTestId("lang")).toHaveTextContent("es");
+    expect(window.localStorage.getItem(LANG_STORAGE_KEY)).toBe("pt");
+  });
+
   it("usar el idioma fuera del proveedor avisa con un error claro", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderHook(() => useLanguage())).toThrow(/LandingLanguageProvider/);

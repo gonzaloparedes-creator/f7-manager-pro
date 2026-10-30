@@ -35,6 +35,8 @@ import SuperAdminFinanzas from "./pages/SuperAdminFinanzas.tsx";
 import Presentacion from "./pages/Presentacion.tsx";
 import Oferta from "./pages/Oferta.tsx";
 import LandingLayout from "./components/LandingLayout.tsx";
+import OfertaPy from "./pages/OfertaPy.tsx";
+import { LandingLanguageProvider } from "./i18n/LandingLanguage";
 import AppLayout from "./components/AppLayout.tsx";
 
 const queryClient = new QueryClient();
@@ -63,6 +65,15 @@ const App = () => (
             <Route path="/" element={<Presentacion />} />
             <Route path="/oferta" element={<Oferta />} />
           </Route>
+          {/* Landing del VSL para Paraguay: siempre en español, no comparte el idioma de / y /oferta */}
+          <Route
+            path="/py"
+            element={
+              <LandingLanguageProvider fixedLang="es">
+                <OfertaPy />
+              </LandingLanguageProvider>
+            }
+          />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/actualizar-password" element={<UpdatePassword />} />
