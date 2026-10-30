@@ -1,7 +1,7 @@
 // VSL de la landing /py (versión Paraguay). El video vive en YouTube como "no listado":
 // carga rápido con datos móviles y no gasta ancho de banda de Vercel.
 // Para cambiar el video: subirlo a YouTube (no listado) y pegar acá su id (lo que va después de "v=").
-export const VSL_YOUTUBE_ID = "";
+export const VSL_YOUTUBE_ID = "rM6JSDxGgaU";
 
 export const VSL_DURATION_LABEL = "6 min";
 
