@@ -42,7 +42,10 @@ export function useBranches() {
   const visibleBranches = restrictToBranch ? branches.filter((b) => b.id === userBranchId) : branches;
   const hasMultipleBranches = visibleBranches.length > 1;
   // Sucursal que se guarda por defecto en un alta nueva. Con una sola
-  // sucursal no hace falta atribuir (queda sin sucursal, como siempre).
+  // sucursal no se atribuye acá: los gastos y las cajas quedan "generales".
+  // Los artículos sí: la base los deja en esa única sucursal (trigger
+  // inventory_items_set_sole_branch), si no un usuario con "Solo ve su
+  // sucursal" no los vería.
   const defaultBranchId = hasMultipleBranches || restrictToBranch ? userBranchId : null;
 
   return { branches: visibleBranches, userBranchId, restrictToBranch, defaultBranchId, hasMultipleBranches, loading };
