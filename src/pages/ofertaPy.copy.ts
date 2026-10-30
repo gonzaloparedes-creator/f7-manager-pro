@@ -98,6 +98,39 @@ export const PY = {
     ],
     chip: "Funciona en el celular o en la compu · Sin instalar nada",
   },
+  // Capturas reales del grupo de WhatsApp, publicadas con permiso de cada uno (números tapados).
+  // No editar lo que dicen: el alt es la transcripción literal.
+  testimonials: {
+    kicker: "Mensajes reales",
+    title: "Lo que nos escriben los talleres que [[ya usan F7]]",
+    items: [
+      {
+        key: "ever",
+        image: "/py/testimonio-ever.webp",
+        width: 720,
+        height: 380,
+        who: "Ever Coronel",
+        alt: "Mensaje de WhatsApp de Ever Coronel: «A mi me es re útil hasta ahora ni una queja». «Equipo que ingresa, equipo que se registra».",
+      },
+      {
+        key: "milciades-ever",
+        image: "/py/testimonio-milciades-ever.webp",
+        width: 720,
+        height: 725,
+        who: "Milciades Electrónica y Ever Coronel",
+        alt: "Mensajes de WhatsApp. Milciades Electrónica: «Legalmente es muy bueno el panel conviene mas a los que tienen su control en word y es mucho mas rapido». Ever Coronel responde: «Yo lgmt primera vez usaré un sistema así el sistema que usaba antes era anotar todo en mi cabeza».",
+      },
+      {
+        key: "reporte",
+        image: "/py/testimonio-reporte.webp",
+        width: 720,
+        height: 836,
+        who: "Un taller compartiendo su reporte del mes",
+        alt: "Un usuario comparte por WhatsApp la captura de su reporte financiero del mes en F7 Manager y escribe: «Full».",
+      },
+    ],
+    footnote: "Capturas reales de WhatsApp, publicadas con permiso. Tapamos los números de teléfono.",
+  },
   objections: {
     kicker: "Seguro estás pensando…",
     items: [

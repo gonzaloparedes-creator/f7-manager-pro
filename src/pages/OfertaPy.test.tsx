@@ -68,6 +68,15 @@ describe("/py (landing del VSL para Paraguay)", () => {
     expect(screen.getByRole("heading", { name: /te devolvemos todo tu dinero/ })).toBeInTheDocument();
   });
 
+  it("muestra los testimonios reales de WhatsApp con su transcripción y el aviso de permiso", () => {
+    renderPage();
+    expect(screen.getByRole("heading", { name: /Lo que nos escriben los talleres/ })).toBeInTheDocument();
+    expect(screen.getByAltText(/Equipo que ingresa, equipo que se registra/)).toHaveAttribute("src", "/py/testimonio-ever.webp");
+    expect(screen.getByAltText(/anotar todo en mi cabeza/)).toBeInTheDocument();
+    expect(screen.getByAltText(/reporte financiero/)).toBeInTheDocument();
+    expect(screen.getByText(/publicadas con permiso/)).toBeInTheDocument();
+  });
+
   it("el precio del plan Pro sale de la tabla de precios, en guaraníes", () => {
     renderPage();
     expect(screen.getAllByText(/Gs\. 95\.000/).length).toBeGreaterThan(0);

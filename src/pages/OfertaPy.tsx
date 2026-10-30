@@ -243,8 +243,37 @@ export default function OfertaPy() {
         </div>
       </section>
 
-      {/* OBJECIONES */}
+      {/* TESTIMONIOS (capturas reales de WhatsApp; en el celular se deslizan de costado) */}
       <section className="py-14 md:py-20">
+        <div className="container">
+          <div className="mx-auto max-w-2xl text-center">
+            <Kicker>{PY.testimonials.kicker}</Kicker>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
+              <Rich text={PY.testimonials.title} />
+            </h2>
+          </div>
+        </div>
+        <div className="mx-auto mt-8 flex max-w-6xl snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 md:grid md:grid-cols-3 md:items-start md:overflow-visible md:px-8">
+          {PY.testimonials.items.map((item) => (
+            <figure key={item.key} className="w-[82%] max-w-[340px] shrink-0 snap-center md:w-auto md:max-w-none">
+              <img
+                src={item.image}
+                alt={item.alt}
+                width={item.width}
+                height={item.height}
+                className="h-auto w-full rounded-2xl border border-border shadow-elevated"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption className="mt-2 text-center text-sm font-semibold text-muted-foreground">{item.who}</figcaption>
+            </figure>
+          ))}
+        </div>
+        <p className="container mt-4 text-center text-xs text-muted-foreground">{PY.testimonials.footnote}</p>
+      </section>
+
+      {/* OBJECIONES */}
+      <section className="border-t border-border/60 py-14 md:py-20">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
             <Kicker>{PY.objections.kicker}</Kicker>
