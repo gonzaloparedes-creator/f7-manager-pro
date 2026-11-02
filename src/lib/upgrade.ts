@@ -1,5 +1,5 @@
 // Centralized WhatsApp upgrade contact for Plan Pro
-export const UPGRADE_PHONE = "595985158655";
+export const UPGRADE_PHONE = "595986222831";
 export const UPGRADE_MESSAGE =
   "¡Hola! Vengo de la plataforma y me interesa activar el Plan Pro de F7 Manager Pro para mi taller.";
 

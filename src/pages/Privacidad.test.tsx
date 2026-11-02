@@ -27,9 +27,9 @@ describe("/privacidad", () => {
   it("explica cómo pedir que borren tus datos, con el WhatsApp de soporte", () => {
     renderPage();
     expect(screen.getByRole("heading", { name: "Tus derechos" })).toBeInTheDocument();
-    const links = screen.getAllByRole("link", { name: /\+595985158655/ });
+    const links = screen.getAllByRole("link", { name: /\+595986222831/ });
     expect(links.length).toBeGreaterThan(0);
-    expect(links[0]).toHaveAttribute("href", "https://wa.me/595985158655");
+    expect(links[0]).toHaveAttribute("href", "https://wa.me/595986222831");
   });
 
   it("nunca promete avisos automáticos", () => {
