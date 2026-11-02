@@ -475,8 +475,8 @@ function BranchesTab() {
     load();
   };
 
-  const { isStarter, limits } = usePlan();
-  const atBranchLimit = isStarter && items.length >= limits.branches;
+  const { isStarter, hasSeatLimits, limits } = usePlan();
+  const atBranchLimit = hasSeatLimits && items.length >= limits.branches;
 
   return (
     <Card>
@@ -488,9 +488,9 @@ function BranchesTab() {
           </div>
           <Button onClick={openNew} disabled={atBranchLimit}><Plus className="mr-2 h-4 w-4" /> Nueva sucursal</Button>
         </div>
-        {isStarter && (
+        {hasSeatLimits && (
           <div className="text-xs text-muted-foreground">
-            El plan <span className="font-semibold text-secondary">Starter</span> permite 1 sucursal y 1 usuario. Pásate a <span className="font-semibold text-secondary">PRO</span> para expandir tu equipo.
+            El plan <span className="font-semibold text-secondary">{isStarter ? "Starter" : "Retail"}</span> permite 1 sucursal y 1 usuario. Pásate a <span className="font-semibold text-secondary">{isStarter ? "PRO" : "Business"}</span> para expandir tu equipo.
           </div>
         )}
 
@@ -747,7 +747,7 @@ function UsersTab() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const { companyId } = useCompany();
-  const { isStarter, isRetail, limits } = usePlan();
+  const { isStarter, isRetail, hasSeatLimits, limits } = usePlan();
   const canUseCommissions = !isStarter && !isRetail;
   const [users, setUsers] = useState<UserRow[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -1011,7 +1011,7 @@ function UsersTab() {
     load();
   };
 
-  const atUserLimit = isStarter && users.length >= limits.users;
+  const atUserLimit = hasSeatLimits && users.length >= limits.users;
 
   return (
     <Card>
@@ -1023,9 +1023,9 @@ function UsersTab() {
           </div>
           <Button onClick={() => setOpen(true)} disabled={atUserLimit}><Plus className="mr-2 h-4 w-4" /> Nuevo usuario</Button>
         </div>
-        {isStarter && (
+        {hasSeatLimits && (
           <div className="text-xs text-muted-foreground">
-            El plan <span className="font-semibold text-secondary">Starter</span> permite 1 sucursal y 1 usuario. Pásate a <span className="font-semibold text-secondary">PRO</span> para expandir tu equipo.
+            El plan <span className="font-semibold text-secondary">{isStarter ? "Starter" : "Retail"}</span> permite 1 sucursal y 1 usuario. Pásate a <span className="font-semibold text-secondary">{isStarter ? "PRO" : "Business"}</span> para expandir tu equipo.
           </div>
         )}
 

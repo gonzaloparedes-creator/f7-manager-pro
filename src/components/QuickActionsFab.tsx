@@ -22,7 +22,7 @@ export default function QuickActionsFab() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { isBusiness, isRetail } = usePlan();
+  const { isBusiness, isRetail, hasWorkshop } = usePlan();
   const { canViewProducts } = useStaffPermissions();
   const hasStore = (isBusiness || isRetail) && canViewProducts;
   const [scrolledDown, setScrolledDown] = useState(false);
@@ -46,28 +46,33 @@ export default function QuickActionsFab() {
 
   useEffect(() => { setScrolledDown(false); }, [pathname]);
 
+  // Retail (solo ventas) no recibe equipos para reparar: solo le queda la venta.
   const actions = [
-    {
-      key: "order",
-      label: "Nueva Orden",
-      desc: "Recibir un equipo para reparación",
-      icon: ClipboardList,
-      run: () => navigate("/ordenes/nueva"),
-    },
-    {
-      key: "quote",
-      label: "Nuevo Presupuesto",
-      desc: "Cotizar sin recibir el equipo todavía",
-      icon: FileText,
-      run: () => navigate("/dashboard", { state: { openNewQuote: true } }),
-    },
-    {
-      key: "batch",
-      label: "Modo Lote",
-      desc: "Recibir varios equipos del mismo cliente a la vez",
-      icon: Layers,
-      run: () => navigate("/dashboard", { state: { openBatchOrder: true } }),
-    },
+    ...(hasWorkshop
+      ? [
+          {
+            key: "order",
+            label: "Nueva Orden",
+            desc: "Recibir un equipo para reparación",
+            icon: ClipboardList,
+            run: () => navigate("/ordenes/nueva"),
+          },
+          {
+            key: "quote",
+            label: "Nuevo Presupuesto",
+            desc: "Cotizar sin recibir el equipo todavía",
+            icon: FileText,
+            run: () => navigate("/dashboard", { state: { openNewQuote: true } }),
+          },
+          {
+            key: "batch",
+            label: "Modo Lote",
+            desc: "Recibir varios equipos del mismo cliente a la vez",
+            icon: Layers,
+            run: () => navigate("/dashboard", { state: { openBatchOrder: true } }),
+          },
+        ]
+      : []),
     ...(hasStore
       ? [{
           key: "sale",
@@ -79,7 +84,7 @@ export default function QuickActionsFab() {
       : []),
   ];
 
-  if (!FAB_ROUTES.includes(pathname)) return null;
+  if (!FAB_ROUTES.includes(pathname) || actions.length === 0) return null;
 
   const handleTap = () => {
     if (actions.length === 1) { actions[0].run(); return; }

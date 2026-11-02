@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate, useLocation, Link } from "react-router-dom";
+import { NavLink, Navigate, Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { LayoutDashboard, Settings, LogOut, Users, BarChart3, Package, ShoppingBag, ShieldCheck, Lock, BookOpen, Wallet, Receipt, Cpu, MessageCircle, Menu } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,7 +12,7 @@ import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { usePlan } from "@/hooks/usePlan";
 import { useGenerateRecurringExpenses } from "@/hooks/useGenerateRecurringExpenses";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
-import { PLAN_MESSAGES } from "@/lib/plans";
+import { PLAN_MESSAGES, isWorkshopPath } from "@/lib/plans";
 import SuspendedAccount from "@/pages/SuspendedAccount";
 import UpgradeProDialog from "@/components/UpgradeProDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -23,20 +23,23 @@ import PendingMessagesProvider from "@/components/PendingMessagesProvider";
 import PlanExpiryReminder from "@/components/PlanExpiryReminder";
 import { usePendingMessages } from "@/hooks/usePendingMessages";
 
+// workshopOnly: pantallas del lado taller; el plan Retail (solo ventas) no las
+// tiene y no se le muestran (ni siquiera con candado: no es un escalón de la
+// escalera de upgrade).
 const baseNav = [
-  { to: "/dashboard", label: "Órdenes", icon: LayoutDashboard, proOnly: false, businessOnly: false, adminOnly: false },
-  { to: "/clientes", label: "Clientes", icon: Users, proOnly: false, businessOnly: false, adminOnly: false },
-  { to: "/avisos", label: "Avisos", icon: MessageCircle, proOnly: false, businessOnly: false, adminOnly: false },
-  { to: "/inventario", label: "Inventario", icon: Package, proOnly: true, businessOnly: false, adminOnly: false },
-  { to: "/productos", label: "Productos", icon: ShoppingBag, proOnly: false, businessOnly: true, adminOnly: false },
-  { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true },
-  { to: "/cierre-caja", label: "Caja", icon: Wallet, proOnly: true, businessOnly: false, adminOnly: false },
-  { to: "/gastos", label: "Gastos", icon: Receipt, proOnly: true, businessOnly: false, adminOnly: false },
-  { to: "/panic-full", label: "Panic Full", icon: Cpu, proOnly: true, businessOnly: false, adminOnly: false },
-  { to: "/como-usar", label: "Cómo usar", icon: BookOpen, proOnly: false, businessOnly: false, adminOnly: false },
+  { to: "/dashboard", label: "Órdenes", icon: LayoutDashboard, proOnly: false, businessOnly: false, adminOnly: false, workshopOnly: true },
+  { to: "/clientes", label: "Clientes", icon: Users, proOnly: false, businessOnly: false, adminOnly: false, workshopOnly: false },
+  { to: "/avisos", label: "Avisos", icon: MessageCircle, proOnly: false, businessOnly: false, adminOnly: false, workshopOnly: false },
+  { to: "/inventario", label: "Inventario", icon: Package, proOnly: true, businessOnly: false, adminOnly: false, workshopOnly: true },
+  { to: "/productos", label: "Productos", icon: ShoppingBag, proOnly: false, businessOnly: true, adminOnly: false, workshopOnly: false },
+  { to: "/reportes", label: "Reportes", icon: BarChart3, proOnly: true, businessOnly: false, adminOnly: true, workshopOnly: false },
+  { to: "/cierre-caja", label: "Caja", icon: Wallet, proOnly: true, businessOnly: false, adminOnly: false, workshopOnly: false },
+  { to: "/gastos", label: "Gastos", icon: Receipt, proOnly: true, businessOnly: false, adminOnly: false, workshopOnly: false },
+  { to: "/panic-full", label: "Panic Full", icon: Cpu, proOnly: true, businessOnly: false, adminOnly: false, workshopOnly: true },
+  { to: "/como-usar", label: "Cómo usar", icon: BookOpen, proOnly: false, businessOnly: false, adminOnly: false, workshopOnly: false },
 ];
 const adminNav = [
-  { to: "/configuracion", label: "Configuración", icon: Settings, proOnly: false, businessOnly: false, adminOnly: true },
+  { to: "/configuracion", label: "Configuración", icon: Settings, proOnly: false, businessOnly: false, adminOnly: true, workshopOnly: false },
 ];
 
 function PendingBadge({ mobile }: { mobile: boolean }) {
@@ -61,10 +64,10 @@ function PendingBadge({ mobile }: { mobile: boolean }) {
 function AppLayoutContent() {
   const { user, loading } = useAuth();
   const { isAdmin } = useUserRole();
-  const { canViewProducts, canViewGastos, canViewCaja, canManageCompany } = useStaffPermissions();
+  const { canViewProducts, canViewGastos, canViewCaja, canManageCompany, loading: permsLoading } = useStaffPermissions();
   const { isSuperAdmin } = useSuperAdmin();
   const { isActive, reason: suspensionReason, expiresAt: planExpiresAt, loading: statusLoading } = useCompanyStatus();
-  const { isStarter, isBusiness, isRetail, loading: planLoading } = usePlan();
+  const { isStarter, isBusiness, isRetail, hasWorkshop, loading: planLoading } = usePlan();
   const hasExternalInventory = isBusiness || isRetail;
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -78,11 +81,12 @@ function AppLayoutContent() {
     if (!canViewGastos) filtered = filtered.filter((i) => i.to !== "/gastos");
     if (!canViewCaja) filtered = filtered.filter((i) => i.to !== "/cierre-caja");
     if (!canManageCompany) filtered = filtered.filter((i) => i.to !== "/configuracion");
+    if (!hasWorkshop) filtered = filtered.filter((i) => !i.workshopOnly);
     if (isSuperAdmin) {
-      filtered.push({ to: "/superadmin", label: "Super Admin", icon: ShieldCheck, proOnly: false, businessOnly: false, adminOnly: false });
+      filtered.push({ to: "/superadmin", label: "Super Admin", icon: ShieldCheck, proOnly: false, businessOnly: false, adminOnly: false, workshopOnly: false });
     }
     return filtered;
-  }, [isAdmin, isSuperAdmin, canViewProducts, canViewGastos, canViewCaja, canManageCompany]);
+  }, [isAdmin, isSuperAdmin, hasWorkshop, canViewProducts, canViewGastos, canViewCaja, canManageCompany]);
 
   // La barra inferior mobile no entra con más de ~5 ítems (peor todavía con
   // el badge de bloqueo PRO/BUSINESS) — Configuración y Super Admin son de
@@ -114,6 +118,22 @@ function AppLayoutContent() {
 
   if (isActive === false && !isSuperAdmin) {
     return <SuspendedAccount reason={suspensionReason ?? "manual"} expiresAt={planExpiresAt} />;
+  }
+
+  // Retail es solo ventas: las pantallas de taller (órdenes, repuestos, Panic
+  // Full) no existen para ese plan, aunque alguien escriba la URL o tenga un
+  // enlace guardado. Su inicio es Productos; si es staff sin permiso para
+  // Productos, Clientes. Antes de decidir hay que conocer los permisos, para no
+  // mandar a Clientes a quien sí puede ver Productos.
+  if (!hasWorkshop && isWorkshopPath(pathname)) {
+    if (permsLoading) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      );
+    }
+    return <Navigate to={canViewProducts ? "/productos" : "/clientes"} replace />;
   }
 
   // Nueva orden es una pantalla completa por pasos: sin sidebar, barra

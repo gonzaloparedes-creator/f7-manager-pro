@@ -90,3 +90,24 @@ export const PLAN_FEATURES: Record<PlanType, string[]> = {
 // Escalera de upsell del lado "Taller". Retail es una oferta paralela, no
 // un escalón de esta escalera.
 export const TALLER_LADDER: PlanType[] = ["starter", "pro", "business"];
+
+// Retail es "solo ventas": no incluye órdenes de reparación, inventario de
+// repuestos ni Panic Full (así lo dicen el precio, la tarjeta de Suscripción y
+// PLAN_FEATURES). Antes esto solo estaba escrito, no aplicado: el menú
+// desbloqueaba para Retail lo mismo que para Business.
+export function planHasWorkshop(plan: PlanType): boolean {
+  return plan !== "retail";
+}
+
+// Pantallas del lado taller (el detalle de una orden es /ordenes/:id y la
+// pantalla de alta /ordenes/nueva). AppLayout manda a Retail fuera de ellas.
+const WORKSHOP_PATHS = ["/dashboard", "/ordenes", "/inventario", "/panic-full"];
+
+export function isWorkshopPath(pathname: string): boolean {
+  return WORKSHOP_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+// Starter y Retail comparten el tope de 1 usuario y 1 sucursal (PLAN_LIMITS).
+export function planHasSeatLimits(plan: PlanType): boolean {
+  return plan === "starter" || plan === "retail";
+}
