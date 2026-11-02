@@ -636,6 +636,9 @@ export default function Oferta() {
             <button onClick={() => contactWhatsApp("footer")} className="hover:text-primary">
               {o.footer.support}
             </button>
+            <Link to="/privacidad" className="hover:text-primary">
+              {t.common.privacy}
+            </Link>
           </div>
         </div>
       </footer>

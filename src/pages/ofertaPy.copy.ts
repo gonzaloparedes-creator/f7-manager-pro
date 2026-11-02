@@ -158,6 +158,6 @@ export const PY = {
     text: `Escribinos por WhatsApp y arrancás hoy, con la **garantía de ${days}**: si no te sirve, te devolvemos todo tu dinero.`,
     smallPrint: "🇵🇾 Hecho en Paraguay · Soporte por WhatsApp en español",
   },
-  footer: { brand: "F7 Manager · Hecho en Paraguay", support: "Soporte por WhatsApp" },
+  footer: { brand: "F7 Manager · Hecho en Paraguay", support: "Soporte por WhatsApp", privacy: "Privacidad" },
   stickyCta: "Escribinos por WhatsApp",
 } as const;

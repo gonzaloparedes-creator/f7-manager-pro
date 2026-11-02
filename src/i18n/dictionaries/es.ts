@@ -11,6 +11,7 @@ export const es = {
     startNow: "Empezar ahora",
     howItWorks: "Ver cómo funciona",
     footerBrand: "F7 Manager Pro · Hecho en Paraguay",
+    privacy: "Privacidad",
     languageLabel: "Idioma",
     ctaGuarantee: "Empezar con garantía de {days}",
     guarantee: "Si en {days} no te sirve, te devolvemos todo tu dinero.",

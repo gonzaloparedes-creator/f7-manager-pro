@@ -8,6 +8,7 @@ export const en: LandingDict = {
     startNow: "Start now",
     howItWorks: "See how it works",
     footerBrand: "F7 Manager Pro · Made in Paraguay",
+    privacy: "Privacy",
     languageLabel: "Language",
     ctaGuarantee: "Start with the {dayCount}-day guarantee",
     guarantee: "If it doesn't work for you in {days}, we refund all your money.",

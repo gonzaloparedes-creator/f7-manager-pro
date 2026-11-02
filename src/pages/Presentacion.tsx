@@ -507,6 +507,7 @@ export default function Presentacion() {
             >
               {t.common.startNow}
             </button>
+            <Link to="/privacidad" className="hover:text-primary">{t.common.privacy}</Link>
           </div>
         </div>
       </footer>

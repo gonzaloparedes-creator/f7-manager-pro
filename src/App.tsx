@@ -36,6 +36,7 @@ import Presentacion from "./pages/Presentacion.tsx";
 import Oferta from "./pages/Oferta.tsx";
 import LandingLayout from "./components/LandingLayout.tsx";
 import OfertaPy from "./pages/OfertaPy.tsx";
+import Privacidad from "./pages/Privacidad.tsx";
 import { LandingLanguageProvider } from "./i18n/LandingLanguage";
 import AppLayout from "./components/AppLayout.tsx";
 
@@ -74,6 +75,7 @@ const App = () => (
               </LandingLanguageProvider>
             }
           />
+          <Route path="/privacidad" element={<Privacidad />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/actualizar-password" element={<UpdatePassword />} />

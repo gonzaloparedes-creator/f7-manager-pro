@@ -403,6 +403,9 @@ export default function OfertaPy() {
             <button onClick={() => contactWhatsApp("footer")} className="hover:text-primary">
               {PY.footer.support}
             </button>
+            <Link to="/privacidad" className="hover:text-primary">
+              {PY.footer.privacy}
+            </Link>
           </div>
         </div>
       </footer>
