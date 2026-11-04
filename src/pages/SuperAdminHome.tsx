@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Globe2, Building2, Rocket, BarChart3, Receipt, BellRing, Landmark } from "lucide-react";
+import { ShieldCheck, Globe2, Building2, Rocket, BarChart3, Receipt, BellRing, Landmark, Link2 } from "lucide-react";
 
 export default function SuperAdminHome() {
   const { isSuperAdmin, loading } = useSuperAdmin();
@@ -41,6 +41,12 @@ export default function SuperAdminHome() {
       icon: BellRing,
       title: "Suscripciones y seguimiento",
       desc: "Clientes que pagan, pruebas gratis y a quién escribirle hoy con mensajes de WhatsApp ya armados.",
+    },
+    {
+      to: "/superadmin/altas",
+      icon: Link2,
+      title: "Links de alta pagada",
+      desc: "Después de cobrar, un link de un solo uso: el cliente se registra con su plan ya activo y la garantía de 7 días.",
     },
     {
       to: "/superadmin/fundadores",

@@ -31,6 +31,7 @@ import SuperAdminFundadores from "./pages/SuperAdminFundadores.tsx";
 import SuperAdminMetrics from "./pages/SuperAdminMetrics.tsx";
 import SuperAdminReceipts from "./pages/SuperAdminReceipts.tsx";
 import SuperAdminSubscriptions from "./pages/SuperAdminSubscriptions.tsx";
+import SuperAdminAltas from "./pages/SuperAdminAltas.tsx";
 import SuperAdminFinanzas from "./pages/SuperAdminFinanzas.tsx";
 import Presentacion from "./pages/Presentacion.tsx";
 import Oferta from "./pages/Oferta.tsx";
@@ -88,6 +89,8 @@ const App = () => (
           <Route path="/privacidad" element={<Privacidad />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          {/* Link de alta pagada (un solo uso), se manda por WhatsApp después del pago */}
+          <Route path="/empezar/:code" element={<Register />} />
           <Route path="/actualizar-password" element={<UpdatePassword />} />
           <Route path="/tracking/:orderCode" element={<PublicTrackingByCode />} />
           <Route path="/v/:slug" element={<PublicStorefront />} />
@@ -99,6 +102,7 @@ const App = () => (
           <Route path="/superadmin/metricas" element={<SuperAdminMetrics />} />
           <Route path="/superadmin/recibos" element={<SuperAdminReceipts />} />
           <Route path="/superadmin/suscripciones" element={<SuperAdminSubscriptions />} />
+          <Route path="/superadmin/altas" element={<SuperAdminAltas />} />
           <Route path="/superadmin/finanzas" element={<SuperAdminFinanzas />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />

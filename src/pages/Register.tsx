@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Wrench, Sparkles, Search, Check } from "lucide-react";
+import { Wrench, Sparkles, Search, Check, ShieldCheck, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COUNTRIES, PY_DEPARTMENTS, citiesForDepartment } from "@/lib/locations";
 import PhoneInput, { type CountryData } from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
+import { OFFER_GUARANTEE_DAYS } from "@/lib/ofertaOffer";
+import { formatDateISO } from "@/lib/subscriptionReceipt";
+import { invitePlanLine, type PublicSignupInvite } from "@/lib/signupInvites";
+import { openUpgradeWhatsApp } from "@/lib/upgrade";
 
 const REPAIRS_BUCKETS = ["1 a 5", "6 a 15", "16 a 30", "Más de 30"];
 
@@ -77,6 +81,10 @@ function SearchableSelect({
 export default function Register() {
   const [searchParams] = useSearchParams();
   const refSlug = searchParams.get("ref");
+  // /empezar/:code: link de alta pagada (un solo uso) que se manda después del pago.
+  const { code: inviteCode } = useParams<{ code: string }>();
+  const [invite, setInvite] = useState<PublicSignupInvite | null>(null);
+  const [checkingInvite, setCheckingInvite] = useState(!!inviteCode);
 
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -134,6 +142,20 @@ export default function Register() {
   useEffect(() => { document.title = "Registro | F7 Manager Pro"; }, []);
 
   useEffect(() => {
+    if (!inviteCode) return;
+    supabase
+      .rpc("get_signup_invite", { _code: inviteCode })
+      .then(({ data }) => {
+        const row = Array.isArray(data) ? data[0] : null;
+        setInvite(row ? (row as PublicSignupInvite) : null);
+        setCheckingInvite(false);
+      });
+  }, [inviteCode]);
+
+  const isInviteFlow = !!inviteCode;
+  const inviteUsable = !!invite?.usable;
+
+  useEffect(() => {
     fetch("/api/geo")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -183,6 +205,7 @@ export default function Register() {
             country,
             department: isParaguay ? department : "",
             city: isParaguay ? city : "",
+            ...(isInviteFlow && inviteUsable ? { signup_invite: inviteCode } : {}),
             ...(isFounderFlow
               ? {
                   referral_slug: refSlug,
@@ -227,6 +250,41 @@ export default function Register() {
     }
   };
 
+  if (isInviteFlow && checkingInvite) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (isInviteFlow && !inviteUsable) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent/10 p-4">
+        <Card className="w-full max-w-md text-center shadow-elevated">
+          <CardHeader>
+            <CardTitle className="text-2xl">Este link ya no sirve</CardTitle>
+            <CardDescription>
+              {invite ? "Ya se usó para crear una cuenta o fue anulado." : "No encontramos este link de alta."} Escribinos por
+              WhatsApp y lo revisamos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button className="w-full" onClick={() => openUpgradeWhatsApp("¡Hola! Mi link de alta de F7 Manager no funciona.")}>
+              <MessageCircle className="h-4 w-4" /> Escribinos por WhatsApp
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              ¿Ya creaste tu cuenta?{" "}
+              <Link to="/login" className="font-medium text-primary hover:underline">
+                Iniciá sesión
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent/10 p-4">
       <Card className="w-full max-w-md shadow-elevated">
@@ -235,9 +293,22 @@ export default function Register() {
             <Wrench className="h-6 w-6" />
           </div>
           <CardTitle className="text-2xl">Crear cuenta</CardTitle>
-          <CardDescription>Empezá a gestionar tus reparaciones</CardDescription>
+          <CardDescription>
+            {isInviteFlow ? "Tu plan ya está pago: creá tu cuenta y empezá hoy" : "Empezá a gestionar tus reparaciones"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
+          {isInviteFlow && invite && (
+            <div className="mb-4 space-y-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+              <p className="font-semibold">
+                {invitePlanLine(invite.plan_type, invite.billing_cycle)} · activo hasta el {formatDateISO(invite.plan_expires_at)}
+              </p>
+              <p className="flex items-start gap-1.5 text-muted-foreground">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                Garantía de {OFFER_GUARANTEE_DAYS} días: si no te sirve, te devolvemos todo tu dinero.
+              </p>
+            </div>
+          )}
           {!checkingPartner && isFounderFlow && (
             <div className="mb-4 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />

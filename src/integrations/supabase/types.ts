@@ -1684,6 +1684,59 @@ export type Database = {
         }
         Relationships: []
       }
+      signup_invites: {
+        Row: {
+          billing_cycle: string
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          plan_expires_at: string
+          plan_paid_from: string
+          plan_type: string
+          revoked_at: string | null
+          used_at: string | null
+          used_company_id: string | null
+        }
+        Insert: {
+          billing_cycle: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          plan_expires_at: string
+          plan_paid_from: string
+          plan_type: string
+          revoked_at?: string | null
+          used_at?: string | null
+          used_company_id?: string | null
+        }
+        Update: {
+          billing_cycle?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          plan_expires_at?: string
+          plan_paid_from?: string
+          plan_type?: string
+          revoked_at?: string | null
+          used_at?: string | null
+          used_company_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signup_invites_used_company_id_fkey"
+            columns: ["used_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1779,6 +1832,15 @@ export type Database = {
       get_company_currency_by_code: { Args: { _code: string }; Returns: string }
       get_company_currency_by_tracking: { Args: { _token: string }; Returns: string }
       get_storefront_currency: { Args: { _slug: string }; Returns: string }
+      get_signup_invite: {
+        Args: { _code: string }
+        Returns: {
+          billing_cycle: string
+          plan_expires_at: string
+          plan_type: string
+          usable: boolean
+        }[]
+      }
       get_history_by_code: {
         Args: { _code: string }
         Returns: {
