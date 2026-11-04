@@ -74,7 +74,7 @@ export const PLAN_FEATURES: Record<PlanType, string[]> = {
     "Módulo Punto de Venta (POS / Caja rápida)",
     "Inventario Externo (catálogo para venta al público)",
     "Cobro unificado: reparación + venta en un solo ticket",
-    "Recibos automatizados por WhatsApp",
+    "Recibos listos para enviar por WhatsApp",
     "Usuarios ilimitados",
   ],
   retail: [
@@ -82,7 +82,7 @@ export const PLAN_FEATURES: Record<PlanType, string[]> = {
     "Inventario Externo (ventas)",
     "Carga de productos con código de barras",
     "Control de Caja y Reportes de Ventas",
-    "Recibos automatizados por WhatsApp",
+    "Recibos listos para enviar por WhatsApp",
     "1 usuario / 1 sucursal",
   ],
 };

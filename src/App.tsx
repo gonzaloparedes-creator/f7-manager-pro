@@ -36,6 +36,7 @@ import Presentacion from "./pages/Presentacion.tsx";
 import Oferta from "./pages/Oferta.tsx";
 import LandingLayout from "./components/LandingLayout.tsx";
 import OfertaPy from "./pages/OfertaPy.tsx";
+import OfertaLatam from "./pages/OfertaLatam.tsx";
 import Privacidad from "./pages/Privacidad.tsx";
 import { LandingLanguageProvider } from "./i18n/LandingLanguage";
 import AppLayout from "./components/AppLayout.tsx";
@@ -72,6 +73,15 @@ const App = () => (
             element={
               <LandingLanguageProvider fixedLang="es">
                 <OfertaPy />
+              </LandingLanguageProvider>
+            }
+          />
+          {/* Landing del VSL para el resto de Latinoamérica: en español y en dólares */}
+          <Route
+            path="/latam"
+            element={
+              <LandingLanguageProvider fixedLang="es">
+                <OfertaLatam />
               </LandingLanguageProvider>
             }
           />

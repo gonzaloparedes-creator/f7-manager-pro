@@ -3,6 +3,9 @@
 // Para cambiar el video: subirlo a YouTube (no listado) y pegar acá su id (lo que va después de "v=").
 export const VSL_YOUTUBE_ID = "rM6JSDxGgaU";
 
+// VSL de /latam (en dólares y sin "hecho en Paraguay"), en YouTube como no listado (subido el 2026-11-04).
+export const VSL_LATAM_YOUTUBE_ID = "Tx6a76yhPVw";
+
 export const VSL_DURATION_LABEL = "6 min";
 
 /** Porcentajes del video que se avisan al Pixel (para públicos de "vio el 50 %", etc.). */

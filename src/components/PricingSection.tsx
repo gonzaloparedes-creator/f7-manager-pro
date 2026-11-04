@@ -21,14 +21,18 @@ function fmt(amount: number, currency: Currency, lang: Lang, usdPrefix: string) 
 export function PricingSection({
   onContact,
   note,
+  currency: fixedCurrency,
 }: {
   onContact: (message?: string) => void;
   note?: ReactNode;
+  /** Fija la moneda y oculta el selector (ej. /latam, siempre en dólares). */
+  currency?: Currency;
 }) {
   const { t, lang } = useLanguage();
   const p = t.pricing;
   const [segment, setSegment] = useState<Segment>("taller");
-  const [currency, setCurrency] = useState<Currency>("gs");
+  const [chosenCurrency, setCurrency] = useState<Currency>("gs");
+  const currency = fixedCurrency ?? chosenCurrency;
   const [cycle, setCycle] = useState<Cycle>("mensual");
 
   const cycleSuffix: Record<Cycle, string> = { mensual: p.perMonth, semestral: p.perSemester, anual: p.perYear };
@@ -137,20 +141,22 @@ export function PricingSection({
 
         {/* Toggles de moneda y ciclo */}
         <div className="mx-auto mt-4 flex max-w-3xl flex-col items-center gap-4 sm:flex-row sm:justify-center">
-          <div className="inline-flex rounded-full border border-border bg-card p-1">
-            {(["gs", "usd"] as Currency[]).map((c) => (
-              <button
-                key={c}
-                onClick={() => setCurrency(c)}
-                className={
-                  "px-4 py-2.5 text-xs font-semibold rounded-full transition-colors " +
-                  (currency === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
-                }
-              >
-                {c === "gs" ? p.currencyGs : p.currencyUsd}
-              </button>
-            ))}
-          </div>
+          {!fixedCurrency && (
+            <div className="inline-flex rounded-full border border-border bg-card p-1">
+              {(["gs", "usd"] as Currency[]).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCurrency(c)}
+                  className={
+                    "px-4 py-2.5 text-xs font-semibold rounded-full transition-colors " +
+                    (currency === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {c === "gs" ? p.currencyGs : p.currencyUsd}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="inline-flex rounded-full border border-border bg-card p-1">
             {([

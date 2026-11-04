@@ -84,6 +84,6 @@ describe("/py (landing del VSL para Paraguay)", () => {
 
   it("nunca promete avisos automáticos", () => {
     const { container } = renderPage();
-    expect(container.textContent ?? "").not.toMatch(/autom[aá]tic/i);
+    expect(container.textContent ?? "").not.toMatch(/autom[aá]ti/i);
   });
 });
