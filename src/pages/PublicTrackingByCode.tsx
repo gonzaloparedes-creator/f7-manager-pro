@@ -106,24 +106,20 @@ export default function PublicTrackingByCode() {
         setLoading(false);
         return;
       }
-      // Los links nuevos (QR/recibos generados hoy en adelante) usan el
-      // tracking_token (uuid, no adivinable). Los links con el código
-      // correlativo ORD-XXXX (ya impresos/entregados antes de este cambio)
-      // se siguen resolviendo, pero sin exponer la bitácora técnica interna.
-      const isToken = UUID_RE.test(orderCode);
-      const [{ data: o }, { data: h }, { data: tn }, { data: currency }] = isToken
-        ? await Promise.all([
-            supabase.rpc("get_order_by_tracking", { _token: orderCode }),
-            supabase.rpc("get_order_history_by_tracking", { _token: orderCode }),
-            supabase.rpc("get_technical_notes_by_tracking", { _token: orderCode }),
-            supabase.rpc("get_company_currency_by_tracking", { _token: orderCode }),
-          ])
-        : await Promise.all([
-            supabase.rpc("get_order_by_code", { _code: orderCode }),
-            supabase.rpc("get_history_by_code", { _code: orderCode }),
-            Promise.resolve({ data: [] as PublicTechNote[] }),
-            supabase.rpc("get_company_currency_by_code", { _code: orderCode }),
-          ]);
+      // Solo se resuelven los links con tracking_token (uuid, no adivinable). Los
+      // links viejos por número de orden (ORD-XXXX) dejaron de funcionar: ese
+      // número se repite entre talleres y buscarlo en todos exponía órdenes
+      // ajenas (ver 20261104180000_cerrar_funciones_por_codigo.sql).
+      if (!UUID_RE.test(orderCode)) {
+        setLoading(false);
+        return;
+      }
+      const [{ data: o }, { data: h }, { data: tn }, { data: currency }] = await Promise.all([
+        supabase.rpc("get_order_by_tracking", { _token: orderCode }),
+        supabase.rpc("get_order_history_by_tracking", { _token: orderCode }),
+        supabase.rpc("get_technical_notes_by_tracking", { _token: orderCode }),
+        supabase.rpc("get_company_currency_by_tracking", { _token: orderCode }),
+      ]);
       // Los montos se muestran en la moneda del negocio (antes de dibujarlos).
       setActiveCurrency(parseCurrency(currency));
       const found: any = Array.isArray(o) ? o[0] : null;
@@ -149,13 +145,20 @@ export default function PublicTrackingByCode() {
   }
 
   if (!order) {
+    const legacyLink = !!orderCode && !UUID_RE.test(orderCode);
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-accent/10 p-4">
         <Card className="max-w-md text-center">
           <CardContent className="space-y-3 p-8">
-            <h1 className="text-xl font-bold">Orden no encontrada</h1>
+            <h1 className="text-xl font-bold">{legacyLink ? "Este link ya no es válido" : "Orden no encontrada"}</h1>
             <p className="text-sm text-muted-foreground">
-              No encontramos ninguna orden con el código <span className="font-mono">{orderCode}</span>.
+              {legacyLink ? (
+                "Los links por número de orden dejaron de funcionar por seguridad. Pedile al taller que te envíe de nuevo tu link de seguimiento."
+              ) : (
+                <>
+                  No encontramos ninguna orden con el código <span className="font-mono">{orderCode}</span>.
+                </>
+              )}
             </p>
             <Link to="/" className="inline-block text-sm font-medium text-primary hover:underline">
               Volver al inicio

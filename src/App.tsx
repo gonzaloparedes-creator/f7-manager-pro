@@ -41,6 +41,7 @@ import OfertaLatam from "./pages/OfertaLatam.tsx";
 import Privacidad from "./pages/Privacidad.tsx";
 import { LandingLanguageProvider } from "./i18n/LandingLanguage";
 import AppLayout from "./components/AppLayout.tsx";
+import { isPixelExcludedPath } from "./lib/metaPixel.ts";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,8 @@ const MetaPixelTracker = () => {
   const location = useLocation();
 
   useEffect(() => {
+    // El link de seguimiento no viaja a Meta (ver lib/metaPixel).
+    if (isPixelExcludedPath(location.pathname)) return;
     if (typeof window !== "undefined" && (window as any).fbq) {
       (window as any).fbq("track", "PageView");
     }

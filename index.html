@@ -24,6 +24,10 @@
 
   <!-- Meta Pixel Code -->
   <script>
+    // No se carga en el seguimiento público (/tracking/<código>): esa dirección es
+    // la llave de entrada a la orden de un cliente del taller y no tiene que viajar
+    // a Meta. Misma regla que isPixelExcludedPath en src/lib/metaPixel.ts.
+    if (!/^\/tracking(\/|$)/.test(location.pathname)) {
     !function(f,b,e,v,n,t,s)
     {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
     n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -33,6 +37,7 @@
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
     fbq('init', '1720376785975837');
+    }
   </script>
   <!-- End Meta Pixel Code -->
 </head>
