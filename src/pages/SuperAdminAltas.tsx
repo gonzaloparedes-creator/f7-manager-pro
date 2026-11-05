@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Copy, Link2, Loader2, ShieldCheck, XCircle } from "lucide-react";
@@ -15,6 +15,7 @@ import { PLAN_LABELS, type Cycle, type PlanType } from "@/lib/plans";
 import { CYCLE_LABELS, formatDateISO, isValidISODate, todayInAsuncion } from "@/lib/subscriptionReceipt";
 import { suggestedExpiry } from "@/lib/planExpiry";
 import {
+  defaultInviteAmount,
   guaranteeEndsAt,
   INVITE_STATUS_LABELS,
   inviteStatus,
@@ -60,9 +61,11 @@ export default function SuperAdminAltas() {
   const [plan, setPlan] = useState<PlanType>("pro");
   const [cycle, setCycle] = useState<Cycle>("mensual");
   const [paidFrom, setPaidFrom] = useState(today);
+  const [amount, setAmount] = useState(String(defaultInviteAmount("pro", "mensual")));
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<SignupInvite | null>(null);
   const [toRevoke, setToRevoke] = useState<InviteRow | null>(null);
+  const retried = useRef(new Set<string>());
 
   useEffect(() => { document.title = "Links de alta — Super Admin"; }, []);
 
@@ -78,18 +81,39 @@ export default function SuperAdminAltas() {
       toast.error("No se pudieron cargar los links", { description: error.message });
       return;
     }
-    setRows((data ?? []) as unknown as InviteRow[]);
+    const list = (data ?? []) as unknown as InviteRow[];
+    setRows(list);
+    // Respaldo: si el aviso a Meta no salió al registrarse, se reintenta acá (una vez por visita).
+    const pending = list.filter((r) => r.used_at && !r.meta_reported_at && !retried.current.has(r.code));
+    if (pending.length) {
+      pending.forEach((r) => retried.current.add(r.code));
+      await Promise.all(pending.map((r) => supabase.functions.invoke("report-purchase", { body: { code: r.code } })));
+      const { data: again } = await supabase
+        .from("signup_invites")
+        .select("*, companies:used_company_id(name)")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (again) setRows(again as unknown as InviteRow[]);
+    }
   }, []);
 
   useEffect(() => {
     if (isSuperAdmin) load();
   }, [isSuperAdmin, load]);
 
+  const selectPlan = (p: PlanType, c: Cycle) => {
+    setPlan(p);
+    setCycle(c);
+    setAmount(String(defaultInviteAmount(p, c)));
+  };
+
+  const amountGs = Number(amount.replace(/\D/g, ""));
+  const validAmount = amount.trim() !== "" && Number.isFinite(amountGs) && amountGs > 0;
   const validFrom = isValidISODate(paidFrom);
   const expiresAt = useMemo(() => (validFrom ? suggestedExpiry(paidFrom, cycle) : ""), [validFrom, paidFrom, cycle]);
 
   const create = async () => {
-    if (!validFrom) return;
+    if (!validFrom || !validAmount) return;
     setCreating(true);
     const { data, error } = await supabase
       .from("signup_invites")
@@ -99,6 +123,7 @@ export default function SuperAdminAltas() {
         plan_paid_from: paidFrom,
         plan_expires_at: expiresAt,
         note: note.trim() || null,
+        amount_gs: amountGs,
       })
       .select("*")
       .single();
@@ -168,7 +193,7 @@ export default function SuperAdminAltas() {
             </div>
             <div className="space-y-1.5">
               <Label>Plan</Label>
-              <Select value={plan} onValueChange={(v) => setPlan(v as PlanType)}>
+              <Select value={plan} onValueChange={(v) => selectPlan(v as PlanType, cycle)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PLAN_ORDER.map((p) => <SelectItem key={p} value={p}>{PLAN_LABELS[p]}</SelectItem>)}
@@ -177,7 +202,7 @@ export default function SuperAdminAltas() {
             </div>
             <div className="space-y-1.5">
               <Label>Ciclo</Label>
-              <Select value={cycle} onValueChange={(v) => setCycle(v as Cycle)}>
+              <Select value={cycle} onValueChange={(v) => selectPlan(plan, v as Cycle)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CYCLES.map((c) => <SelectItem key={c} value={c}>{CYCLE_LABELS[c]}</SelectItem>)}
@@ -188,6 +213,10 @@ export default function SuperAdminAltas() {
               <Label htmlFor="invite-paid-from">Fecha del pago</Label>
               <Input id="invite-paid-from" type="date" value={paidFrom} onChange={(e) => setPaidFrom(e.target.value)} />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-amount">Monto cobrado (Gs.)</Label>
+              <Input id="invite-amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
           </div>
           {validFrom && (
             <p className="text-sm text-muted-foreground">
@@ -195,7 +224,7 @@ export default function SuperAdminAltas() {
               <b className="text-foreground">{formatDateISO(guaranteeEndsAt(paidFrom))}</b>
             </p>
           )}
-          <Button onClick={create} disabled={creating || !validFrom}>
+          <Button onClick={create} disabled={creating || !validFrom || !validAmount}>
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />} Crear link
           </Button>
 
@@ -244,6 +273,15 @@ export default function SuperAdminAltas() {
                         <ShieldCheck className="h-3.5 w-3.5" /> Garantía hasta el {formatDateISO(guaranteeEndsAt(row.plan_paid_from))}
                         {status === "used" && row.companies?.name ? ` · cuenta: ${row.companies.name}` : ""}
                       </p>
+                      {status === "used" && (
+                        <p className="text-xs text-muted-foreground">
+                          {row.meta_reported_at
+                            ? "Venta avisada a Meta"
+                            : row.meta_report_error
+                              ? "Meta: el aviso falló, se reintenta al abrir esta página"
+                              : "Meta: aviso pendiente"}
+                        </p>
+                      )}
                     </div>
                     {status === "pending" && (
                       <div className="flex shrink-0 gap-2">

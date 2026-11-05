@@ -1686,11 +1686,14 @@ export type Database = {
       }
       signup_invites: {
         Row: {
+          amount_gs: number | null
           billing_cycle: string
           code: string
           created_at: string
           created_by: string | null
           id: string
+          meta_report_error: string | null
+          meta_reported_at: string | null
           note: string | null
           plan_expires_at: string
           plan_paid_from: string
@@ -1700,11 +1703,14 @@ export type Database = {
           used_company_id: string | null
         }
         Insert: {
+          amount_gs?: number | null
           billing_cycle: string
           code?: string
           created_at?: string
           created_by?: string | null
           id?: string
+          meta_report_error?: string | null
+          meta_reported_at?: string | null
           note?: string | null
           plan_expires_at: string
           plan_paid_from: string
@@ -1714,11 +1720,14 @@ export type Database = {
           used_company_id?: string | null
         }
         Update: {
+          amount_gs?: number | null
           billing_cycle?: string
           code?: string
           created_at?: string
           created_by?: string | null
           id?: string
+          meta_report_error?: string | null
+          meta_reported_at?: string | null
           note?: string | null
           plan_expires_at?: string
           plan_paid_from?: string

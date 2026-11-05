@@ -2,7 +2,7 @@
 // admin crea un link de un solo uso y al registrarse con él la empresa nace con el plan
 // pagado activo (sin prueba gratis). La garantía de 7 días se cuenta desde el pago.
 import { OFFER_GUARANTEE_DAYS } from "@/lib/ofertaOffer";
-import { PLAN_LABELS, type Cycle, type PlanType } from "@/lib/plans";
+import { PLAN_LABELS, PRICING, type Cycle, type PlanType } from "@/lib/plans";
 import { addDaysISO, CYCLE_LABELS, formatDateISO } from "@/lib/subscriptionReceipt";
 
 export interface SignupInvite {
@@ -17,6 +17,16 @@ export interface SignupInvite {
   used_at: string | null;
   used_company_id: string | null;
   revoked_at: string | null;
+  /** Lo que pagó el cliente; vacío = precio del plan. */
+  amount_gs: number | null;
+  /** Cuándo se le avisó la compra a Meta (función report-purchase). */
+  meta_reported_at: string | null;
+  meta_report_error: string | null;
+}
+
+/** Monto sugerido al crear un link: el precio de lista del plan y ciclo. */
+export function defaultInviteAmount(plan: PlanType, cycle: Cycle): number {
+  return PRICING[plan][cycle].gs;
 }
 
 /** Lo que devuelve get_signup_invite: lo mínimo para la página de registro. */

@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.respond-to-quote]
 verify_jwt = false
 
+[functions.report-purchase]
+verify_jwt = false
+
 [functions.admin-create-user]
 verify_jwt = true
 

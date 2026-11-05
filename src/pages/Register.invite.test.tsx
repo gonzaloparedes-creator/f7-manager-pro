@@ -7,6 +7,7 @@ const db = vi.hoisted(() => ({
   invite: [] as unknown[],
   signUp: vi.fn(),
   rpc: vi.fn(),
+  invoke: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -17,6 +18,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }),
     auth: { signUp: (...args: unknown[]) => db.signUp(...args) },
+    functions: { invoke: (...args: unknown[]) => db.invoke(...args) },
   },
 }));
 vi.mock("@/lib/upgrade", () => ({ openUpgradeWhatsApp: vi.fn() }));
@@ -46,6 +48,7 @@ beforeEach(() => {
   db.invite = [];
   db.signUp.mockReset().mockResolvedValue({ data: { session: null }, error: null });
   db.rpc.mockReset();
+  db.invoke.mockReset().mockResolvedValue({ data: { ok: true }, error: null });
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
 });
 
@@ -72,6 +75,8 @@ describe("registro con link de alta pagada (/empezar/:code)", () => {
     const meta = db.signUp.mock.calls[0][0].options.data;
     expect(meta.signup_invite).toBe("AB12CD34EF");
     expect(meta.country).toBe("AR");
+    // y le avisa la compra a Meta con el código del link
+    await waitFor(() => expect(db.invoke).toHaveBeenCalledWith("report-purchase", { body: { code: "AB12CD34EF" } }));
   });
 
   it("si el link ya se usó, no muestra el formulario y ofrece WhatsApp", async () => {

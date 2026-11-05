@@ -230,6 +230,11 @@ export default function Register() {
         return;
       }
 
+      // Link de alta pagada: se le avisa la compra a Meta. Si falla, lo reintenta /superadmin/altas.
+      if (isInviteFlow && inviteUsable && inviteCode) {
+        supabase.functions.invoke("report-purchase", { body: { code: inviteCode } }).catch(() => {});
+      }
+
       if (data?.session) {
         toast({ title: "¡Cuenta creada!", description: "Ingresando..." });
         navigate("/dashboard", { replace: true });
