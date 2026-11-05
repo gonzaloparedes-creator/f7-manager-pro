@@ -24,6 +24,12 @@ describe("/privacidad", () => {
     expect(screen.getByText("No vendemos datos a nadie.")).toBeInTheDocument();
   });
 
+  it("avisa que el email y el teléfono de quien se registra o paga se comparten cifrados con Meta", () => {
+    renderPage();
+    expect(screen.getByText(/compartimos con Meta tu email y tu teléfono cifrados/)).toBeInTheDocument();
+    expect(screen.getByText(/Meta no recibe esos datos en forma legible/)).toBeInTheDocument();
+  });
+
   it("explica cómo pedir que borren tus datos, con el WhatsApp de soporte", () => {
     renderPage();
     expect(screen.getByRole("heading", { name: "Tus derechos" })).toBeInTheDocument();

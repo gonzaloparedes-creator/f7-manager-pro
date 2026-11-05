@@ -6,7 +6,7 @@ import { UPGRADE_PHONE } from "@/lib/upgrade";
 // /privacidad: política de privacidad pública (la piden Meta y quien usa el píxel).
 // Describe solo lo que F7 hace de verdad; si cambia un servicio o un dato que se guarda, actualizar acá.
 
-export const PRIVACY_UPDATED = "1 de noviembre de 2026";
+export const PRIVACY_UPDATED = "4 de noviembre de 2026";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -100,6 +100,11 @@ export default function Privacidad() {
             anuncios y mostrárselos a personas a las que les pueden servir.
           </p>
           <p>
+            Cuando te registrás o contratás un plan, compartimos con Meta tu email y tu teléfono cifrados, junto con el plan y
+            el monto, solo para medir qué anuncios funcionan y no mostrarte publicidad de algo que ya usás. Meta no recibe esos
+            datos en forma legible.
+          </p>
+          <p>
             Podés borrar o bloquear las cookies desde tu navegador, y elegir qué anuncios ves desde la configuración de
             anuncios de tu cuenta de Facebook o Instagram.
           </p>
@@ -110,7 +115,7 @@ export default function Privacidad() {
           <ul className="list-disc space-y-1 pl-5">
             <li>Supabase: base de datos, inicio de sesión y almacenamiento de fotos.</li>
             <li>Vercel: aloja el sitio web.</li>
-            <li>Meta: píxel de medición y anuncios.</li>
+            <li>Meta: píxel de medición y anuncios, y el email y teléfono cifrados de quien se registra o contrata un plan.</li>
             <li>YouTube: muestra los videos de nuestras páginas cuando tocás reproducir.</li>
           </ul>
           <p>También podemos entregar datos si una autoridad competente lo exige por ley.</p>
