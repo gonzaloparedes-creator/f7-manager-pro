@@ -34,3 +34,12 @@ export function vslEmbedUrl(videoId: string, origin: string): string {
   });
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`;
 }
+
+// Links por grupo de WhatsApp (?g=1, ?g=2…): la marca del mensaje dice de qué grupo viene,
+// por ejemplo " (Vi el video · Latam)" → " (Vi el video · Latam · Grupo 1)".
+const GROUP_RE = /^[a-z0-9]{1,12}$/i;
+
+export function withGroupTag(tag: string, group: string | null | undefined): string {
+  if (!group || !GROUP_RE.test(group)) return tag;
+  return /\)\s*$/.test(tag) ? tag.replace(/\)\s*$/, ` · Grupo ${group})`) : `${tag} (Grupo ${group})`;
+}

@@ -97,6 +97,70 @@
       "destination": "/api/storefront-og?slug=:slug"
     },
     {
+      "source": "/py",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|WhatsApp|Twitterbot|Slackbot|TelegramBot|LinkedInBot|Discordbot|SkypeUriPreview|Pinterest|Applebot|redditbot|vkShare).*"
+        }
+      ],
+      "destination": "/api/vsl-og?page=py"
+    },
+    {
+      "source": "/py",
+      "missing": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode"
+        }
+      ],
+      "destination": "/api/vsl-og?page=py"
+    },
+    {
+      "source": "/py",
+      "has": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode",
+          "value": "^(?!navigate$).+$"
+        }
+      ],
+      "destination": "/api/vsl-og?page=py"
+    },
+    {
+      "source": "/latam",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|WhatsApp|Twitterbot|Slackbot|TelegramBot|LinkedInBot|Discordbot|SkypeUriPreview|Pinterest|Applebot|redditbot|vkShare).*"
+        }
+      ],
+      "destination": "/api/vsl-og?page=latam"
+    },
+    {
+      "source": "/latam",
+      "missing": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode"
+        }
+      ],
+      "destination": "/api/vsl-og?page=latam"
+    },
+    {
+      "source": "/latam",
+      "has": [
+        {
+          "type": "header",
+          "key": "sec-fetch-mode",
+          "value": "^(?!navigate$).+$"
+        }
+      ],
+      "destination": "/api/vsl-og?page=latam"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -5,9 +5,9 @@ import { LandingLanguageProvider } from "@/i18n/LandingLanguage";
 import OfertaLatam from "./OfertaLatam";
 import { LATAM } from "./ofertaLatam.copy";
 
-const renderPage = () =>
+const renderPage = (path = "/latam") =>
   render(
-    <MemoryRouter initialEntries={["/latam"]}>
+    <MemoryRouter initialEntries={[path]}>
       <LandingLanguageProvider fixedLang="es">
         <OfertaLatam />
       </LandingLanguageProvider>
@@ -50,6 +50,20 @@ describe("/latam (landing del VSL para el resto de Latinoamérica)", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Escribinos por WhatsApp/ })[0]);
     expect(open).toHaveBeenCalledTimes(1);
     expect(String(open.mock.calls[0][0])).toContain("https://wa.me/");
+    expect(openedText(open)).toBe(LATAM.whatsapp.message + " (Vi el video · Latam)");
+  });
+
+  it("con ?g=1 el mensaje dice de qué grupo de WhatsApp vino el link", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderPage("/latam?g=1");
+    fireEvent.click(screen.getAllByRole("button", { name: /Escribinos por WhatsApp/ })[0]);
+    expect(openedText(open)).toBe(LATAM.whatsapp.message + " (Vi el video · Latam · Grupo 1)");
+  });
+
+  it("ignora un ?g= raro y deja la marca de siempre", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderPage("/latam?g=<script>");
+    fireEvent.click(screen.getAllByRole("button", { name: /Escribinos por WhatsApp/ })[0]);
     expect(openedText(open)).toBe(LATAM.whatsapp.message + " (Vi el video · Latam)");
   });
 

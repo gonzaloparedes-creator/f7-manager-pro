@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -10,6 +10,7 @@ import { useLanguage } from "@/i18n/useLanguage";
 import { usePageMeta } from "@/i18n/usePageMeta";
 import { openUpgradeWhatsApp } from "@/lib/upgrade";
 import { trackMeta, trackMetaCustom } from "@/lib/metaPixel";
+import { withGroupTag } from "@/lib/vsl";
 import type { VslLandingCopy } from "@/components/vslLanding.types";
 import { ArrowRight, CheckCircle2, Lock, MessageCircle, ShieldCheck, Smartphone, Users } from "lucide-react";
 
@@ -54,10 +55,13 @@ export function VslLanding({ copy, page, videoId, durationLabel, poster, currenc
 
   usePageMeta(copy.meta.title, copy.meta.description);
 
-  // La marca "(Vi el video)" distingue en WhatsApp a quien viene de esta página.
+  // La marca "(Vi el video)" distingue en WhatsApp a quien viene de esta página, y ?g=
+  // suma de qué grupo de WhatsApp vino el link ("· Grupo 1").
+  const [searchParams] = useSearchParams();
+  const tag = withGroupTag(copy.whatsapp.tag, searchParams.get("g"));
   const contactWhatsApp = (origin: string, message?: string) => {
     trackMeta("Contact", { content_name: page, content_category: origin });
-    openUpgradeWhatsApp((message ?? copy.whatsapp.message) + copy.whatsapp.tag);
+    openUpgradeWhatsApp((message ?? copy.whatsapp.message) + tag);
   };
 
   useEffect(() => {
