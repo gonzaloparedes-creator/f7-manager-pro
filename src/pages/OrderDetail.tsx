@@ -40,6 +40,7 @@ import { OrderQRCode } from "@/components/OrderQRCode";
 import { PrintReceipt } from "@/components/PrintReceipt";
 import OrderActionsMenu from "@/components/OrderActionsMenu";
 import OrderPartsSection from "@/components/OrderPartsSection";
+import OrderReportDialog from "@/components/OrderReportDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import ConvertQuoteDialog from "@/components/ConvertQuoteDialog";
 import AvisarClienteDialog, { type MessageOption } from "@/components/AvisarClienteDialog";
@@ -147,6 +148,7 @@ export default function OrderDetail() {
   const [savingCharge, setSavingCharge] = useState(false);
   const [removingChargeIdx, setRemovingChargeIdx] = useState<number | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
@@ -834,6 +836,11 @@ export default function OrderDetail() {
               <Printer className="h-4 w-4" /> Imprimir
             </Button>
           )}
+          {!isMobile && (
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} className="gap-2" data-testid="order-report-open">
+              <FileText className="h-4 w-4" /> Reporte completo
+            </Button>
+          )}
           <OrderActionsMenu
             orderId={order.id}
             orderNumber={order.order_number}
@@ -843,6 +850,9 @@ export default function OrderDetail() {
                 <>
                   <DropdownMenuItem onSelect={copyTracking}>
                     <Copy className="mr-2 h-4 w-4" /> Link tracking
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTimeout(() => setReportOpen(true), 200)}>
+                    <FileText className="mr-2 h-4 w-4" /> Reporte completo
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setTimeout(handlePrint, 200)}>
                     <Printer className="mr-2 h-4 w-4" /> Imprimir
@@ -1754,6 +1764,16 @@ export default function OrderDetail() {
 
       <PrintReceipt order={order} businessName={businessName} serviceTerms={renderServiceTerms(serviceTermsTemplate, order.warranty_days)} statusLabel={resolveStatusLabel(order.status, statusPresets)} />
 
+      <OrderReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        order={order}
+        history={history}
+        techNotes={techNotes}
+        businessName={businessName}
+        branchName={branches.find((b) => b.id === order.current_branch_id)?.name ?? null}
+        technicianName={technicians.find((s) => s.id === order.assigned_technician_id)?.full_name ?? null}
+      />
       <RegisterPaymentDialog order={order} open={payDialogOpen} onOpenChange={setPayDialogOpen} onRegistered={load} />
       <AvisarTecnicoDialog open={techNoticeOpen} onOpenChange={setTechNoticeOpen} recipients={techRecipients} />
       {avisar && (
