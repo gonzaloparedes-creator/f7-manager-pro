@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, CalendarCheck, Loader2 } from "lucide-react";
@@ -12,14 +12,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import PlanExpiryBar from "@/components/PlanExpiryBar";
+import SubscriptionPaymentFields from "@/components/SubscriptionPaymentFields";
 import { PLAN_LABELS, type Cycle, type PlanType } from "@/lib/plans";
 import {
   CYCLE_LABELS,
   formatDateISO,
+  formatMoney,
   isValidISODate,
   todayInAsuncion,
+  type SubscriptionReceipt,
 } from "@/lib/subscriptionReceipt";
 import { companyExpiryInfo, planExpiryInfo, renewalStart, suggestedExpiry } from "@/lib/planExpiry";
+import {
+  applyContextDefaults,
+  buildPaymentPayload,
+  initialCobro,
+  pickDefaultCategory,
+  type CobroState,
+  type PaymentContext,
+  type PaymentErrors,
+} from "@/lib/subscriptionPayment";
+import { loadPaymentContext, registerSubscriptionPayment, type RegisteredPayment } from "@/lib/subscriptionPaymentApi";
+import { downloadSubscriptionReceiptPdf } from "@/lib/subscriptionReceiptPdf";
+import { f7LogoUrl, loadF7LogoDataUri } from "@/lib/f7Logo";
 import { usePlanGraceDays } from "@/hooks/usePlanGraceDays";
 
 const PLAN_ORDER: PlanType[] = ["starter", "pro", "business", "retail"];
@@ -36,6 +51,8 @@ export interface PayableCompany {
   plan_expires_at: string | null;
   created_at?: string | null;
   trial_ends_at?: string | null;
+  // Define la moneda con la que se propone cobrar (Paraguay en guaraníes, el resto en dólares).
+  country?: string | null;
 }
 
 export interface PaymentPatch {
@@ -54,9 +71,22 @@ interface MarkPaidDialogProps {
   editing?: boolean;
   onClose: () => void;
   onSaved: (companyId: string, patch: PaymentPatch) => void;
+  // Cuando el pago se registró con recibo e ingreso (para refrescar la lista de recibos).
+  onPaid?: (payment: RegisteredPayment) => void;
 }
 
-export default function MarkPaidDialog({ company, editing = false, onClose, onSaved }: MarkPaidDialogProps) {
+// El botón del aviso sigue andando aunque el diálogo ya se haya cerrado.
+async function downloadReceipt(receipt: SubscriptionReceipt) {
+  try {
+    await downloadSubscriptionReceiptPdf(receipt, { logoUrl: (await loadF7LogoDataUri()) ?? f7LogoUrl() });
+    toast.success(`PDF del recibo ${receipt.receipt_number} descargado`);
+  } catch (err) {
+    console.error("No se pudo generar el PDF del recibo", err);
+    toast.error("No se pudo generar el PDF", { description: "Podés bajarlo desde Recibos." });
+  }
+}
+
+export default function MarkPaidDialog({ company, editing = false, onClose, onSaved, onPaid }: MarkPaidDialogProps) {
   return (
     <Dialog open={!!company} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto">
@@ -67,6 +97,7 @@ export default function MarkPaidDialog({ company, editing = false, onClose, onSa
             editing={editing}
             onClose={onClose}
             onSaved={onSaved}
+            onPaid={onPaid}
           />
         )}
       </DialogContent>
@@ -79,11 +110,13 @@ function MarkPaidForm({
   editing: editingRequested,
   onClose,
   onSaved,
+  onPaid,
 }: {
   company: PayableCompany;
   editing: boolean;
   onClose: () => void;
   onSaved: MarkPaidDialogProps["onSaved"];
+  onPaid: MarkPaidDialogProps["onPaid"];
 }) {
   const navigate = useNavigate();
   const graceDays = usePlanGraceDays();
@@ -91,6 +124,7 @@ function MarkPaidForm({
   const continueFrom = useMemo(() => renewalStart(company.plan_expires_at, today), [company.plan_expires_at, today]);
   const canContinue = continueFrom !== today;
   const editing = editingRequested && !!company.plan_paid_from && !!company.plan_expires_at;
+  const paymentMode = !editing;
 
   const [plan, setPlan] = useState<PlanType>(
     PLAN_ORDER.includes(company.plan_type as PlanType) ? (company.plan_type as PlanType) : "pro"
@@ -105,6 +139,46 @@ function MarkPaidForm({
   const [saving, setSaving] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [ackLapsed, setAckLapsed] = useState(false);
+
+  // Cobro: recibo + ingreso en Finanzas F7. Se llena solo con lo último que se usó.
+  const [record, setRecord] = useState(true);
+  const [cobro, setCobro] = useState<CobroState>(() => initialCobro(company, today));
+  const [cobroErrors, setCobroErrors] = useState<PaymentErrors>({});
+  const [ctx, setCtx] = useState<PaymentContext | null>(null);
+  const [ctxFailed, setCtxFailed] = useState(false);
+  const cobroTouched = useRef(false);
+
+  useEffect(() => {
+    if (!paymentMode) return;
+    let cancelled = false;
+    loadPaymentContext()
+      .then((loaded) => {
+        if (cancelled) return;
+        setCtx(loaded);
+        // Si ya empezó a editar el cobro, solo se completa la categoría: no se le pisa nada.
+        setCobro((prev) =>
+          cobroTouched.current
+            ? { ...prev, categoryId: prev.categoryId || pickDefaultCategory(loaded.categories) }
+            : applyContextDefaults(prev, loaded)
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setCtxFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [paymentMode]);
+
+  const updateCobro = (patch: Partial<CobroState>) => {
+    cobroTouched.current = true;
+    setCobro((prev) => ({ ...prev, ...patch }));
+    setCobroErrors({});
+  };
+
+  const recordAvailable = !!ctx && ctx.categories.length > 0;
+  const recording = paymentMode && record && recordAvailable;
+  const cobroLoading = paymentMode && record && !ctx && !ctxFailed;
 
   const fromValid = isValidISODate(paidFrom);
   const expiresAt = expiresOverride ?? (fromValid ? suggestedExpiry(paidFrom, cycle) : "");
@@ -161,19 +235,60 @@ function MarkPaidForm({
   };
 
   const save = async () => {
-    if (error || (wouldBeSuspended && !ackLapsed)) return;
-    setSaving(true);
+    if (error || (wouldBeSuspended && !ackLapsed) || cobroLoading) return;
+
     const patch: PaymentPatch = {
       plan_type: plan,
       billing_cycle: cycle,
       plan_paid_from: paidFrom,
       plan_expires_at: expiresAt,
     };
-    if (!editing) {
-      if (markPaying && !company.is_paying) patch.is_paying = true;
-      if (!company.is_active && reactivate) patch.is_active = true;
+    const willMarkPaying = !editing && markPaying && !company.is_paying;
+    const willReactivate = !editing && !company.is_active && reactivate;
+    if (willMarkPaying) patch.is_paying = true;
+    if (willReactivate) patch.is_active = true;
+
+    // Pago completo: plan + recibo + ingreso en Finanzas F7, en un solo paso de la base.
+    if (recording) {
+      const { errors, payload } = buildPaymentPayload(
+        {
+          company: { id: company.id, name: company.name },
+          plan,
+          cycle,
+          periodStart: paidFrom,
+          periodEnd: expiresAt,
+          markPaying: willMarkPaying,
+          reactivate: willReactivate,
+          cobro,
+        },
+        today
+      );
+      setCobroErrors(errors);
+      if (!payload) {
+        toast.error("Revisá los datos marcados en rojo");
+        return;
+      }
+      setSaving(true);
+      try {
+        const payment = await registerSubscriptionPayment(payload);
+        onSaved(company.id, patch);
+        onPaid?.(payment);
+        onClose();
+        const { receipt } = payment;
+        toast.success(`Pago registrado: ${company.name}`, {
+          description: `Recibo ${receipt.receipt_number} · ${formatMoney(receipt.amount, receipt.currency)} · vence el ${formatDateISO(expiresAt)}. Ya está en Finanzas F7.`,
+          duration: 12000,
+          action: { label: "Descargar PDF", onClick: () => void downloadReceipt(receipt) },
+        });
+      } catch (err) {
+        toast.error("No se pudo registrar el pago", { description: err instanceof Error ? err.message : undefined });
+      } finally {
+        setSaving(false);
+      }
+      return;
     }
 
+    setSaving(true);
     const { error: saveError } = await supabase.from("companies").update(patch).eq("id", company.id);
     setSaving(false);
     if (saveError) {
@@ -206,6 +321,16 @@ function MarkPaidForm({
     onClose();
     toast.success(`Fechas de pago borradas: ${company.name}`);
   };
+
+  const recordHint = ctxFailed
+    ? "No se pudo leer Finanzas F7: por ahora se guardan solo las fechas."
+    : ctx && ctx.categories.length === 0
+      ? "No hay una categoría de ingresos activa en Finanzas F7: se guardan solo las fechas."
+      : recording
+        ? "Se hace todo junto: si algo falla, no se guarda nada."
+        : "Apagado: se guardan solo las fechas del plan (sirve para cargar pagos viejos sin recibo).";
+
+  const saveLabel = editing ? "Guardar fechas" : recording ? "Registrar pago y emitir recibo" : "Registrar pago";
 
   return (
     <>
@@ -256,7 +381,7 @@ function MarkPaidForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="pay-from">Pagó desde</Label>
+          <Label htmlFor="pay-from">{paymentMode ? "El plan rige desde" : "Pagó desde"}</Label>
           <Input id="pay-from" type="date" value={paidFrom} onChange={(e) => changeFrom(e.target.value)} />
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => changeFrom(today)}>
@@ -321,6 +446,42 @@ function MarkPaidForm({
           </p>
         )}
 
+        {paymentMode && (
+          <div className="space-y-4 rounded-lg border border-border p-3" data-testid="payment-block">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="pay-record" className="text-sm font-medium">
+                  Emitir el recibo y anotar el ingreso en Finanzas F7
+                </Label>
+                <p className="text-xs text-muted-foreground" data-testid="payment-hint">{recordHint}</p>
+              </div>
+              <Switch
+                id="pay-record"
+                checked={recording}
+                disabled={!recordAvailable || saving}
+                onCheckedChange={setRecord}
+              />
+            </div>
+            {recording &&
+              (cobroLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+                </div>
+              ) : (
+                <SubscriptionPaymentFields
+                  cobro={cobro}
+                  onChange={updateCobro}
+                  plan={plan}
+                  cycle={cycle}
+                  ctx={ctx}
+                  errors={cobroErrors}
+                  today={today}
+                  disabled={saving}
+                />
+              ))}
+          </div>
+        )}
+
         {!editing && (!company.is_paying || !company.is_active) && (
           <div className="space-y-3 rounded-lg border border-border p-3">
             {!company.is_paying && (
@@ -339,7 +500,7 @@ function MarkPaidForm({
         )}
       </div>
 
-      <DialogFooter className="gap-2 sm:justify-between">
+      <DialogFooter className="flex-wrap gap-2 sm:justify-between">
         {company.plan_paid_from ? (
           <Button
             type="button"
@@ -355,9 +516,9 @@ function MarkPaidForm({
         )}
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button type="button" onClick={save} disabled={saving || !!error || (wouldBeSuspended && !ackLapsed)}>
+          <Button type="button" onClick={save} disabled={saving || cobroLoading || !!error || (wouldBeSuspended && !ackLapsed)} data-testid="pay-save">
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {editing ? "Guardar fechas" : "Registrar pago"}
+            {saveLabel}
           </Button>
         </div>
       </DialogFooter>

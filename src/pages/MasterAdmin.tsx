@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   BellRing,
   CalendarCheck,
+  CheckCircle2,
   ChevronDown,
   FlaskConical,
   Pencil,
@@ -28,7 +29,15 @@ import { COUNTRIES, PY_DEPARTMENTS, countryLabel } from "@/lib/locations";
 import { monthKey, monthLabel, lastMonths, daysSince } from "@/lib/dateBuckets";
 import { cn } from "@/lib/utils";
 import { PLAN_LABELS, type PlanType } from "@/lib/plans";
-import { CYCLE_LABELS, formatDateISO, todayInAsuncion } from "@/lib/subscriptionReceipt";
+import { CYCLE_LABELS, formatDateISO, formatMoney, todayInAsuncion } from "@/lib/subscriptionReceipt";
+import {
+  PAY_ACTION_LABEL,
+  paymentAction,
+  receiptCoverage,
+  receiptsByCompany,
+  type CompanyReceiptRow,
+} from "@/lib/subscriptionPayment";
+import { loadPaymentOverview, toCompanyReceiptRow } from "@/lib/subscriptionPaymentApi";
 import {
   companyExpiryInfo,
   expirySortKey,
@@ -126,6 +135,9 @@ export default function MasterAdmin() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ExpiryFilter>("todas");
   const [sort, setSort] = useState<SortMode>("vencimiento");
+  // Recibos vigentes y cuáles ya están en Finanzas F7: para saber qué pagos tienen su recibo.
+  const [receiptRows, setReceiptRows] = useState<CompanyReceiptRow[]>([]);
+  const [financeLinked, setFinanceLinked] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     document.title = "Gestión de empresas — F7 Manager Pro";
@@ -134,6 +146,7 @@ export default function MasterAdmin() {
   useEffect(() => {
     if (!isSuperAdmin) return;
     void load();
+    void loadOverview();
   }, [isSuperAdmin]);
 
   async function load() {
@@ -154,6 +167,17 @@ export default function MasterAdmin() {
     }
     setCompanies((data as Company[]) ?? []);
     setPartners((partnersData as Partner[]) ?? []);
+  }
+
+  // Si no se pueden leer los recibos, la lista igual funciona: solo no se muestran las marcas de recibo.
+  async function loadOverview() {
+    try {
+      const overview = await loadPaymentOverview();
+      setReceiptRows(overview.receipts);
+      setFinanceLinked(overview.financeLinked);
+    } catch (err) {
+      console.error("No se pudieron leer los recibos", err);
+    }
   }
 
   async function updateCompany(id: string, patch: Partial<Company>) {
@@ -189,6 +213,7 @@ export default function MasterAdmin() {
   }
 
   const today = todayInAsuncion();
+  const receiptsMap = useMemo(() => receiptsByCompany(receiptRows), [receiptRows]);
   const graceDays = usePlanGraceDays();
   const infos = useMemo(() => {
     const map = new Map<string, PlanExpiryInfo | null>();
@@ -379,6 +404,8 @@ export default function MasterAdmin() {
                 }
                 onUpdate={(patch) => updateCompany(c.id, patch)}
                 onToggleFounder={(value) => toggleFounder(c.id, value)}
+                receipts={receiptsMap.get(c.id)}
+                financeLinked={financeLinked}
                 onPay={() => setPayTarget({ company: c, editing: false })}
                 onEditDates={() => setPayTarget({ company: c, editing: true })}
                 onTrial={() => setTrialCompany(c)}
@@ -394,6 +421,10 @@ export default function MasterAdmin() {
         editing={payTarget?.editing ?? false}
         onClose={() => setPayTarget(null)}
         onSaved={applyPatch}
+        onPaid={({ receipt, entryId }) => {
+          setReceiptRows((prev) => [toCompanyReceiptRow(receipt), ...prev]);
+          if (entryId) setFinanceLinked((prev) => new Set(prev).add(receipt.id));
+        }}
       />
       <TrialDialog company={trialCompany} onClose={() => setTrialCompany(null)} onSaved={applyPatch} />
       <CompanyDetailDialog company={detailCompany} onClose={() => setDetailCompany(null)} />
@@ -414,6 +445,9 @@ interface CompanyCardProps {
   setCityDraft: (value: string | undefined) => void;
   onUpdate: (patch: Partial<Company>) => Promise<boolean>;
   onToggleFounder: (value: boolean) => void;
+  // Recibos vigentes de la empresa (el más reciente primero) y cuáles ya están en Finanzas F7.
+  receipts: CompanyReceiptRow[] | undefined;
+  financeLinked: Set<string>;
   onPay: () => void;
   onEditDates: () => void;
   onTrial: () => void;
@@ -441,6 +475,8 @@ function CompanyCard({
   setCityDraft,
   onUpdate,
   onToggleFounder,
+  receipts,
+  financeLinked,
   onPay,
   onEditDates,
   onTrial,
@@ -452,6 +488,9 @@ function CompanyCard({
   const lapsed = info?.phase === "suspended";
   const isTrial = info?.kind === "trial";
   const panelId = `empresa-${c.id}`;
+  const action = paymentAction(info);
+  const coverage = receiptCoverage(info, receipts);
+  const lastReceipt = receipts?.[0];
 
   return (
     <Collapsible open={expanded}>
@@ -483,17 +522,31 @@ function CompanyCard({
                 </span>
               </span>
             </button>
-            <Button
-              size="sm"
-              className="shrink-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPay();
-              }}
-            >
-              <CalendarCheck className="mr-1.5 h-4 w-4" />
-              Pagado
-            </Button>
+            {action === "none" && info ? (
+              // Ya pagó y le falta bastante: no hay nada que cobrar, así que se muestra el estado (no un botón).
+              <Badge
+                variant="outline"
+                className="shrink-0 gap-1 border-primary/40 bg-primary/10 px-2.5 py-1 text-primary"
+                data-testid="paid-chip"
+                aria-label={`Pagado hasta el ${formatDateISO(info.expiresAt)}`}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Pagado
+              </Badge>
+            ) : (
+              <Button
+                size="sm"
+                className="shrink-0"
+                data-testid="pay-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPay();
+                }}
+              >
+                <CalendarCheck className="mr-1.5 h-4 w-4" />
+                {PAY_ACTION_LABEL[action === "none" ? "register" : action]}
+              </Button>
+            )}
           </div>
           {info ? (
             <PlanExpiryBar info={info} />
@@ -512,7 +565,7 @@ function CompanyCard({
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     Todavía no tiene un pago ni una prueba registrados, así que no se suspende por tiempo. Con{" "}
-                    <span className="font-medium text-foreground">Pagado</span> cargás desde cuándo pagó y se arma la cuenta
+                    <span className="font-medium text-foreground">Registrar pago</span> cargás desde cuándo rige su plan y se arma la cuenta
                     regresiva; con <span className="font-medium text-foreground">Dar prueba gratis</span> le fijás una fecha de fin.
                   </p>
                 )}
@@ -538,7 +591,28 @@ function CompanyCard({
                   <DetailRow label="Cliente que paga">
                     {c.is_paying ? <Badge>Sí</Badge> : <Badge variant="outline">No</Badge>}
                   </DetailRow>
+                  {info?.kind === "paid" && (
+                    <DetailRow label="Último recibo">
+                      {lastReceipt ? (
+                        <>
+                          <span className="font-mono text-xs">{lastReceipt.receipt_number}</span> · {formatDateISO(lastReceipt.payment_date)}
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            {formatMoney(lastReceipt.amount, lastReceipt.currency)} ·{" "}
+                            {financeLinked.has(lastReceipt.id) ? "ya está en Finanzas F7" : "todavía no está en Finanzas F7"}
+                          </span>
+                        </>
+                      ) : (
+                        "Ninguno"
+                      )}
+                    </DetailRow>
+                  )}
                 </dl>
+                {coverage === "uncovered" && (
+                  <p className="rounded-md border border-secondary/40 bg-secondary/10 p-2.5 text-xs" data-testid="no-receipt-hint">
+                    Este período no tiene recibo, así que tampoco figura como ingreso en Finanzas F7. Con{" "}
+                    <span className="font-medium">Emitir recibo</span> lo armás con estos datos.
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={onPay}>
                     <CalendarCheck className="mr-1.5 h-4 w-4" />

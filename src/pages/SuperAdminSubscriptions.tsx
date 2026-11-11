@@ -264,7 +264,7 @@ function SubscriptionCard({ company: c, info, situation, today, onWrite, onPay, 
           )}
           <Button size="sm" variant={situation ? "outline" : "default"} onClick={onPay}>
             <CalendarCheck className="mr-1.5 h-4 w-4" />
-            {info?.kind === "paid" ? "Registrar nuevo pago" : isTrial ? "Pagado" : "Registrar pago"}
+            {info?.kind === "paid" ? "Registrar nuevo pago" : "Registrar pago"}
           </Button>
         </div>
       </div>

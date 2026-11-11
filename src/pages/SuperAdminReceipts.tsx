@@ -845,7 +845,7 @@ export default function SuperAdminReceipts() {
           <DialogHeader>
             <DialogTitle>Anular el recibo {voidTarget?.receipt_number}</DialogTitle>
             <DialogDescription>
-              Queda en el historial marcado como anulado y su número no se vuelve a usar. Si el pago sí existió, emití un recibo nuevo con los datos correctos.
+              Queda en el historial marcado como anulado y su número no se vuelve a usar. Si el pago sí existió, emití un recibo nuevo con los datos correctos. Su ingreso en Finanzas F7 también se anula solo; las fechas del plan de la empresa no cambian (si hay que corregirlas, usá «Editar fechas» en Gestión de empresas).
             </DialogDescription>
           </DialogHeader>
           <div>
