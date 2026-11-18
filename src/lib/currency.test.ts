@@ -8,6 +8,7 @@ import {
   FALLBACK_CURRENCY,
   currencyForCountry,
   currencySymbol,
+  formatAmount,
   formatMoney,
   getActiveCurrency,
   hasOwnCurrency,
@@ -43,6 +44,22 @@ describe("formatMoney", () => {
 
   it("los montos negativos conservan el signo (como antes)", () => {
     expect(formatMoney(-5000)).toBe("Gs. -5.000");
+  });
+});
+
+describe("formatAmount", () => {
+  it("es el mismo número que formatMoney pero sin el símbolo", () => {
+    expect(formatAmount(18000)).toBe("18.000");
+    expect(formatAmount(1850000)).toBe("1.850.000");
+    expect(formatAmount(0)).toBe("0");
+    expect(formatAmount(null)).toBe("0");
+    expect(formatAmount(undefined)).toBe("0");
+  });
+
+  it("no depende de la moneda activa: solo agrupa", () => {
+    setActiveCurrency("USD");
+    expect(formatAmount(1250)).toBe("1.250");
+    expect(formatMoney(1250)).toBe(`US$ ${formatAmount(1250)}`);
   });
 });
 

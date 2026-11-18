@@ -44,6 +44,7 @@ import DeviceDossierDialog from "@/components/DeviceDossierDialog";
 import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartSheet";
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
+import { saleMatchesQuery, ticketNumber } from "@/lib/ticketNumber";
 import EnviarReciboDialog from "@/components/EnviarReciboDialog";
 import WarrantyLookup from "@/components/WarrantyLookup";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -120,6 +121,10 @@ type SaleGroup = {
 const ALL_BRANCHES = "__all__";
 const NO_CATEGORY_KEY = "__sin_categoria__";
 const CART_STORAGE_KEY = "f7_products_cart";
+// Cuántas líneas de venta se traen para "Ventas recientes" y para buscar por número de
+// ticket. Eran 20: con las ventas de un par de horas ya no quedaba el ticket que un
+// cliente traía de hace unos días (y "Ventas de hoy" se calcula con estas mismas líneas).
+const RECENT_SALES_LIMIT = 200;
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -147,6 +152,7 @@ export default function Products() {
   const [dossierItem, setDossierItem] = useState<Product | null>(null);
   const [labelItem, setLabelItem] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
+  const [salesSearch, setSalesSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
   const [stockFilter, setStockFilter] = useState<CatalogFilter>("all");
   const [activeTab, setActiveTab] = useState("catalogo");
@@ -274,7 +280,7 @@ export default function Products() {
         .select("id, product_name, quantity, unit_price, trade_in_value, reservation_deposit, payment_method, created_at, branch_id, sale_group_id, imei, warranty_days, customer_name, customer_phone")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(RECENT_SALES_LIMIT),
     ]);
     if (pErr) toast.error(pErr.message);
     else setItems((productsData ?? []) as Product[]);
@@ -524,6 +530,13 @@ export default function Products() {
       }))
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [sales]);
+
+  // Búsqueda en "Ventas recientes": por el número que sale impreso en el ticket o por el
+  // nombre de cualquiera de los productos de la venta.
+  const visibleSaleGroups = useMemo(
+    () => saleGroups.filter((g) => saleMatchesQuery(g.key, g.items.map((i) => i.product_name), salesSearch)),
+    [saleGroups, salesSearch]
+  );
 
   const openCreate = () => { setEditItem(null); setRegisterAsDevice(false); setOpen(true); };
   const openEdit = (item: Product) => { setEditItem(item); setOpen(true); };
@@ -924,14 +937,30 @@ export default function Products() {
               {saleGroups.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Todavía no registraste ninguna venta.</p>
               ) : (
+                <>
+                <Input
+                  placeholder="Buscar por n.º de ticket (ej. 3A2233) o producto..."
+                  aria-label="Buscar una venta por número de ticket o por producto"
+                  data-testid="sales-search"
+                  value={salesSearch}
+                  onChange={(e) => setSalesSearch(e.target.value)}
+                  className="max-w-sm"
+                />
+                {visibleSaleGroups.length === 0 && (
+                  <p className="text-sm text-muted-foreground" data-testid="sales-search-empty">
+                    No encontré ninguna venta con «{salesSearch.trim()}» entre las últimas {saleGroups.length}.
+                  </p>
+                )}
                 <div className="space-y-1.5">
-                  {saleGroups.map((g) => (
+                  {visibleSaleGroups.map((g) => (
                     <div key={g.key} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
                       <div className="min-w-0">
                         <div className="truncate font-medium text-foreground">
                           {g.items.length === 1 ? g.items[0].product_name : `${g.items.length} productos`}
                         </div>
                         <div className="truncate text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground" data-testid="sale-ticket-number">Ticket #{ticketNumber(g.key)}</span>
+                          {" · "}
                           {new Date(g.created_at).toLocaleString("es-PY", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                           {" · "}
                           {g.items.length === 1
@@ -975,6 +1004,7 @@ export default function Products() {
                     </div>
                   ))}
                 </div>
+                </>
               )}
             </CardContent>
           </Card>

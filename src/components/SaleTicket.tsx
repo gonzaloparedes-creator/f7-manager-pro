@@ -1,7 +1,4 @@
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { formatMoney } from "@/lib/currency";
-import { warrantyDocumentLine } from "@/lib/deviceWarranty";
+import { buildTicketRows, rowFits, wrapTextToWidth, type TicketTextSize } from "@/lib/ticketRows";
 
 interface TicketLineItem {
   product_name: string;
@@ -46,24 +43,14 @@ function printableWidthMm(paperWidthMm: number): number {
   return Math.max(20, paperWidthMm - 8);
 }
 
+// El partido de líneas vive en ticketRows.ts (wrapTextToWidth) para poder probarlo:
+// la versión que había acá se comía la última línea de todo texto que se partía.
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (ctx.measureText(test).width > maxWidth && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = test;
-    }
-  }
-  return lines.length > 0 ? lines : current ? [current] : [""];
+  return wrapTextToWidth((t) => ctx.measureText(t).width, text, maxWidth);
 }
 
 type Block =
-  | { kind: "center"; text: string; font: string; height: number }
+  | { kind: "center"; lines: string[]; font: string; size: number; height: number }
   | { kind: "row"; left: string; right: string; font: string; height: number }
   | { kind: "lines"; lines: string[]; font: string; size: number; height: number }
   | { kind: "dashed"; height: number }
@@ -97,10 +84,6 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  const total = sale.items.reduce((s, i) => s + i.quantity * Number(i.unit_price || 0), 0);
-  const ticketNumber = sale.id.slice(-6).toUpperCase();
-  const dateLabel = format(new Date(sale.created_at), "dd/MM/yy HH:mm", { locale: es });
-
   const width = Math.round(widthMm * PX_PER_MM);
   const padding = Math.round(PADDING_MM * PX_PER_MM);
   const contentWidth = width - padding * 2;
@@ -117,11 +100,27 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
   ctx.textBaseline = "top";
 
   const blocks: Block[] = [];
+  // Centrado: un nombre de negocio largo se parte en varias líneas en vez de salirse
+  // por los dos lados del papel.
   const addCenter = (text: string, size: number) => {
-    blocks.push({ kind: "center", text, font: `bold ${size}px monospace`, height: size + lineGap });
+    const font = `bold ${size}px monospace`;
+    ctx.font = font;
+    const lines = wrapText(ctx, text, contentWidth);
+    blocks.push({ kind: "center", lines, font, size, height: lines.length * (size + lineGap) });
   };
+  // Dos textos en la misma línea (izquierda y derecha). Si juntos no entran en el ancho
+  // del papel, el de la derecha baja a la línea siguiente, alineado a la derecha: antes se
+  // dibujaban uno encima del otro y no se entendía ninguno de los dos.
   const addRow = (left: string, right: string, size: number) => {
-    blocks.push({ kind: "row", left, right, font: `bold ${size}px monospace`, height: size + lineGap });
+    const font = `bold ${size}px monospace`;
+    ctx.font = font;
+    const height = size + lineGap;
+    if (rowFits(ctx.measureText(left).width, ctx.measureText(right).width, contentWidth, size)) {
+      blocks.push({ kind: "row", left, right, font, height });
+      return;
+    }
+    blocks.push({ kind: "row", left, right: "", font, height });
+    blocks.push({ kind: "row", left: "", right, font, height });
   };
   const addWrapped = (text: string, size: number) => {
     const font = `bold ${size}px monospace`;
@@ -132,46 +131,20 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
   const addDashed = () => blocks.push({ kind: "dashed", height: Math.round(1.5 * PX_PER_MM) + sectionGap });
   const addGap = (mm: number) => blocks.push({ kind: "gap", height: Math.round(mm * PX_PER_MM) });
 
-  addCenter(shopName, fontHeader);
-  if (branchName) addCenter(branchName, fontSmall);
-  addCenter("Comprobante de venta", fontSmall);
-  addGap(1);
-  addDashed();
-  addRow(`Ticket #${ticketNumber}`, dateLabel, fontSmall);
-  const buyerName = sale.customer_name?.trim();
-  if (buyerName) addWrapped(`Cliente: ${buyerName}`, fontSmall);
-  addDashed();
-  let hasWarranty = false;
-  for (const item of sale.items) {
-    addWrapped(item.product_name, fontBody);
-    if (item.imei) addWrapped(`IMEI ${item.imei}`, fontSmall);
-    const warrantyLine = warrantyDocumentLine(sale.created_at, item.warranty_days);
-    if (warrantyLine) {
-      addWrapped(warrantyLine, fontSmall);
-      if (Number(item.warranty_days) > 0) hasWarranty = true;
-    }
-    addRow(`${item.quantity} x ${formatMoney(item.unit_price)}`, formatMoney(item.quantity * Number(item.unit_price || 0)), fontBody);
-    addGap(0.8);
+  // El contenido (qué dice cada fila) sale de buildTicketRows; acá solo se le da tamaño.
+  const fontSizes: Record<TicketTextSize, number> = {
+    header: fontHeader,
+    body: fontBody,
+    small: fontSmall,
+    total: fontTotal,
+  };
+  for (const row of buildTicketRows(sale, shopName, branchName)) {
+    if (row.kind === "center") addCenter(row.text, fontSizes[row.size]);
+    else if (row.kind === "text") addWrapped(row.text, fontSizes[row.size]);
+    else if (row.kind === "pair") addRow(row.left, row.right, fontSizes[row.size]);
+    else if (row.kind === "dashed") addDashed();
+    else addGap(row.mm);
   }
-  addDashed();
-  const tradeInValue = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in.value : 0;
-  const depositValue = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
-  if (tradeInValue > 0 || depositValue > 0) {
-    addRow("Subtotal", formatMoney(total), fontBody);
-    if (tradeInValue > 0 && sale.trade_in) {
-      addWrapped(`Equipo recibido: ${sale.trade_in.device_name}`, fontSmall);
-      addRow("Canje", `-${formatMoney(tradeInValue)}`, fontBody);
-    }
-    if (depositValue > 0) addRow("Seña abonada", `-${formatMoney(depositValue)}`, fontBody);
-    addRow("A PAGAR", formatMoney(Math.max(0, total - tradeInValue - depositValue)), fontTotal);
-  } else {
-    addRow("TOTAL", formatMoney(total), fontTotal);
-  }
-  addRow("Pago", sale.payment_method || "—", fontSmall);
-  addDashed();
-  if (hasWarranty) addWrapped("Conserve este ticket: es su comprobante de garantía.", fontSmall);
-  addCenter("¡Gracias por su compra!", fontSmall);
-  addGap(1);
 
   const totalHeight = padding * 2 + blocks.reduce((s, b) => s + b.height, 0);
   canvas.height = totalHeight; // limpia el canvas y resetea el estado del contexto
@@ -198,7 +171,7 @@ export function buildTicketImage(sale: TicketSale, options: TicketOptions = {}):
     ctx.font = block.font;
     if (block.kind === "center") {
       ctx.textAlign = "center";
-      ctx.fillText(block.text, width / 2, y);
+      block.lines.forEach((line, i) => ctx.fillText(line, width / 2, y + i * (block.size + lineGap)));
     } else if (block.kind === "row") {
       ctx.textAlign = "left";
       ctx.fillText(block.left, padding, y);

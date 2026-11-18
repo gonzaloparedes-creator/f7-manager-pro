@@ -4,6 +4,7 @@
 // mostrador tenga un único lugar donde revisar "¿este equipo tiene garantía?".
 
 import { WARRANTY_LEAD_DAYS, elapsedDays, formatDMY, warrantyExpiryDate } from "./postSale";
+import { ticketNumber } from "./ticketNumber";
 
 export const DEFAULT_DEVICE_WARRANTY_DAYS = 30;
 export const MAX_WARRANTY_DAYS = 3650;
@@ -149,7 +150,7 @@ export interface DeviceSaleRow {
 }
 
 export function entryFromDeviceSale(row: DeviceSaleRow): WarrantyEntry {
-  const ticket = (row.sale_group_id ?? row.id).slice(-6).toUpperCase();
+  const ticket = ticketNumber(row.sale_group_id ?? row.id);
   return {
     key: `venta-${row.id}`,
     source: "venta",

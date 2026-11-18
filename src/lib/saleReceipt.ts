@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatMoney } from "@/lib/currency";
 import { warrantyDocumentLine } from "@/lib/deviceWarranty";
+import { ticketNumber } from "@/lib/ticketNumber";
 import type { TicketSale } from "@/components/SaleTicket";
 
 export function saleTotal(sale: TicketSale): number {
@@ -47,7 +48,7 @@ export function buildSaleReceiptMessage(
   const hasWarranty = sale.items.some((i) => Number(i.warranty_days) > 0);
   return [
     `🧾 *Comprobante de venta — ${shop}*${branchName ? ` (${branchName})` : ""}`,
-    `Ticket #${sale.id.slice(-6).toUpperCase()} · ${date}`,
+    `Ticket #${ticketNumber(sale.id)} · ${date}`,
     "",
     ...lines,
     "",

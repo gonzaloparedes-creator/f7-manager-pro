@@ -61,7 +61,12 @@ export function currencySymbol(code: CurrencyCode = activeCurrency): string {
   return CURRENCIES[code].symbol;
 }
 
+// Solo el número con el agrupado de miles, sin el símbolo. Para lugares angostos
+// (tickets de 58 mm) donde la moneda se indica una sola vez, en el total.
+export function formatAmount(value: number | null | undefined): string {
+  return Number(value ?? 0).toLocaleString("es-PY");
+}
+
 export function formatMoney(value: number | null | undefined, code: CurrencyCode = activeCurrency): string {
-  const n = Number(value ?? 0);
-  return `${CURRENCIES[code].symbol} ${n.toLocaleString("es-PY")}`;
+  return `${CURRENCIES[code].symbol} ${formatAmount(value)}`;
 }
