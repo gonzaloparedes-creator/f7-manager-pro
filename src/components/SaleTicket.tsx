@@ -3,7 +3,10 @@ import { buildTicketRows, rowFits, wrapTextToWidth, type TicketTextSize } from "
 interface TicketLineItem {
   product_name: string;
   quantity: number;
+  /** Lo que se cobró por unidad (con el descuento del carrito ya repartido). */
   unit_price: number;
+  /** Precio por unidad antes del descuento; si falta, no hubo descuento (o es una venta anterior). */
+  unit_price_before_discount?: number | null;
   imei?: string | null;
   warranty_days?: number | null;
 }

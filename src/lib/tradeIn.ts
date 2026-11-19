@@ -63,6 +63,8 @@ export interface TradeInSaleLine {
   inventory_item_id: string;
   quantity: number;
   unit_price: number;
+  /** Precio por unidad antes del descuento del carrito; solo se manda si hubo descuento. */
+  unit_price_before_discount?: number | null;
   reservation_id?: string | null;
 }
 
@@ -92,6 +94,7 @@ export function buildTradeInSaleParams(args: {
       inventory_item_id: l.inventory_item_id,
       quantity: l.quantity,
       unit_price: l.unit_price,
+      ...(l.unit_price_before_discount != null ? { unit_price_before_discount: l.unit_price_before_discount } : {}),
       ...(l.reservation_id ? { reservation_id: l.reservation_id } : {}),
     })),
     trade_in: { ...args.draft.params, branch_id: null },

@@ -109,6 +109,92 @@ describe("buildTicketRows: productos", () => {
   });
 });
 
+// La misma venta, tal como se guarda hoy: cobrado (con el 40 % repartido) y precio de antes.
+const clientSaleWithDiscount = {
+  ...clientSale,
+  items: [
+    { product_name: "Glass 5d A07", quantity: 1, unit_price: 18000, unit_price_before_discount: 30000 },
+    { product_name: "Estuche Samsung A07", quantity: 1, unit_price: 12000, unit_price_before_discount: 20000 },
+    { product_name: "Estuche Note 13 pro", quantity: 1, unit_price: 12000, unit_price_before_discount: 20000 },
+    { product_name: "Glass 5d Redmi Note 13", quantity: 1, unit_price: 18000, unit_price_before_discount: 30000 },
+  ],
+};
+
+describe("buildTicketRows: venta con descuento", () => {
+  it("las líneas salen a precio de lista, el que el dueño ve en el catálogo", () => {
+    const itemPairs = pairs(buildTicketRows(clientSaleWithDiscount, "Servi Smart")).filter(([l]) => /^\d+ x /.test(l));
+    expect(itemPairs).toEqual([
+      ["1 x 30.000", "30.000"],
+      ["1 x 20.000", "20.000"],
+      ["1 x 20.000", "20.000"],
+      ["1 x 30.000", "30.000"],
+    ]);
+  });
+
+  it("muestra subtotal a lista, descuento aparte y el total que se cobró", () => {
+    const p = pairs(buildTicketRows(clientSaleWithDiscount, "Servi Smart"));
+    const labels = p.map(([l]) => l);
+    expect(p).toContainEqual(["Subtotal", "Gs. 100.000"]);
+    expect(p).toContainEqual(["Descuento", "-Gs. 40.000"]);
+    expect(p).toContainEqual(["TOTAL", "Gs. 60.000"]);
+    // en orden: subtotal, descuento, total
+    expect(labels.indexOf("Subtotal")).toBeLessThan(labels.indexOf("Descuento"));
+    expect(labels.indexOf("Descuento")).toBeLessThan(labels.indexOf("TOTAL"));
+  });
+
+  it("una venta sin el precio de antes sale como siempre: sin subtotal ni descuento", () => {
+    const p = pairs(buildTicketRows(clientSale, "Servi Smart"));
+    expect(p.some(([l]) => l === "Subtotal" || l === "Descuento")).toBe(false);
+    expect(p).toContainEqual(["TOTAL", "Gs. 60.000"]);
+  });
+
+  it("un precio de antes igual o menor al cobrado no inventa un descuento", () => {
+    const sale = { ...clientSale, items: [{ product_name: "Cable", quantity: 1, unit_price: 15000, unit_price_before_discount: 15000 }] };
+    const p = pairs(buildTicketRows(sale, "X"));
+    expect(p.some(([l]) => l === "Descuento")).toBe(false);
+    expect(p).toContainEqual(["TOTAL", "Gs. 15.000"]);
+  });
+
+  it("con descuento y canje: subtotal a lista, descuento, canje y lo que se paga", () => {
+    const sale = {
+      ...clientSale,
+      items: [{ product_name: "iPhone 14", quantity: 1, unit_price: 2700000, unit_price_before_discount: 3000000 }],
+      trade_in: { device_name: "iPhone 11", value: 1200000 },
+    };
+    const rows = buildTicketRows(sale, "X");
+    const p = pairs(rows);
+    expect(p).toEqual(
+      expect.arrayContaining([
+        ["1 x 3.000.000", "3.000.000"],
+        ["Subtotal", "Gs. 3.000.000"],
+        ["Descuento", "-Gs. 300.000"],
+        ["Canje", "-Gs. 1.200.000"],
+        ["A PAGAR", "Gs. 1.500.000"],
+      ])
+    );
+    expect(p.some(([l]) => l === "TOTAL")).toBe(false);
+  });
+
+  it("con descuento y seña de reserva: lo que se paga es lo cobrado menos la seña", () => {
+    const sale = { ...clientSaleWithDiscount, deposit: 10000 };
+    const p = pairs(buildTicketRows(sale, "X"));
+    expect(p).toEqual(
+      expect.arrayContaining([
+        ["Subtotal", "Gs. 100.000"],
+        ["Descuento", "-Gs. 40.000"],
+        ["Seña abonada", "-Gs. 10.000"],
+        ["A PAGAR", "Gs. 50.000"],
+      ])
+    );
+  });
+
+  it("lista menos descuento menos lo demás siempre da lo que se paga", () => {
+    const sale = { ...clientSaleWithDiscount, deposit: 10000, trade_in: { device_name: "X", value: 5000 } };
+    const p = Object.fromEntries(pairs(buildTicketRows(sale, "X")).map(([l, r]) => [l, Number(r.replace(/[^\d]/g, ""))]));
+    expect(p["Subtotal"] - p["Descuento"] - p["Canje"] - p["Seña abonada"]).toBe(p["A PAGAR"]);
+  });
+});
+
 describe("buildTicketRows: totales", () => {
   it("la venta del cliente suma 60.000 y paga en efectivo", () => {
     const rows = buildTicketRows(clientSale, "Servi Smart");

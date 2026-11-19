@@ -37,8 +37,18 @@ export type CompletedCartSale = {
   created_at: string;
   payment_method: string | null;
   branch_id: string | null;
-  /** `imei` y `warranty_days` solo vienen en las líneas de equipos. */
-  items: { product_name: string; quantity: number; unit_price: number; imei?: string | null; warranty_days?: number | null }[];
+  /**
+   * `imei` y `warranty_days` solo vienen en las líneas de equipos. `unit_price` es lo cobrado
+   * (con el descuento ya repartido); `unit_price_before_discount`, el precio de antes, solo si hubo descuento.
+   */
+  items: {
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    unit_price_before_discount?: number | null;
+    imei?: string | null;
+    warranty_days?: number | null;
+  }[];
   customer_name?: string | null;
   customer_phone?: string | null;
   /** Equipo que el cliente entregó como parte de pago; `record` es su comprobante de compra. */
@@ -111,6 +121,11 @@ export default function CartSheet({
   // Precio unitario con el descuento ya repartido: es lo que realmente se cobra y se registra.
   const finalPrice = (l: { unitPrice: number }) =>
     discountFraction > 0 ? Math.round(l.unitPrice * (1 - discountFraction)) : l.unitPrice;
+
+  // El precio que tenía la línea antes del descuento, solo si el descuento de verdad la rebajó.
+  // Se guarda junto a la venta para que el ticket muestre el precio de lista y el descuento
+  // aparte (lo cobrado sigue siendo unit_price: Reportes y Caja no cambian).
+  const priceBeforeDiscount = (l: { unitPrice: number }) => (finalPrice(l) < l.unitPrice ? l.unitPrice : null);
 
   // La seña de una reserva ya se cobró (y se contó en Caja) el día que se recibió:
   // acá solo se descuenta de lo que falta cobrar. El monto sale de la reserva
@@ -218,7 +233,7 @@ export default function CartSheet({
         : { warranty_days: null, customer_name: null, customer_phone: null };
 
       type InsertedRow = {
-        id: string; product_name: string; quantity: number; unit_price: number; payment_method: string | null;
+        id: string; product_name: string; quantity: number; unit_price: number; unit_price_before_discount?: number | null; payment_method: string | null;
         created_at: string; branch_id: string | null;
         imei: string | null; warranty_days: number | null; customer_name: string | null; customer_phone: string | null;
         reservation_deposit?: number | string | null;
@@ -235,7 +250,13 @@ export default function CartSheet({
           p: buildTradeInSaleParams({
             saleGroupId,
             paymentMethod,
-            lines: lines.map((l) => ({ inventory_item_id: l.id, quantity: l.quantity, unit_price: finalPrice(l), reservation_id: l.reservationId ?? null })),
+            lines: lines.map((l) => ({
+              inventory_item_id: l.id,
+              quantity: l.quantity,
+              unit_price: finalPrice(l),
+              unit_price_before_discount: priceBeforeDiscount(l),
+              reservation_id: l.reservationId ?? null,
+            })),
             draft: tradeIn,
             warranty,
           }),
@@ -275,6 +296,7 @@ export default function CartSheet({
           product_name: l.product.name,
           quantity: l.quantity,
           unit_price: finalPrice(l),
+          unit_price_before_discount: priceBeforeDiscount(l),
           unit_cost: l.product.cost_price,
           payment_method: paymentMethod,
           created_by: user.id,
@@ -285,7 +307,7 @@ export default function CartSheet({
         const { data, error } = await (supabase as any)
           .from("product_sales")
           .insert(rows)
-          .select("id, product_name, quantity, unit_price, payment_method, created_at, branch_id, imei, warranty_days, customer_name, customer_phone, reservation_deposit");
+          .select("id, product_name, quantity, unit_price, unit_price_before_discount, payment_method, created_at, branch_id, imei, warranty_days, customer_name, customer_phone, reservation_deposit");
         if (error) throw error;
         inserted = (data as InsertedRow[]) ?? [];
       }
@@ -301,6 +323,7 @@ export default function CartSheet({
           product_name: r.product_name,
           quantity: r.quantity,
           unit_price: r.unit_price,
+          unit_price_before_discount: r.unit_price_before_discount ?? null,
           imei: r.imei,
           warranty_days: r.warranty_days,
         })),

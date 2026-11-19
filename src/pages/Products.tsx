@@ -45,6 +45,7 @@ import CartSheet, { type Cart, type CompletedCartSale } from "@/components/CartS
 import QuantityStepper from "@/components/QuantityStepper";
 import { printTicket } from "@/components/SaleTicket";
 import { saleMatchesQuery, ticketNumber } from "@/lib/ticketNumber";
+import { discountOf } from "@/lib/saleDiscount";
 import EnviarReciboDialog from "@/components/EnviarReciboDialog";
 import WarrantyLookup from "@/components/WarrantyLookup";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -93,6 +94,8 @@ type Sale = {
   product_name: string;
   quantity: number;
   unit_price: number;
+  /** Precio por unidad antes del descuento del carrito; null si no hubo descuento (o es una venta anterior). */
+  unit_price_before_discount: number | null;
   payment_method: string | null;
   created_at: string;
   branch_id: string | null;
@@ -114,6 +117,8 @@ type SaleGroup = {
   branch_id: string | null;
   tradeInValue: number;
   depositValue: number;
+  /** Cuánto se rebajó respecto del precio de lista (0 si no hubo descuento). */
+  discountValue: number;
   customerName: string | null;
   customerPhone: string | null;
 };
@@ -249,6 +254,7 @@ export default function Products() {
       product_name: i.product_name,
       quantity: i.quantity,
       unit_price: i.unit_price,
+      unit_price_before_discount: i.unit_price_before_discount,
       imei: i.imei,
       warranty_days: i.warranty_days,
     })),
@@ -277,7 +283,7 @@ export default function Products() {
         .order("created_at", { ascending: false }),
       (supabase as any)
         .from("product_sales")
-        .select("id, product_name, quantity, unit_price, trade_in_value, reservation_deposit, payment_method, created_at, branch_id, sale_group_id, imei, warranty_days, customer_name, customer_phone")
+        .select("id, product_name, quantity, unit_price, unit_price_before_discount, trade_in_value, reservation_deposit, payment_method, created_at, branch_id, sale_group_id, imei, warranty_days, customer_name, customer_phone")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(RECENT_SALES_LIMIT),
@@ -525,6 +531,7 @@ export default function Products() {
         branch_id: groupItems[0].branch_id,
         tradeInValue: tradeInOfSale(groupItems),
         depositValue: depositOfSale(groupItems),
+        discountValue: discountOf(groupItems),
         customerName: groupItems.find((i) => i.customer_name)?.customer_name ?? null,
         customerPhone: groupItems.find((i) => i.customer_phone)?.customer_phone ?? null,
       }))
@@ -968,6 +975,11 @@ export default function Products() {
                             : g.items.map((i) => i.product_name).join(", ")}
                           {g.payment_method ? ` · ${g.payment_method}` : ""}
                         </div>
+                        {g.discountValue > 0 && (
+                          <div className="truncate text-xs text-primary" data-testid="sale-discount">
+                            Con descuento: -{formatMoney(g.discountValue)} · precio de lista {formatMoney(g.total + g.discountValue)}
+                          </div>
+                        )}
                         {g.tradeInValue > 0 && (
                           <div className="truncate text-xs text-primary">
                             Con canje: {tradeInDeviceName(g.key)} (-{formatMoney(g.tradeInValue)}) · cobrado {formatMoney(g.total - g.tradeInValue - g.depositValue)}

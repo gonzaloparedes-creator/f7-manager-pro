@@ -3,6 +3,7 @@ import { es } from "date-fns/locale";
 import { formatMoney } from "@/lib/currency";
 import { warrantyDocumentLine } from "@/lib/deviceWarranty";
 import { ticketNumber } from "@/lib/ticketNumber";
+import { discountOf, lineListPrice, listTotalOf } from "@/lib/saleDiscount";
 import type { TicketSale } from "@/components/SaleTicket";
 
 export function saleTotal(sale: TicketSale): number {
@@ -17,15 +18,17 @@ export function saleToPay(sale: TicketSale): number {
 }
 
 function totalLines(sale: TicketSale): string[] {
-  const total = saleTotal(sale);
+  const discount = discountOf(sale.items);
   const tradeIn = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in : null;
   const deposit = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
-  if (!tradeIn && !deposit) return [`*Total: ${formatMoney(total)}*`];
+  if (!tradeIn && !deposit && discount <= 0) return [`*Total: ${formatMoney(saleTotal(sale))}*`];
+  // Subtotal a precio de lista y de ahí se resta cada cosa: descuento, equipo recibido, seña.
   return [
-    `Subtotal: ${formatMoney(total)}`,
+    `Subtotal: ${formatMoney(listTotalOf(sale.items))}`,
+    ...(discount > 0 ? [`Descuento: -${formatMoney(discount)}`] : []),
     ...(tradeIn ? [`Equipo recibido (${tradeIn.device_name}): -${formatMoney(tradeIn.value)}`] : []),
     ...(deposit ? [`Seña ya abonada: -${formatMoney(deposit)}`] : []),
-    `*A pagar: ${formatMoney(saleToPay(sale))}*`,
+    `*${tradeIn || deposit ? "A pagar" : "Total"}: ${formatMoney(saleToPay(sale))}*`,
   ];
 }
 
@@ -40,7 +43,7 @@ export function buildSaleReceiptMessage(
   const lines = sale.items.flatMap((i) => {
     const warranty = warrantyDocumentLine(sale.created_at, i.warranty_days);
     return [
-      `• ${i.quantity} x ${i.product_name} — ${formatMoney(i.quantity * Number(i.unit_price || 0))}`,
+      `• ${i.quantity} x ${i.product_name} — ${formatMoney(i.quantity * lineListPrice(i))}`,
       ...(i.imei ? [`   IMEI: ${i.imei}`] : []),
       ...(warranty ? [`   ${warranty}`] : []),
     ];

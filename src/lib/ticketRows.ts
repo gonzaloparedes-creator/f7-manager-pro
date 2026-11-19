@@ -3,6 +3,7 @@ import { es } from "date-fns/locale";
 import { formatAmount, formatMoney } from "@/lib/currency";
 import { warrantyDocumentLine } from "@/lib/deviceWarranty";
 import { saleToPay, saleTotal } from "@/lib/saleReceipt";
+import { discountOf, lineListPrice, listTotalOf } from "@/lib/saleDiscount";
 import { ticketNumber } from "@/lib/ticketNumber";
 import type { TicketSale } from "@/components/SaleTicket";
 
@@ -98,9 +99,10 @@ export function buildTicketRows(sale: TicketSale, shopName: string, branchName?:
       rows.push({ kind: "text", text: warrantyLine, size: "small" });
       if (Number(item.warranty_days) > 0) hasWarranty = true;
     }
-    // Sin el símbolo de la moneda: repetido en cada precio ocupaba la mitad de la línea.
-    // La moneda figura una sola vez, en el total.
-    const unit = Number(item.unit_price || 0);
+    // A precio de lista (el que el dueño ve en el catálogo y en el carrito); el descuento, si
+    // lo hubo, se muestra aparte en los totales. Sin el símbolo de la moneda: repetido en cada
+    // precio ocupaba la mitad de la línea. La moneda figura una sola vez, en el total.
+    const unit = lineListPrice(item);
     rows.push({
       kind: "pair",
       left: `${item.quantity} x ${formatAmount(unit)}`,
@@ -111,19 +113,22 @@ export function buildTicketRows(sale: TicketSale, shopName: string, branchName?:
   }
   rows.push({ kind: "dashed" });
 
-  const total = saleTotal(sale);
+  const discount = discountOf(sale.items);
   const tradeInValue = sale.trade_in && sale.trade_in.value > 0 ? sale.trade_in.value : 0;
   const depositValue = sale.deposit && sale.deposit > 0 ? sale.deposit : 0;
-  if (tradeInValue > 0 || depositValue > 0) {
-    rows.push({ kind: "pair", left: "Subtotal", right: formatMoney(total), size: "body" });
+  const hasAdjustments = tradeInValue > 0 || depositValue > 0;
+  if (discount > 0 || hasAdjustments) {
+    // Subtotal a precio de lista, y de ahí se resta cada cosa: descuento, canje, seña.
+    rows.push({ kind: "pair", left: "Subtotal", right: formatMoney(listTotalOf(sale.items)), size: "body" });
+    if (discount > 0) rows.push({ kind: "pair", left: "Descuento", right: `-${formatMoney(discount)}`, size: "body" });
     if (tradeInValue > 0 && sale.trade_in) {
       rows.push({ kind: "text", text: `Equipo recibido: ${sale.trade_in.device_name}`, size: "small" });
       rows.push({ kind: "pair", left: "Canje", right: `-${formatMoney(tradeInValue)}`, size: "body" });
     }
     if (depositValue > 0) rows.push({ kind: "pair", left: "Seña abonada", right: `-${formatMoney(depositValue)}`, size: "body" });
-    rows.push({ kind: "pair", left: "A PAGAR", right: formatMoney(saleToPay(sale)), size: "total" });
+    rows.push({ kind: "pair", left: hasAdjustments ? "A PAGAR" : "TOTAL", right: formatMoney(saleToPay(sale)), size: "total" });
   } else {
-    rows.push({ kind: "pair", left: "TOTAL", right: formatMoney(total), size: "total" });
+    rows.push({ kind: "pair", left: "TOTAL", right: formatMoney(saleTotal(sale)), size: "total" });
   }
   rows.push({ kind: "pair", left: "Pago", right: sale.payment_method || "—", size: "small" });
   rows.push({ kind: "dashed" });

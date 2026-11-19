@@ -58,6 +58,51 @@ describe("buildSaleReceiptMessage", () => {
     expect(msg).not.toContain("Seña");
   });
 
+  describe("con descuento", () => {
+    const discounted = {
+      ...sale,
+      items: [
+        { product_name: "Glass 5d A07", quantity: 1, unit_price: 18000, unit_price_before_discount: 30000 },
+        { product_name: "Estuche Samsung A07", quantity: 1, unit_price: 12000, unit_price_before_discount: 20000 },
+      ],
+    };
+
+    it("muestra cada producto a precio de lista y el descuento aparte", () => {
+      const msg = buildSaleReceiptMessage(discounted, {});
+      expect(msg).toContain("• 1 x Glass 5d A07 — Gs. 30.000");
+      expect(msg).toContain("• 1 x Estuche Samsung A07 — Gs. 20.000");
+      expect(msg).toContain("Subtotal: Gs. 50.000");
+      expect(msg).toContain("Descuento: -Gs. 20.000");
+      expect(msg).toContain("*Total: Gs. 30.000*");
+    });
+
+    it("lo que se cobra sigue siendo el precio rebajado", () => {
+      expect(saleToPay(discounted)).toBe(30000);
+    });
+
+    it("sin descuento no escribe subtotal ni descuento", () => {
+      const msg = buildSaleReceiptMessage(sale, {});
+      expect(msg).not.toContain("Descuento");
+      expect(msg).not.toContain("Subtotal");
+    });
+
+    it("con descuento y canje: subtotal a lista, descuento, equipo recibido y lo que se paga", () => {
+      const msg = buildSaleReceiptMessage(
+        {
+          ...sale,
+          items: [{ product_name: "iPhone 14", quantity: 1, unit_price: 2700000, unit_price_before_discount: 3000000 }],
+          trade_in: { device_name: "iPhone 11", value: 1200000 },
+        },
+        {}
+      );
+      expect(msg).toContain("Subtotal: Gs. 3.000.000");
+      expect(msg).toContain("Descuento: -Gs. 300.000");
+      expect(msg).toContain("Equipo recibido (iPhone 11): -Gs. 1.200.000");
+      expect(msg).toContain("*A pagar: Gs. 1.500.000*");
+      expect(msg).not.toContain("*Total:");
+    });
+  });
+
   it("sin garantía registrada no escribe líneas de garantía ni IMEI", () => {
     const msg = buildSaleReceiptMessage(sale, {});
     expect(msg).not.toContain("IMEI");

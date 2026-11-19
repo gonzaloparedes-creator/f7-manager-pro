@@ -141,6 +141,32 @@ describe("buildTradeInSaleParams", () => {
     ]);
   });
 
+  it("manda el precio de antes del descuento solo en las líneas que lo traen", () => {
+    const form = {
+      ...emptyDevicePurchaseForm("branch-1"),
+      device_name: "iPhone 11",
+      imei: "356938035643809",
+      seller_name: "Ana",
+      seller_cedula: "1.234.567",
+      purchase_price: "500.000",
+    };
+    const params = buildTradeInSaleParams({
+      saleGroupId: "grp-1",
+      paymentMethod: "Efectivo",
+      lines: [
+        { inventory_item_id: "item-1", quantity: 1, unit_price: 2700000, unit_price_before_discount: 3000000 },
+        { inventory_item_id: "item-2", quantity: 2, unit_price: 50000, unit_price_before_discount: null },
+        { inventory_item_id: "item-3", quantity: 1, unit_price: 10000 },
+      ],
+      draft: { form, params: buildDevicePurchaseParams(form, []) },
+    });
+    expect(params.items).toEqual([
+      { inventory_item_id: "item-1", quantity: 1, unit_price: 2700000, unit_price_before_discount: 3000000 },
+      { inventory_item_id: "item-2", quantity: 2, unit_price: 50000 },
+      { inventory_item_id: "item-3", quantity: 1, unit_price: 10000 },
+    ]);
+  });
+
   it("incluye la garantía y los datos del comprador cuando se piden", () => {
     const form = {
       ...emptyDevicePurchaseForm("branch-1"),
